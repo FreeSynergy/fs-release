@@ -21,6 +21,20 @@ On macOS: open the app once, then System Settings > Privacy & Security > "Open A
 
 Licence: MIT OR Apache-2.0.
 
+## Verifying our releases
+
+All release files and packages are signed with OpenPGP (RFC 9580):
+
+- Key: `FreeSynergy Release <support@freesynergy.net>`, Ed25519, valid until 2029-11-05
+- Fingerprint: `C40F 0FBA 5C4C F71D 7BEB  B5C6 5478 A473 8FFE EB69`
+- Public key: [`release-signing-key.asc`](release-signing-key.asc)
+
+```sh
+gpg --import release-signing-key.asc
+gpg --verify capnp-compiler-<version>-linux-x86_64.tar.gz.asc capnp-compiler-<version>-linux-x86_64.tar.gz
+sha256sum -c SHA256SUMS.txt
+```
+
 ## Status (2026-11-06)
 
 First real run green on `FreeSynergy/fs-capnpc` (tag `v0.1.1-rc.5`, draft release, not public):
