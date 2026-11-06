@@ -36,18 +36,22 @@ make_tarball() {
     --mtime="@${SOURCE_DATE_EPOCH:-0}" -czf "$dist/$base.tar.gz" "$base"
 }
 
-make_deb() { cargo deb --no-build --target "$TRIPLE" "${pkg[@]}" --output "$dist/"; }
+make_deb() { cargo deb --no-build --target "$TRIPLE" ${pkg[@]+"${pkg[@]}"} --output "$dist/"; }
 
 make_rpm() {
-  local -a extra=()
-  if ! grep -q 'package.metadata.generate-rpm' Cargo.toml; then
-    local assets="" b
+  # cargo-generate-rpm can only overwrite an existing [package.metadata.generate-rpm] table, not create one.
+  # If the package has none, append it to the manifest of this CI checkout only (never committed).
+  local manifest b assets=""
+  manifest=$(cargo metadata --format-version 1 --no-deps \
+    | jq -r --arg b "${bins[0]}" '.packages[] | select(any(.targets[]; .name == $b and (.kind | index("bin")))) | .manifest_path' | head -n1)
+  [[ -n "$manifest" ]] || die "no package provides binary ${bins[0]}"
+  if ! grep -q 'package.metadata.generate-rpm' "$manifest"; then
     for b in "${bins[@]}"; do
       assets+="{ source = \"$(bin_path "$TRIPLE" "$b")\", dest = \"/usr/bin/$b\", mode = \"755\" }, "
     done
-    extra=(--set-metadata "assets = [${assets%, }]")
+    printf '\n[package.metadata.generate-rpm]\nassets = [%s]\n' "${assets%, }" >> "$manifest"
   fi
-  cargo generate-rpm --target "$TRIPLE" "${pkg[@]}" "${extra[@]}" --output "$dist/"
+  cargo generate-rpm --target "$TRIPLE" ${pkg[@]+"${pkg[@]}"} --output "$dist/"
 }
 
 make_appimage() {

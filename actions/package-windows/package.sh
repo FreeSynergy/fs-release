@@ -27,8 +27,8 @@ make_zip() { (cd "$RUNNER_TEMP/stage" && 7z a -tzip -mx=9 "$dist/$base.zip" "$ba
 
 make_msi() {
   command -v candle.exe >/dev/null || [[ -n "${WIX:-}" ]] || choco install wixtoolset -y --no-progress
-  [[ -f wix/main.wxs ]] || cargo wix init "${pkg[@]}"
-  cargo wix --no-build --nocapture --target "$TRIPLE" "${pkg[@]}" \
+  [[ -f wix/main.wxs ]] || cargo wix init ${pkg[@]+"${pkg[@]}"}
+  cargo wix --no-build --nocapture --target "$TRIPLE" ${pkg[@]+"${pkg[@]}"} \
     --install-version "$core" --output "$dist/$base.msi"
 }
 

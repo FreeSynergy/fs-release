@@ -27,7 +27,7 @@ cargo_build() {
   local triple=$1 b f
   local -a args=(build --release --locked --target "$triple")
   pkg=(); while IFS= read -r _l; do pkg+=("$_l"); done < <(cargo_pkg_args)   # bash 3.2 (macOS) has no mapfile
-  args+=("${pkg[@]}")
+  args+=(${pkg[@]+"${pkg[@]}"})
   for b in $(plan_get binaries | tr ',' ' '); do args+=(--bin "$b"); done
   f=$(plan_get features)
   [[ -n "$f" ]] && args+=(--features "$f")
