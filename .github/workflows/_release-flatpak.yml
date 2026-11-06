@@ -34,7 +34,9 @@ jobs:
           APP_ID: ${{ fromJSON(inputs.plan).app_id }}
           OUT: dist/${{ fromJSON(inputs.plan).name }}-${{ fromJSON(inputs.plan).version }}-linux-${{ matrix.arch }}.flatpak
         run: |
-          [ -n "$MANIFEST" ] && [ -n "$APP_ID" ] || { echo "::error::flatpak needs flatpak-manifest and app-id"; exit 1; }
+          if [ -z "$MANIFEST" ] || [ -z "$APP_ID" ]; then
+            echo "::error::flatpak needs flatpak-manifest and app-id"; exit 1
+          fi
           mkdir -p dist
           flatpak-builder --user --arch="$ARCH" --disable-rofiles-fuse --force-clean \
             --install-deps-from=flathub --repo=repo build-dir "$MANIFEST"
