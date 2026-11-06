@@ -51,7 +51,9 @@ make_rpm() {
     done
     printf '\n[package.metadata.generate-rpm]\nassets = [%s]\n' "${assets%, }" >> "$manifest"
   fi
-  cargo generate-rpm --target "$TRIPLE" ${pkg[@]+"${pkg[@]}"} --output "$dist/"
+  # RPM forbids '-' in versions; a SemVer pre-release becomes '~' (sorts before the release, e.g. 1.0~rc.1 < 1.0).
+  local v; v=$(plan_get version); v=${v/-/\~}
+  cargo generate-rpm --target "$TRIPLE" ${pkg[@]+"${pkg[@]}"} -s "version = \"$v\"" --output "$dist/"
 }
 
 make_appimage() {
