@@ -84,6 +84,11 @@ def main():
     owners = [p for p in chosen if any(t["name"] in binaries and "bin" in t["kind"] for t in p["targets"])]
     if not owners:
         fail(f"no cargo package provides the binaries {binaries}")
+    # Packaging tools (cargo-deb, cargo-wix, rpm) need these; fail here, not after 20 minutes of builds.
+    for p in owners:
+        missing = [k for k in ("authors", "description", "license", "repository") if not p.get(k)]
+        if missing:
+            fail(f"{p['name']}: Cargo.toml lacks {', '.join(missing)} (needed for deb/rpm/msi metadata)")
     if not any(p["version"] == version for p in owners):
         fail(f"tag version {version} differs from Cargo.toml ({', '.join(p['version'] for p in owners)})")
     owner = owners[0]

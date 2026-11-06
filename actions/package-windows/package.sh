@@ -12,7 +12,7 @@ dist=$(dist_dir)
 in_workdir
 base="$name-$version-windows-$ARCH"
 read -ra bins <<<"$(plan_get binaries | tr ',' ' ')"
-mapfile -t pkg < <(cargo_pkg_args)
+pkg=(); while IFS= read -r _l; do pkg+=("$_l"); done < <(cargo_pkg_args)   # bash 3.2 (macOS) has no mapfile
 
 group "build $TRIPLE"
 cargo_build "$TRIPLE"

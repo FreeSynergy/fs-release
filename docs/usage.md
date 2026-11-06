@@ -110,3 +110,10 @@ Inside fs-release, nested workflows and composite actions are referenced as `Fre
 ### Local checks
 
 `actionlint` and `shellcheck -x -S warning scripts/lib.sh actions/*/*.sh` (the `lint` workflow runs both).
+
+## Required package metadata
+
+The plan step fails early unless the package that owns the binaries declares `authors`, `description`,
+`license` and `repository` in `Cargo.toml` — `cargo-deb`, `cargo-wix` and the rpm builder need them.
+Declare `rust-version` too; the CI `msrv` input should match it.
+
