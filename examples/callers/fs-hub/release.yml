@@ -1,0 +1,31 @@
+# Copy to fs-hub/.github/workflows/release.yml
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  packages: write   # only needed when container-push is true
+
+jobs:
+  release:
+    uses: FreeSynergy/fs-release/.github/workflows/release.yml@main
+    with:
+      binaries: fs-hub
+      cargo-package: fs-hub          # workspace: fs-hub, fs-hub-client, fs-hub-proto
+      kind: daemon
+      app-id: net.freesynergy.Hub
+      description: FreeSynergy Hub daemon
+      windows-targets: ""            # a daemon: Linux and macOS only for now
+      # OCI image from the Linux binaries. Only exported as an archive into the draft release;
+      # set container-push: true (and container-image) to publish to ghcr.io.
+      container: true
+      containerfile: Containerfile
+      container-image: ghcr.io/freesynergy/fs-hub
+      container-push: false
+    secrets:
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
