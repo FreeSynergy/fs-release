@@ -20,3 +20,17 @@ On macOS: open the app once, then System Settings > Privacy & Security > "Open A
 | [examples/callers/](examples/callers/) | ready callers for fs-capnpc and fs-hub |
 
 Licence: MIT OR Apache-2.0.
+
+## Status (2026-11-06)
+
+First real run green on `FreeSynergy/fs-capnpc` (tag `v0.1.1-rc.5`, draft release, not public):
+`.tar.gz` (Linux x86_64/aarch64, macOS universal), `.deb` (amd64/arm64), `.rpm` (x86_64/aarch64),
+Arch `.pkg.tar.zst`, Windows `.msi` + `.zip`, SPDX SBOM, `SHA256SUMS.txt`. CI (`ci.yml`) green incl. MSRV.
+
+Lessons fixed on the way: callers must grant `packages: write`; macOS runs bash 3.2 (no `mapfile`, empty
+arrays under `set -u`); `cargo-deb`/`cargo-wix` need `authors`; `cargo-generate-rpm` needs an existing
+metadata table; RPM versions use `~` for SemVer pre-releases.
+
+Not yet exercised: OpenPGP signatures (no key yet), AppImage/`.exe`/`.dmg` (apps only), Flatpak,
+container, Android/iOS (with the first Blinc app).
+
