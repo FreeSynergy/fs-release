@@ -16,6 +16,6 @@ runs:
         config=deny.toml
         [[ -f "$config" ]] || config=$DEFAULT_CONFIG
         echo "cargo-deny policy: $config"
-        cargo deny check --config "$config" licenses bans sources
+        cargo deny --config "$config" check licenses bans sources
         # Advisories depend on a moving database: report, but do not block a release.
-        cargo deny check --config "$config" advisories || echo "::warning::cargo-deny reported advisories (see log)"
+        cargo deny --config "$config" check advisories || echo "::warning::cargo-deny reported advisories (see log)"

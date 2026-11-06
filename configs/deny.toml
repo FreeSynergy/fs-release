@@ -23,6 +23,7 @@ allow = [
     "BSL-1.0",
 ]
 confidence-threshold = 0.93
+unused-allowed-license = "allow"
 # Workspace members with `publish = false` and no licence are our own code.
 private = { ignore = true }
 
