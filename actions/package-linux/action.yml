@@ -1,0 +1,15 @@
+name: package-linux
+description: Build and package one Linux architecture - tar.gz, deb, rpm, AppImage (formats from the plan).
+inputs:
+  plan: { description: "JSON from actions/plan", required: true }
+  arch: { description: "x86_64 or aarch64", required: true }
+  triple: { description: "Rust target triple", required: true }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        PLAN: ${{ inputs.plan }}
+        ARCH: ${{ inputs.arch }}
+        TRIPLE: ${{ inputs.triple }}
+      run: '"$GITHUB_ACTION_PATH/package.sh"'

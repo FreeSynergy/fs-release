@@ -1,0 +1,31 @@
+# Internal: universal macOS (lipo), ad-hoc signed only - no Apple account, no notarisation.
+name: _release-macos
+on:
+  workflow_call:
+    inputs:
+      plan: { type: string, required: true }
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: macos universal
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+          working-directory: ${{ fromJSON(inputs.plan).workdir }}
+          cache-key: release-macos
+      - uses: FreeSynergy/fs-release/actions/package-macos@main
+        with:
+          plan: ${{ inputs.plan }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-macos-universal
+          path: dist/*
+          if-no-files-found: error

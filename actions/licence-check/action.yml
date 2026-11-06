@@ -1,0 +1,21 @@
+name: licence-check
+description: cargo-deny licence, ban and source check with the FreeSynergy default policy (configs/deny.toml) unless the repo has its own deny.toml.
+inputs:
+  working-directory: { description: "Cargo workspace", default: "." }
+runs:
+  using: composite
+  steps:
+    - uses: FreeSynergy/fs-release/actions/install-tools@main
+      with:
+        tools: cargo-deny
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        DEFAULT_CONFIG: ${{ github.action_path }}/../../configs/deny.toml
+      run: |
+        config=deny.toml
+        [[ -f "$config" ]] || config=$DEFAULT_CONFIG
+        echo "cargo-deny policy: $config"
+        cargo deny check --config "$config" licenses bans sources
+        # Advisories depend on a moving database: report, but do not block a release.
+        cargo deny check --config "$config" advisories || echo "::warning::cargo-deny reported advisories (see log)"

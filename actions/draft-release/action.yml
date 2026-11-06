@@ -1,0 +1,20 @@
+name: draft-release
+description: Create a draft GitHub release with all artefacts and generated notes. Never publishes.
+inputs:
+  tag: { description: "Release tag", required: true }
+  name: { description: "Release name prefix", required: true }
+  prerelease: { description: "true for SemVer pre-releases", default: "false" }
+  directory: { description: "Artefact directory", default: dist }
+  token: { description: "Token with contents write", required: true }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        NAME: ${{ inputs.name }}
+        PRERELEASE: ${{ inputs.prerelease }}
+        DIST: ${{ github.workspace }}/${{ inputs.directory }}
+        REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: '"$GITHUB_ACTION_PATH/draft.sh"'

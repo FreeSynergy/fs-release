@@ -1,0 +1,11 @@
+name: package-macos
+description: Universal macOS binaries (lipo of x86_64 and aarch64), ad-hoc signed, as tar.gz or dmg. No Apple account, no notarisation.
+inputs:
+  plan: { description: "JSON from actions/plan", required: true }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        PLAN: ${{ inputs.plan }}
+      run: '"$GITHUB_ACTION_PATH/package.sh"'

@@ -1,0 +1,46 @@
+# Internal: optional Flatpak bundle. The app repo owns the manifest (offline cargo sources included).
+name: _release-flatpak
+on:
+  workflow_call:
+    inputs:
+      plan: { type: string, required: true }
+      manifest: { type: string, required: true }
+      image: { type: string, default: "ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08" }
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: flatpak ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ${{ inputs.image }}
+      options: --privileged
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: aarch64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: flatpak-builder
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+          ARCH: ${{ matrix.arch }}
+          APP_ID: ${{ fromJSON(inputs.plan).app_id }}
+          OUT: dist/${{ fromJSON(inputs.plan).name }}-${{ fromJSON(inputs.plan).version }}-linux-${{ matrix.arch }}.flatpak
+        run: |
+          [ -n "$MANIFEST" ] && [ -n "$APP_ID" ] || { echo "::error::flatpak needs flatpak-manifest and app-id"; exit 1; }
+          mkdir -p dist
+          flatpak-builder --user --arch="$ARCH" --disable-rofiles-fuse --force-clean \
+            --install-deps-from=flathub --repo=repo build-dir "$MANIFEST"
+          flatpak build-bundle --arch="$ARCH" repo "$OUT" "$APP_ID"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-flatpak-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error

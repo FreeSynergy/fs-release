@@ -1,0 +1,55 @@
+# Internal: SBOM, signatures, checksums, provenance, DRAFT release. The only job that sees secrets.
+name: _release-finalize
+on:
+  workflow_call:
+    inputs:
+      plan: { type: string, required: true }
+      attest: { type: boolean, default: true }
+    secrets:
+      GPG_PRIVATE_KEY: { required: false }
+      GPG_PASSPHRASE: { required: false }
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - uses: FreeSynergy/fs-release/actions/sbom@main
+        with:
+          name: ${{ fromJSON(inputs.plan).name }}
+          version: ${{ fromJSON(inputs.plan).version }}
+          working-directory: ${{ fromJSON(inputs.plan).workdir }}
+      # Order matters: package signatures change the files, so they come before the checksums.
+      - uses: FreeSynergy/fs-release/actions/sign-files@main
+        with:
+          mode: packages
+          private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+      - uses: FreeSynergy/fs-release/actions/checksums@main
+      - uses: FreeSynergy/fs-release/actions/sign-files@main
+        with:
+          mode: detached
+          private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+      - if: inputs.attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - uses: FreeSynergy/fs-release/actions/draft-release@main
+        with:
+          tag: ${{ fromJSON(inputs.plan).tag }}
+          name: ${{ fromJSON(inputs.plan).name }}
+          prerelease: ${{ fromJSON(inputs.plan).prerelease }}
+          token: ${{ github.token }}

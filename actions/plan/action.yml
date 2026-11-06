@@ -1,0 +1,50 @@
+name: plan
+description: Validate the release tag (SemVer) and turn the caller inputs into one JSON plan.
+inputs:
+  tag: { description: "Release tag (default - the ref name)", default: "" }
+  name: { description: "Artefact base name", default: "" }
+  binaries: { description: "Comma separated binary names", required: true }
+  cargo-package: { description: "Cargo package (-p) for workspaces", default: "" }
+  working-directory: { description: "Directory of the Cargo workspace", default: "." }
+  features: { description: "Cargo features for release builds", default: "" }
+  kind: { description: "cli, daemon or app", default: "cli" }
+  app-id: { description: "Reverse-DNS application id", default: "" }
+  app-name: { description: "Human readable name", default: "" }
+  description: { description: "One-line description", default: "" }
+  linux-targets: { description: "x86_64,aarch64", default: "x86_64,aarch64" }
+  windows-targets: { description: "x86_64,aarch64 or empty", default: "x86_64" }
+  macos: { description: "Build the universal macOS artefact", default: "true" }
+  linux-formats: { description: "Override the formats for Linux", default: "" }
+  windows-formats: { description: "Override the formats for Windows", default: "" }
+  macos-formats: { description: "Override the formats for macOS", default: "" }
+outputs:
+  plan:
+    description: JSON plan consumed by every other job
+    value: ${{ steps.plan.outputs.plan }}
+  version:
+    description: Version without the leading v
+    value: ${{ steps.plan.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: plan
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        TAG: ${{ inputs.tag }}
+        NAME: ${{ inputs.name }}
+        BINARIES: ${{ inputs.binaries }}
+        CARGO_PACKAGE: ${{ inputs.cargo-package }}
+        WORKDIR: ${{ inputs.working-directory }}
+        FEATURES: ${{ inputs.features }}
+        KIND: ${{ inputs.kind }}
+        APP_ID: ${{ inputs.app-id }}
+        APP_NAME: ${{ inputs.app-name }}
+        DESCRIPTION: ${{ inputs.description }}
+        LINUX_TARGETS: ${{ inputs.linux-targets }}
+        WINDOWS_TARGETS: ${{ inputs.windows-targets }}
+        MACOS: ${{ inputs.macos }}
+        LINUX_FORMATS: ${{ inputs.linux-formats }}
+        WINDOWS_FORMATS: ${{ inputs.windows-formats }}
+        MACOS_FORMATS: ${{ inputs.macos-formats }}
+      run: python3 -I "$GITHUB_ACTION_PATH/plan.py"

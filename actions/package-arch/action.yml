@@ -1,0 +1,13 @@
+name: package-arch
+description: Arch Linux .pkg.tar.zst via makepkg, wrapping the already built linux x86_64 tar.gz. Run inside an archlinux container.
+inputs:
+  plan: { description: "JSON from actions/plan", required: true }
+  directory: { description: "Directory holding the tar.gz; the package is written there too", default: dist }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        PLAN: ${{ inputs.plan }}
+        DIR: ${{ inputs.directory }}
+      run: '"$GITHUB_ACTION_PATH/package.sh" "$GITHUB_WORKSPACE/$DIR"'

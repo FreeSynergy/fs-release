@@ -1,0 +1,17 @@
+name: sign-files
+description: OpenPGP signing, only when the key secret is present. Mode packages = deb/rpm + public key; detached = .asc per file.
+inputs:
+  mode: { description: "packages or detached", required: true }
+  directory: { description: "Artefact directory", default: dist }
+  private-key: { description: "ASCII-armoured secret key", default: "" }
+  passphrase: { description: "Key passphrase", default: "" }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GPG_PRIVATE_KEY: ${{ inputs.private-key }}
+        GPG_PASSPHRASE: ${{ inputs.passphrase }}
+        MODE: ${{ inputs.mode }}
+        DIR: ${{ inputs.directory }}
+      run: '"$GITHUB_ACTION_PATH/sign.sh" "$MODE" "$DIR"'

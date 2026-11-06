@@ -1,0 +1,15 @@
+name: package-windows
+description: Build and package one Windows architecture - zip, msi (cargo-wix), exe setup (NSIS). Unsigned.
+inputs:
+  plan: { description: "JSON from actions/plan", required: true }
+  arch: { description: "x86_64 or aarch64", required: true }
+  triple: { description: "Rust target triple", required: true }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        PLAN: ${{ inputs.plan }}
+        ARCH: ${{ inputs.arch }}
+        TRIPLE: ${{ inputs.triple }}
+      run: '"$GITHUB_ACTION_PATH/package.sh"'

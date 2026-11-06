@@ -1,0 +1,13 @@
+FreeSynergy software is not signed with an Apple Developer ID and is not
+notarised (we do not pay Apple to distribute free software). macOS will say
+the app "cannot be opened". This is a one-time step:
+
+  1. Try to open the app once (it is blocked).
+  2. System Settings > Privacy & Security > scroll down to "Security".
+  3. Click "Open Anyway" next to the app name and confirm.
+
+Command line tools: run once   xattr -d com.apple.quarantine <file>
+(or install them with tar, which does not set the quarantine flag).
+
+Check the download first: SHA256SUMS.txt and the .asc signatures next to it
+are signed with the FreeSynergy release key.

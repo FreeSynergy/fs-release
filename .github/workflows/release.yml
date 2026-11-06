@@ -1,0 +1,133 @@
+# Reusable release pipeline: plan -> platform jobs -> signed, attested DRAFT release. Usage: docs/usage.md
+name: release
+on:
+  workflow_call:
+    inputs:
+      binaries: { type: string, required: true, description: "Comma separated binary names" }
+      app-id: { type: string, default: "", description: "Reverse-DNS id, e.g. net.freesynergy.CapnpCompiler (AppImage, Flatpak, macOS bundle)" }
+      app-name: { type: string, default: "", description: "Human readable name (default - project name)" }
+      description: { type: string, default: "", description: "One line (default - Cargo description)" }
+      kind: { type: string, default: cli, description: "cli, daemon or app - selects the default formats" }
+      name: { type: string, default: "", description: "Artefact base name (default - Cargo package)" }
+      cargo-package: { type: string, default: "", description: "Cargo package (-p) in a workspace" }
+      working-directory: { type: string, default: ".", description: "Directory of the Cargo workspace" }
+      features: { type: string, default: "", description: "Cargo features for release builds" }
+      tag: { type: string, default: "", description: "Tag to release (default - the pushed tag)" }
+      linux-targets: { type: string, default: "x86_64,aarch64", description: "Subset of x86_64,aarch64; empty disables Linux" }
+      windows-targets: { type: string, default: "x86_64", description: "x86_64 and/or aarch64 (zip only); empty disables Windows" }
+      macos: { type: boolean, default: true, description: "Universal macOS build" }
+      linux-formats: { type: string, default: "", description: "Override: tar.gz,deb,rpm,appimage,arch" }
+      windows-formats: { type: string, default: "", description: "Override: zip,msi,exe" }
+      macos-formats: { type: string, default: "", description: "Override: tar.gz,dmg" }
+      apt-packages: { type: string, default: "", description: "System packages needed to build on Linux" }
+      flatpak: { type: boolean, default: false, description: "Build a Flatpak bundle (needs the manifest)" }
+      flatpak-manifest: { type: string, default: "", description: "Path of the Flatpak manifest" }
+      container: { type: boolean, default: false, description: "Build an OCI image from the Linux binaries" }
+      containerfile: { type: string, default: Containerfile, description: "Containerfile (build context holds amd64/ and arm64/)" }
+      container-image: { type: string, default: "", description: "Image name for pushing, e.g. ghcr.io/freesynergy/fs-hub" }
+      container-push: { type: boolean, default: false, description: "Push the image (public!) - default only exports an OCI archive" }
+      android: { type: boolean, default: false, description: "TODO - Android build (arrives with the first Blinc app)" }
+      ios: { type: boolean, default: false, description: "TODO - iOS build (build only)" }
+      attest: { type: boolean, default: true, description: "SLSA provenance (private repos need GitHub Enterprise)" }
+    secrets:
+      GPG_PRIVATE_KEY: { required: false, description: "ASCII-armoured OpenPGP secret key; unsigned without it" }
+      GPG_PASSPHRASE: { required: false, description: "Passphrase of that key" }
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: plan
+        uses: FreeSynergy/fs-release/actions/plan@main
+        with:
+          tag: ${{ inputs.tag }}
+          name: ${{ inputs.name }}
+          binaries: ${{ inputs.binaries }}
+          cargo-package: ${{ inputs.cargo-package }}
+          working-directory: ${{ inputs.working-directory }}
+          features: ${{ inputs.features }}
+          kind: ${{ inputs.kind }}
+          app-id: ${{ inputs.app-id }}
+          app-name: ${{ inputs.app-name }}
+          description: ${{ inputs.description }}
+          linux-targets: ${{ inputs.linux-targets }}
+          windows-targets: ${{ inputs.windows-targets }}
+          macos: ${{ inputs.macos }}
+          linux-formats: ${{ inputs.linux-formats }}
+          windows-formats: ${{ inputs.windows-formats }}
+          macos-formats: ${{ inputs.macos-formats }}
+
+  linux:
+    needs: plan
+    if: fromJSON(needs.plan.outputs.plan).has_linux
+    uses: FreeSynergy/fs-release/.github/workflows/_release-linux.yml@main
+    with:
+      plan: ${{ needs.plan.outputs.plan }}
+      apt-packages: ${{ inputs.apt-packages }}
+
+  windows:
+    needs: plan
+    if: fromJSON(needs.plan.outputs.plan).has_windows
+    uses: FreeSynergy/fs-release/.github/workflows/_release-windows.yml@main
+    with:
+      plan: ${{ needs.plan.outputs.plan }}
+
+  macos:
+    needs: plan
+    if: fromJSON(needs.plan.outputs.plan).has_macos
+    uses: FreeSynergy/fs-release/.github/workflows/_release-macos.yml@main
+    with:
+      plan: ${{ needs.plan.outputs.plan }}
+
+  flatpak:
+    needs: plan
+    if: inputs.flatpak
+    uses: FreeSynergy/fs-release/.github/workflows/_release-flatpak.yml@main
+    with:
+      plan: ${{ needs.plan.outputs.plan }}
+      manifest: ${{ inputs.flatpak-manifest }}
+
+  container:
+    needs: [plan, linux]
+    if: inputs.container
+    uses: FreeSynergy/fs-release/.github/workflows/_release-container.yml@main
+    permissions:
+      contents: read
+      packages: write
+    with:
+      plan: ${{ needs.plan.outputs.plan }}
+      containerfile: ${{ inputs.containerfile }}
+      image: ${{ inputs.container-image }}
+      push: ${{ inputs.container-push }}
+
+  mobile:
+    needs: plan
+    if: inputs.android || inputs.ios
+    uses: FreeSynergy/fs-release/.github/workflows/_release-mobile.yml@main
+    with:
+      plan: ${{ needs.plan.outputs.plan }}
+      android: ${{ inputs.android }}
+      ios: ${{ inputs.ios }}
+
+  finalize:
+    needs: [plan, linux, windows, macos, flatpak, container, mobile]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && !contains(needs.*.result, 'failure') }}
+    uses: FreeSynergy/fs-release/.github/workflows/_release-finalize.yml@main
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      plan: ${{ needs.plan.outputs.plan }}
+      attest: ${{ inputs.attest }}
+    secrets:
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}

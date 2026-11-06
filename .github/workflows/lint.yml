@@ -1,0 +1,24 @@
+# Lints fs-release itself: workflow syntax (actionlint, MIT) and shell scripts (shellcheck, GPL-3.0 - used as a CI tool only, never shipped).
+name: lint
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12 "$RUNNER_TEMP"
+          "$RUNNER_TEMP/actionlint" -color
+      - name: shellcheck
+        run: shellcheck -x -S warning scripts/lib.sh actions/*/*.sh
+      - name: python
+        run: python3 -I -m py_compile actions/plan/plan.py actions/package-linux/placeholder_icon.py

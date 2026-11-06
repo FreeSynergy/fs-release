@@ -1,0 +1,85 @@
+# Reusable CI for every FreeSynergy Rust repo. Usage: docs/usage.md
+name: ci
+on:
+  workflow_call:
+    inputs:
+      working-directory: { type: string, default: ".", description: "Directory of the Cargo workspace" }
+      features: { type: string, default: all, description: "all (--all-features), default (none) or a comma separated list" }
+      msrv: { type: string, default: "", description: "Optional minimum supported Rust version to verify, e.g. 1.88" }
+      apt-packages: { type: string, default: "", description: "System packages needed to build/test" }
+      runs-on: { type: string, default: ubuntu-24.04, description: "Runner label" }
+      rules: { type: boolean, default: true, description: "Run scripts/check_rust_rules.py from fs-documentation" }
+      rules-url: { type: string, default: "https://raw.githubusercontent.com/FreeSynergy/fs-documentation/main/scripts/check_rust_rules.py", description: "Where to fetch the rules checker" }
+      licences: { type: boolean, default: true, description: "Run cargo-deny" }
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  check:
+    runs-on: ${{ inputs.runs-on }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      FEATURE_FLAGS: ${{ inputs.features == 'all' && '--all-features' || (inputs.features == 'default' && '' || format('--features {0}', inputs.features)) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: System packages
+        if: inputs.apt-packages != ''
+        env:
+          PACKAGES: ${{ inputs.apt-packages }}
+        run: |
+          sudo apt-get update
+          # shellcheck disable=SC2086
+          sudo apt-get install -y --no-install-recommends $PACKAGES
+      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+        with:
+          components: rustfmt,clippy
+          working-directory: ${{ inputs.working-directory }}
+      # No --all: that would also check path dependencies of other repos (coding.md section 7).
+      - name: cargo fmt
+        run: cargo fmt --check
+      - name: cargo clippy
+        run: |
+          # shellcheck disable=SC2086
+          cargo clippy --all-targets $FEATURE_FLAGS -- -D warnings
+      - name: cargo test
+        run: |
+          # shellcheck disable=SC2086
+          cargo test $FEATURE_FLAGS
+      - name: FreeSynergy coding rules (ADR 0043)
+        if: inputs.rules
+        env:
+          RULES_URL: ${{ inputs.rules-url }}
+        run: |
+          curl -fsSL "$RULES_URL" -o "$RUNNER_TEMP/check_rust_rules.py"
+          python3 -I "$RUNNER_TEMP/check_rust_rules.py" "$PWD"
+      - name: Licences (cargo-deny)
+        if: inputs.licences
+        uses: FreeSynergy/fs-release/actions/licence-check@main
+        with:
+          working-directory: ${{ inputs.working-directory }}
+
+  msrv:
+    if: inputs.msrv != ''
+    runs-on: ${{ inputs.runs-on }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+        with:
+          toolchain: ${{ inputs.msrv }}
+          working-directory: ${{ inputs.working-directory }}
+          cache-key: msrv
+      - run: cargo check --all-targets --locked

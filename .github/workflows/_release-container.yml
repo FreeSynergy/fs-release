@@ -1,0 +1,78 @@
+# Internal: OCI image assembled from the already built Linux binaries (no compile under QEMU).
+# The caller's Containerfile uses COPY \${TARGETARCH}/<binary> ...; the build context holds amd64/ and arm64/.
+name: _release-container
+on:
+  workflow_call:
+    inputs:
+      plan: { type: string, required: true }
+      containerfile: { type: string, default: Containerfile }
+      image: { type: string, default: "" }
+      push: { type: boolean, default: false }
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: dist-linux-*
+          path: linux
+      - name: Build context from the tarballs
+        env:
+          NAME: ${{ fromJSON(inputs.plan).name }}
+          VERSION: ${{ fromJSON(inputs.plan).version }}
+        run: |
+          for pair in x86_64:amd64 aarch64:arm64; do
+            arch=${pair%%:*}; go=${pair##*:}
+            tarball="linux/dist-linux-$arch/$NAME-$VERSION-linux-$arch.tar.gz"
+            [ -f "$tarball" ] || continue
+            mkdir -p "ctx/$go"
+            tar -xzf "$tarball" -C "ctx/$go" --strip-components=1
+          done
+          ls -R ctx
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Platforms
+        id: platforms
+        run: |
+          p=""; [ -d ctx/amd64 ] && p="linux/amd64"; [ -d ctx/arm64 ] && p="${p:+$p,}linux/arm64"
+          echo "list=$p" >> "$GITHUB_OUTPUT"
+      - name: Export OCI archive
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ctx
+          file: ${{ inputs.containerfile }}
+          platforms: ${{ steps.platforms.outputs.list }}
+          outputs: type=oci,dest=${{ runner.temp }}/image.tar
+      - name: Name the archive
+        run: |
+          mkdir -p dist
+          mv "$RUNNER_TEMP/image.tar" "dist/${{ fromJSON(inputs.plan).name }}-${{ fromJSON(inputs.plan).version }}-oci.tar"
+      - if: inputs.push
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - if: inputs.push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ctx
+          file: ${{ inputs.containerfile }}
+          platforms: ${{ steps.platforms.outputs.list }}
+          push: true
+          tags: ${{ inputs.image }}:${{ fromJSON(inputs.plan).version }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-container
+          path: dist/*
+          if-no-files-found: error

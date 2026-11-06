@@ -1,0 +1,39 @@
+# Default cargo-deny policy for FreeSynergy repos (ADR 0015/0016).
+# A repo may ship its own deny.toml in its working directory; that one wins.
+# Licences are allow-listed: everything not listed (GPL, AGPL, LGPL, SSPL, BUSL,
+# proprietary, unlicensed ...) is rejected.
+
+[graph]
+all-features = true
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "MPL-2.0",
+    "CC0-1.0",
+    "0BSD",
+    "BSL-1.0",
+]
+confidence-threshold = 0.93
+# Workspace members with `publish = false` and no licence are our own code.
+private = { ignore = true }
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# ADR coding.md section 8: our own repos are consumed as git dependencies with tags.
+allow-org = { github = ["FreeSynergy"] }

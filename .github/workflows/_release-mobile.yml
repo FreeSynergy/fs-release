@@ -1,0 +1,41 @@
+# Internal: Android / iOS placeholders. Skipped unless the caller enables them.
+# TODO(first Blinc app): fill these in together with the app. The first Blinc program on
+# Android/iOS is also the test of Blinc's mobile support - problems go back to the Blinc author as PRs.
+name: _release-mobile
+on:
+  workflow_call:
+    inputs:
+      plan: { type: string, required: true }
+      android: { type: boolean, default: false }
+      ios: { type: boolean, default: false }
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    if: inputs.android
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: TODO Android
+        run: |
+          echo "::error::android build is not implemented yet (arrives with the first Blinc app)."
+          echo "Plan: cargo-ndk / Gradle -> unsigned release APK + reproducible build. F-Droid builds from source:"
+          echo "see docs/fdroid.md - an app repo must provide metadata, no proprietary deps, reproducible output."
+          exit 1
+
+  ios:
+    if: inputs.ios
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: TODO iOS
+        run: |
+          echo "::error::ios build is not implemented yet (arrives with the first Blinc app)."
+          echo "Plan: cargo build --target aarch64-apple-ios[-sim] -> .app, BUILD ONLY (no App Store, no Apple account)."
+          exit 1

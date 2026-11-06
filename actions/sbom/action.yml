@@ -1,0 +1,21 @@
+name: sbom
+description: SPDX 2.3 JSON software bill of materials from Cargo.lock (cargo-sbom, MIT).
+inputs:
+  name: { description: "Release name", required: true }
+  version: { description: "Release version", required: true }
+  working-directory: { description: "Cargo workspace", default: "." }
+  directory: { description: "Output directory", default: dist }
+runs:
+  using: composite
+  steps:
+    - uses: FreeSynergy/fs-release/actions/install-tools@main
+      with:
+        tools: cargo-sbom
+    - shell: bash
+      env:
+        OUT: ${{ github.workspace }}/${{ inputs.directory }}/${{ inputs.name }}-${{ inputs.version }}.spdx.json
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        mkdir -p "$(dirname "$OUT")"
+        cargo sbom --output-format spdx_json_2_3 > "$OUT"
+        jq -e '.spdxVersion' "$OUT"

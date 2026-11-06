@@ -1,0 +1,41 @@
+# Internal: Windows zip / msi / exe, unsigned (SignPath later).
+name: _release-windows
+on:
+  workflow_call:
+    inputs:
+      plan: { type: string, required: true }
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: windows ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.plan).windows_matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+        with:
+          targets: ${{ matrix.triple }}
+          working-directory: ${{ fromJSON(inputs.plan).workdir }}
+          cache-key: release-${{ matrix.arch }}
+      - if: contains(fromJSON(inputs.plan).windows_formats, 'msi') && matrix.arch == 'x86_64'
+        uses: FreeSynergy/fs-release/actions/install-tools@main
+        with:
+          tools: cargo-wix
+      - uses: FreeSynergy/fs-release/actions/package-windows@main
+        with:
+          plan: ${{ inputs.plan }}
+          arch: ${{ matrix.arch }}
+          triple: ${{ matrix.triple }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-windows-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
