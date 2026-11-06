@@ -53,6 +53,7 @@ permissions:
   contents: write
   id-token: write
   attestations: write
+  packages: write   # required by the optional container job (GitHub checks it even when skipped)
 jobs:
   release:
     uses: FreeSynergy/fs-release/.github/workflows/release.yml@v1
