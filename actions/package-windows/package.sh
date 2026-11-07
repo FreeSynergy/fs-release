@@ -12,7 +12,8 @@ dist=$(dist_dir)
 in_workdir
 base="$name-$version-windows-$ARCH"
 read -ra bins <<<"$(plan_get binaries | tr ',' ' ')"
-pkg=(); while IFS= read -r _l; do pkg+=("$_l"); done < <(cargo_pkg_args)   # bash 3.2 (macOS) has no mapfile
+groups=(); group_list   # one entry per cargo package: "<package>TAB<bin,bin>"
+sel=()
 
 group "build $TRIPLE"
 cargo_build "$TRIPLE"
@@ -25,11 +26,20 @@ copy_docs "$stage"
 
 make_zip() { (cd "$RUNNER_TEMP/stage" && 7z a -tzip -mx=9 "$dist/$base.zip" "$base" >/dev/null); }
 
+# One msi per cargo package group (cargo wix builds one package at a time). A single group keeps the plain name
+# "$base.msi"; several groups get "<package>-<version>-windows-<arch>.msi" so the files cannot clash.
 make_msi() {
+  local g p out dir sel
   command -v candle.exe >/dev/null || [[ -n "${WIX:-}" ]] || choco install wixtoolset -y --no-progress
-  [[ -f wix/main.wxs ]] || cargo wix init ${pkg[@]+"${pkg[@]}"}
-  cargo wix --no-build --nocapture --target "$TRIPLE" ${pkg[@]+"${pkg[@]}"} \
-    --install-version "$core" --output "$dist/$base.msi"
+  for g in "${groups[@]}"; do
+    p=${g%%$'\t'*}
+    if [[ ${#groups[@]} -eq 1 ]]; then out="$dist/$base.msi"; else out="$dist/$p-$version-windows-$ARCH.msi"; fi
+    sel=(); while IFS= read -r _l; do sel+=("$_l"); done < <(pkg_select "$p")
+    dir=$(pkg_dir "$p")
+    # wix/main.wxs lives in the package directory; an existing one (the app repo's own) is never overwritten.
+    [[ -f "$dir/wix/main.wxs" ]] || cargo wix init ${sel[@]+"${sel[@]}"}
+    cargo wix --no-build --nocapture --target "$TRIPLE" ${sel[@]+"${sel[@]}"} --install-version "$core" --output "$out"
+  done
 }
 
 make_exe() {

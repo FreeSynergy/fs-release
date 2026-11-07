@@ -112,6 +112,11 @@ in_workdir() { cd "${GITHUB_WORKSPACE:-.}/$(plan_get workdir)"; }
 
 dist_dir() { mkdir -p "${GITHUB_WORKSPACE:-$PWD}/dist"; printf '%s/dist\n' "${GITHUB_WORKSPACE:-$PWD}"; }
 
+# pkg_dir PKG -> absolute directory of the cargo package PKG.
+pkg_dir() {
+  cargo metadata --format-version 1 --no-deps | jq -r --arg p "$1" '[.packages[] | select(.name == $p) | .manifest_path | sub("/Cargo.toml$"; "")][0] // empty'
+}
+
 # --- Artefact file names (rule: see DESIGN.md "File names") ---
 # Every released file name uses only [A-Za-z0-9._-]. GitHub rewrites other characters on upload (rpm '~' becomes '.'), so
 # SHA256SUMS.txt would name files that do not exist under that name. We rename first, then hash.

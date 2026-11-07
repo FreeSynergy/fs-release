@@ -14,7 +14,7 @@
 
 - A binary of a workspace package under `crates/` that is not in `binaries` fails the plan (it would otherwise never be packaged). Opt out per binary or with `*` via the `ignore-binaries` input; there is no implicit default packaging.
 - A binary belongs to the cargo package that provides it (the plan's `cargo-package` wins when it provides it too).
-- One deb and one rpm per package; tar.gz, AppImage, Arch, zip, macOS stay one artefact with all binaries.
+- One deb, rpm and msi per package (a single-package repo keeps `<name>-<version>-windows-<arch>.msi`, several get `<package>-<version>-windows-<arch>.msi`; an existing `wix/main.wxs` of a package is kept); tar.gz, AppImage, Arch, zip, macOS stay one artefact with all binaries.
 - Single-package repos behave as before; `tests/golden/capnpc-*` pin plan JSON, commands and file names.
 - cargo-generate-rpm `-p` is a package *directory* relative to the workspace root, cargo-deb `-p` is a package *name*.
 
@@ -32,5 +32,5 @@
 ## State
 
 - Done: per-package build, deb, rpm; tests with stubs and a real `cargo generate-rpm` build.
-- Unsupported / not done: msi (`cargo wix`) still builds one package (`cargo-package`), see below; `cargo-deb` is not installed locally, so the real deb build is tested only in CI-like environments that have it.
-- msi, AppImage, Flatpak, Arch: unchanged. AppImage/Arch/zip/dmg bundle all binaries into one artefact on purpose; Flatpak builds from the app repo's manifest.
+- Unsupported / not done: `cargo-deb` is not installed locally, so the real deb build is tested only in CI-like environments that have it.
+- AppImage, Flatpak, Arch: unchanged. AppImage/Arch/zip/dmg bundle all binaries into one artefact on purpose; Flatpak builds from the app repo's manifest.

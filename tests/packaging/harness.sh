@@ -24,13 +24,16 @@ if [[ -n "\${STUB_EMIT:-}" && ( "\$1" == deb || "\$1" == generate-rpm ) ]]; then
   done
   if [[ -n "\$v" ]]; then : > "\$out/stub-\$v-1.x86_64.rpm"; else : > "\$out/stub_\$STUB_EMIT-1_amd64.deb"; fi
 fi
+if [[ "\$1" == wix && -n "\${STUB_EMIT:-}" ]]; then
+  while [[ \$# -gt 0 ]]; do case "\$1" in --output) : > "\$2" ;; esac; shift; done
+fi
 if [[ "\$1" == build ]]; then
   t=""; bins=()
   while [[ \$# -gt 0 ]]; do
     case "\$1" in --target) t=\$2; shift ;; --bin) bins+=("\$2"); shift ;; esac
     shift
   done
-  for b in "\${bins[@]}"; do mkdir -p "target/\$t/release"; : > "target/\$t/release/\$b"; done
+  for b in "\${bins[@]}"; do mkdir -p "target/\$t/release"; : > "target/\$t/release/\$b"; : > "target/\$t/release/\$b.exe"; done
 fi
 STUB
 printf '#!/usr/bin/env bash\nexit 0\n' > "$T/bin/strip"
