@@ -53,18 +53,42 @@ pkg_select() {
 # group_list -> fills the global array `groups` with the lines of package_groups (bash 3.2 safe, no mapfile).
 group_list() { groups=(); while IFS= read -r _l; do groups+=("$_l"); done < <(package_groups); }
 
+# pkg_features PKG -> the plan's `features` (comma/space separated) that PKG declares, comma joined ("" when none).
+# Entries containing '/' (cargo's "dep/feature" syntax) are passed through. cargo rejects `-p PKG --features X` when PKG
+# lacks X, so every package of a multi-package build gets only its own features; a feature no package declares fails
+# in cargo_features_check.
+pkg_features() {
+  cargo metadata --format-version 1 --no-deps | jq -r --arg p "$1" --arg f "$(plan_get features)" '
+    ([.packages[] | select(.name == $p) | .features | keys[]]) as $k
+    | [$f | split(",") | map(split(" ")) | add // [] | .[] | select(length > 0) | select(contains("/") or IN($k[]))] | join(",")'
+}
+
+# cargo_features_check -> fails early when a requested feature is declared by none of the packages in the plan's groups.
+cargo_features_check() {
+  local f g p all=""
+  local -a groups
+  [[ -n "$(plan_get features)" ]] || return 0
+  group_list
+  for g in "${groups[@]}"; do all+=",$(pkg_features "${g%%$'\t'*}")"; done
+  for f in $(plan_get features | tr ',' ' '); do
+    [[ "$f" == */* || ",$all," == *",$f,"* ]] || die "feature '$f' is declared by none of the packages being built"
+  done
+}
+
 # cargo_build TRIPLE -> release build, one cargo invocation per package group (a workspace may keep binaries in several packages).
+# Every invocation gets the plan's features that its package declares.
 cargo_build() {
   local triple=$1 g p bl b f sel
   local -a args groups
   group_list
-  f=$(plan_get features)
+  cargo_features_check
   for g in "${groups[@]}"; do
     p=${g%%$'\t'*} bl=${g#*$'\t'}
     args=(build --release --locked --target "$triple")
     sel=(); while IFS= read -r _l; do sel+=("$_l"); done < <(pkg_select "$p")
     args+=(${sel[@]+"${sel[@]}"})
     for b in ${bl//,/ }; do args+=(--bin "$b"); done
+    f=$(pkg_features "$p")
     [[ -n "$f" ]] && args+=(--features "$f")
     cargo "${args[@]}"
   done

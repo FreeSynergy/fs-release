@@ -23,9 +23,13 @@
 - Rule: each other character becomes `-` (rpm/deb `0.6.1~rc.2` -> file `...-0.6.1-rc.2-1.x86_64.rpm`). The version *inside* the package stays `0.6.1~rc.2` (needed for correct rpm/deb ordering); only the file name changes.
 - Implemented by `dist_normalise` / `dist_check` in `scripts/lib.sh`: `package-linux` normalises, the `checksums` action normalises again (SBOM etc.), checks, then hashes. Two files that would collide fail the run.
 
+## Features
+
+- The plan's `features` go to every `cargo build` (one per package) and to `cargo deb`, filtered to the features each package declares (`pkg_features`), because cargo rejects `-p PKG --features X` when PKG lacks X. `dep/feature` entries pass through.
+- A feature declared by no built package fails before the first build. `cargo generate-rpm`, `cargo wix --no-build`, tar/zip/dmg/AppImage/Arch reuse the already built binaries and need no features.
+
 ## State
 
 - Done: per-package build, deb, rpm; tests with stubs and a real `cargo generate-rpm` build.
-- Unsupported / not done: msi (`cargo wix`) still builds one package (`cargo-package`), see below; `features` is global;
-  `cargo-deb` is not installed locally, so the real deb build is tested only in CI-like environments that have it.
+- Unsupported / not done: msi (`cargo wix`) still builds one package (`cargo-package`), see below; `cargo-deb` is not installed locally, so the real deb build is tested only in CI-like environments that have it.
 - msi, AppImage, Flatpak, Arch: unchanged. AppImage/Arch/zip/dmg bundle all binaries into one artefact on purpose; Flatpak builds from the app repo's manifest.

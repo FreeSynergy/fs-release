@@ -8,7 +8,8 @@
 set -euo pipefail
 
 deb_package() {
-  local sel=(); while IFS= read -r _l; do sel+=("$_l"); done < <(pkg_select "$1")
+  local sel=() f; while IFS= read -r _l; do sel+=("$_l"); done < <(pkg_select "$1")
+  f=$(pkg_features "$1"); [[ -n "$f" ]] && sel+=(--features "$f")
   cargo deb --no-build --target "$2" ${sel[@]+"${sel[@]}"} --output "$3/"
 }
 
