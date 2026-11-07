@@ -22,6 +22,18 @@ has_format() {
 # cargo_args -> the package / feature selection shared by build and packaging tools.
 cargo_pkg_args() { local p; p=$(plan_get cargo_package); [[ -n "$p" ]] && printf -- '-p\n%s\n' "$p"; return 0; }
 
+# --- Package planning (pattern: Value object - a "group" is one cargo package plus the binaries it provides) ---
+# One group = one cargo package = one deb and one rpm. Contract:
+#   package_groups        stdout: one line per cargo package that provides requested binaries,
+#                         "<package>TAB<bin,bin,...>", in order of first appearance in the `binaries` plan field.
+#                         A binary is owned by the plan's cargo_package when that package provides it, otherwise by the
+#                         first workspace package that does. Needs $PLAN and the workspace as cwd.
+#                         Fails (non-zero, ::error::) when a requested binary has no owning package.
+#   pkg_select PKG        stdout: "-p" and PKG on two lines when the package must be named (cargo_package is set or the plan
+#                         has more than one group); nothing for a single-package repo without cargo_package (as before).
+package_groups() { die "package_groups: not implemented"; }
+pkg_select() { die "pkg_select: not implemented"; }
+
 # cargo_build TRIPLE -> release build of every requested binary.
 cargo_build() {
   local triple=$1 b f
