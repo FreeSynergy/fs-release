@@ -87,3 +87,28 @@ copy_docs() {
 in_workdir() { cd "${GITHUB_WORKSPACE:-.}/$(plan_get workdir)"; }
 
 dist_dir() { mkdir -p "${GITHUB_WORKSPACE:-$PWD}/dist"; printf '%s/dist\n' "${GITHUB_WORKSPACE:-$PWD}"; }
+
+# --- Artefact file names (rule: see DESIGN.md "File names") ---
+# Every released file name uses only [A-Za-z0-9._-]. GitHub rewrites other characters on upload (rpm '~' becomes '.'), so
+# SHA256SUMS.txt would name files that do not exist under that name. We rename first, then hash.
+# dist_normalise DIR  renames every file in DIR whose name has a character outside the set, each such character becomes '-'
+#                     (rpm "1.0~rc.1" -> "1.0-rc.1"). Fails when two files would collide. Package contents are not touched.
+# dist_check DIR      fails (::error::) when a file in DIR still has such a name.
+dist_normalise() {
+  local f n new
+  for f in "$1"/*; do
+    [[ -f "$f" ]] || continue
+    n=${f##*/}; new=$(printf '%s' "$n" | LC_ALL=C sed 's/[^A-Za-z0-9._-]/-/g')
+    [[ "$n" == "$new" ]] && continue
+    [[ ! -e "$1/$new" ]] || die "cannot rename $n to $new: target exists"
+    mv "$f" "$1/$new"
+  done
+}
+dist_check() {
+  local f bad=0
+  for f in "$1"/*; do
+    [[ -f "$f" ]] || continue
+    if printf '%s' "${f##*/}" | LC_ALL=C grep -q '[^A-Za-z0-9._-]'; then printf '::error::unsafe file name: %s\n' "${f##*/}"; bad=1; fi
+  done
+  return "$bad"
+}

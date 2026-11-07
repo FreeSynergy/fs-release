@@ -81,4 +81,5 @@ for f in tar.gz deb rpm appimage; do
   esac
   endgroup
 done
+dist_normalise "$dist"
 ls -l "$dist"

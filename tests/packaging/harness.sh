@@ -16,6 +16,14 @@ cat > "$T/bin/cargo" <<STUB
 #!/usr/bin/env bash
 if [[ "\$1" == metadata ]]; then exec "$REAL_CARGO" "\$@"; fi
 echo "cargo \$*" >> "\$STUB_LOG"
+if [[ -n "\${STUB_EMIT:-}" && ( "\$1" == deb || "\$1" == generate-rpm ) ]]; then
+  out=""; v=""
+  while [[ \$# -gt 0 ]]; do
+    case "\$1" in --output) out=\$2; shift ;; -s) v=\${2#*\"}; v=\${v%\"*}; shift ;; esac
+    shift
+  done
+  if [[ -n "\$v" ]]; then : > "\$out/stub-\$v-1.x86_64.rpm"; else : > "\$out/stub_\$STUB_EMIT-1_amd64.deb"; fi
+fi
 if [[ "\$1" == build ]]; then
   t=""; bins=()
   while [[ \$# -gt 0 ]]; do

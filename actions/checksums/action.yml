@@ -8,6 +8,10 @@ runs:
     - shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
+        # Names must be safe before hashing (see DESIGN.md "File names"); GitHub would rename the others and break this list.
+        source "$GITHUB_ACTION_PATH/../../scripts/lib.sh"
+        dist_normalise .
+        dist_check .
         # Detached signatures do not belong in the list; they sign it.
         find . -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' ! -name '*.asc' -printf '%P\n' \
           | LC_ALL=C sort | xargs -d '\n' sha256sum > SHA256SUMS.txt
