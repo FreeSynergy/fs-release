@@ -3,6 +3,7 @@
 Shared CI and release workflows for all FreeSynergy repositories: one way to build, check, package, sign and describe our software.
 
 - **CI** (`ci.yml`): fmt, clippy, tests, ADR 0043 rules checker, cargo-deny licence policy.
+- **Check** (`check.yml`): the strict push gate - fmt, clippy with `clippy::pedantic`, workspace tests, ADR 0043 rules checker; no secrets.
 - **Release** (`release.yml`): Linux (tar.gz, deb, rpm, AppImage, Arch, optional Flatpak), Windows (zip, msi, exe), macOS universal (tar.gz, dmg), optional OCI image,
   SPDX SBOM, SLSA provenance, SHA256SUMS and OpenPGP signatures, and a **draft** GitHub release (never published automatically).
   Android and iOS are placeholders until the first Blinc app.

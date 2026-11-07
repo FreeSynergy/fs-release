@@ -1,0 +1,50 @@
+# Reusable check gate for every FreeSynergy Rust repo, meant to run on every push. No secrets. Usage: docs/usage.md
+# Stricter than ci.yml (workspace-wide, clippy::pedantic); ci.yml additionally offers MSRV and cargo-deny.
+name: check
+on:
+  workflow_call:
+    inputs:
+      working-directory: { type: string, default: ".", description: "Directory of the Cargo workspace (and root for the rules checker)" }
+      apt-packages: { type: string, default: "", description: "System packages needed to build/test" }
+      runs-on: { type: string, default: ubuntu-24.04, description: "Runner label" }
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  check:
+    runs-on: ${{ inputs.runs-on }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: System packages
+        if: inputs.apt-packages != ''
+        env:
+          PACKAGES: ${{ inputs.apt-packages }}
+        run: |
+          sudo apt-get update
+          # shellcheck disable=SC2086
+          sudo apt-get install -y --no-install-recommends $PACKAGES
+      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+        with:
+          components: rustfmt,clippy
+          working-directory: ${{ inputs.working-directory }}
+          cache-key: check
+      - name: cargo fmt
+        run: cargo fmt --check
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+      - name: cargo test
+        run: cargo test --workspace --all-features
+      - name: FreeSynergy coding rules (ADR 0043)
+        uses: FreeSynergy/fs-release/actions/rust-rules@main
+        with:
+          working-directory: ${{ inputs.working-directory }}

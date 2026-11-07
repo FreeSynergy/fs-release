@@ -5,6 +5,7 @@ fs-release offers two reusable workflows. A repo adds two tiny caller files; eve
 | Workflow | Purpose |
 |----------|---------|
 | `.github/workflows/ci.yml` | fmt, clippy, tests, our coding rules (ADR 0043), licence check |
+| `.github/workflows/check.yml` | the push gate: fmt, clippy pedantic, tests, coding rules (below) |
 | `.github/workflows/release.yml` | plan, build per platform, SBOM, signatures, provenance, **draft** release |
 
 Internal building blocks (`_release-*.yml`, `actions/*`) are not meant to be called directly.
@@ -38,6 +39,19 @@ What runs, in order: `cargo fmt --check` (no `--all`, coding.md section 7), `car
 [`configs/deny.toml`](../configs/deny.toml) (allow-list MIT, Apache-2.0, BSD, ISC, Zlib, Unicode, MPL-2.0 ...;
 GPL/AGPL/LGPL/unknown are rejected) unless the repo has its own `deny.toml`. Advisories are reported as a warning only.
 The rules checker is downloaded without a token, so `fs-documentation` must be readable (public) or `rules-url` must point elsewhere.
+
+## Check (every push)
+
+`check.yml` is the strict gate. Copy [`examples/callers/check.yml`](../examples/callers/check.yml) to `.github/workflows/check.yml`
+of a repo; it runs on every push. It needs no secrets and only `contents: read`. In order:
+
+1. `cargo fmt --check`
+2. `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
+3. `cargo test --workspace --all-features`
+4. `python3 -I scripts/check_rust_rules.py <root>` (ADR 0043), taken from this repo at the same ref as the workflow (`actions/rust-rules`), no download
+
+Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`. Unlike `ci.yml` there is no MSRV or cargo-deny step
+and no feature selection: everything is checked with all features. Repos can run both.
 
 ## Release
 

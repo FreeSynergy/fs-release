@@ -1,0 +1,10 @@
+name: rust-rules
+description: Run scripts/check_rust_rules.py (ADR 0043) from this repo, at the same ref as the action. No network, no secrets.
+inputs:
+  working-directory: { description: "Root to check", default: "." }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../../scripts/check_rust_rules.py" "$PWD"
