@@ -1,0 +1,45 @@
+{
+  "app_id": "net.freesynergy.CapnpCompiler",
+  "app_name": "capnp-compiler",
+  "binaries": [
+    "capnp-compiler"
+  ],
+  "cargo_package": "",
+  "description": "Cap'n Proto schema compiler in Rust",
+  "features": "",
+  "has_arch": true,
+  "has_linux": true,
+  "has_macos": true,
+  "has_windows": true,
+  "homepage": "https://github.com/FreeSynergy/fs-capnpc",
+  "kind": "cli",
+  "license": "MIT OR Apache-2.0",
+  "linux_formats": "tar.gz,deb,rpm,arch",
+  "linux_matrix": [
+    {
+      "arch": "x86_64",
+      "runner": "ubuntu-24.04",
+      "triple": "x86_64-unknown-linux-gnu"
+    },
+    {
+      "arch": "aarch64",
+      "runner": "ubuntu-24.04-arm",
+      "triple": "aarch64-unknown-linux-gnu"
+    }
+  ],
+  "macos_formats": "tar.gz",
+  "name": "capnp-compiler",
+  "prerelease": false,
+  "tag": "v0.1.1",
+  "version": "0.1.1",
+  "version_core": "0.1.1",
+  "windows_formats": "zip,msi",
+  "windows_matrix": [
+    {
+      "arch": "x86_64",
+      "runner": "windows-2022",
+      "triple": "x86_64-pc-windows-msvc"
+    }
+  ],
+  "workdir": "."
+}
