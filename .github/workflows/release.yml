@@ -9,6 +9,7 @@ on:
       description: { type: string, default: "", description: "One line (default - Cargo description)" }
       kind: { type: string, default: cli, description: "cli, daemon or app - selects the default formats" }
       name: { type: string, default: "", description: "Artefact base name (default - Cargo package)" }
+      ignore-binaries: { type: string, default: "", description: "Binaries under crates/ that are deliberately not packaged (* = all)" }
       cargo-package: { type: string, default: "", description: "Cargo package (-p) in a workspace" }
       working-directory: { type: string, default: ".", description: "Directory of the Cargo workspace" }
       features: { type: string, default: "", description: "Cargo features for release builds" }
@@ -52,6 +53,7 @@ jobs:
           name: ${{ inputs.name }}
           binaries: ${{ inputs.binaries }}
           cargo-package: ${{ inputs.cargo-package }}
+          ignore-binaries: ${{ inputs.ignore-binaries }}
           working-directory: ${{ inputs.working-directory }}
           features: ${{ inputs.features }}
           kind: ${{ inputs.kind }}

@@ -12,6 +12,7 @@
 
 ## Rules
 
+- A binary of a workspace package under `crates/` that is not in `binaries` fails the plan (it would otherwise never be packaged). Opt out per binary or with `*` via the `ignore-binaries` input; there is no implicit default packaging.
 - A binary belongs to the cargo package that provides it (the plan's `cargo-package` wins when it provides it too).
 - One deb and one rpm per package; tar.gz, AppImage, Arch, zip, macOS stay one artefact with all binaries.
 - Single-package repos behave as before; `tests/golden/capnpc-*` pin plan JSON, commands and file names.

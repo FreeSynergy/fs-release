@@ -6,6 +6,7 @@ All values arrive as environment variables (see action.yml). Output: `plan` and
 """
 import json
 import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -94,6 +95,20 @@ def main():
             fail(f"no cargo package provides the binary '{b}'")
         owners += [p for p in extra[:1] if p not in owners]
         have.add(b)
+    # A binary under crates/ that is not in `binaries` would silently never be packaged: fail unless explicitly ignored.
+    ignore = set(csv(env("IGNORE_BINARIES")))
+    if "*" not in ignore:
+        root = pathlib.Path(json.loads(subprocess.run(
+            ["cargo", "metadata", "--format-version", "1", "--no-deps"],
+            cwd=workdir, check=True, capture_output=True, text=True).stdout)["workspace_root"])
+        loose = sorted(
+            f"{t['name']} ({p['name']})" for p in pkgs for t in p["targets"]
+            if "bin" in t["kind"] and t["name"] not in binaries and t["name"] not in ignore
+            and "crates" in pathlib.Path(p["manifest_path"]).relative_to(root).parts[:-1]
+        )
+        if loose:
+            fail(f"binaries under crates/ are not packaged: {', '.join(loose)}. Add them to 'binaries' "
+                 "or list them in 'ignore-binaries' (or '*') to skip them on purpose")
     # Packaging tools (cargo-deb, cargo-wix, rpm) need these; fail here, not after 20 minutes of builds.
     for p in owners:
         missing = [k for k in ("authors", "description", "license", "repository") if not p.get(k)]

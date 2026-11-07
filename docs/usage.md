@@ -78,6 +78,7 @@ Full examples: [`examples/callers/`](../examples/callers/) (fs-capnpc as CLI, fs
 | `app-id` | | reverse-DNS id; needed for AppImage, Flatpak, macOS bundle |
 | `app-name`, `description`, `name` | Cargo values | display name, one-liner, artefact base name |
 | `cargo-package` | | `-p` for workspaces; preferred owner of the binaries it provides (msi uses it too). Binaries of other packages are still built and packaged per their own package |
+| `ignore-binaries` | | binaries of workspace packages under `crates/` that are deliberately not packaged (`*` = all). Without it, such a binary missing from `binaries` fails the plan |
 | `working-directory`, `features` | `.`, | Cargo workspace dir, `--features` for release builds |
 | `linux-targets` | `x86_64,aarch64` | empty disables Linux |
 | `windows-targets` | `x86_64` | `aarch64` adds a zip only; empty disables Windows |
@@ -141,8 +142,8 @@ depends = "$auto, tasks-server"    # cargo-deb
 ```
 
 A package without a `generate-rpm` table gets a default one (its binaries to `/usr/bin`); a package with its own table is
-left untouched, so add `assets` there (the default is not merged in). Note: `features` is passed to every package build; a
-feature that a package does not have makes that build fail.
+left untouched, so add `assets` there (the default is not merged in). Note: `features` is passed to every package build, filtered to the
+features each package declares; a feature no package declares fails the plan run.
 
 ## Required package metadata
 

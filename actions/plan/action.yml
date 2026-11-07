@@ -4,6 +4,7 @@ inputs:
   tag: { description: "Release tag (default - the ref name)", default: "" }
   name: { description: "Artefact base name", default: "" }
   binaries: { description: "Comma separated binary names", required: true }
+  ignore-binaries: { description: "Binaries under crates/ that are deliberately not packaged (* = all)", default: "" }
   cargo-package: { description: "Cargo package (-p) for workspaces", default: "" }
   working-directory: { description: "Directory of the Cargo workspace", default: "." }
   features: { description: "Cargo features for release builds", default: "" }
@@ -34,6 +35,7 @@ runs:
         TAG: ${{ inputs.tag }}
         NAME: ${{ inputs.name }}
         BINARIES: ${{ inputs.binaries }}
+        IGNORE_BINARIES: ${{ inputs.ignore-binaries }}
         CARGO_PACKAGE: ${{ inputs.cargo-package }}
         WORKDIR: ${{ inputs.working-directory }}
         FEATURES: ${{ inputs.features }}
