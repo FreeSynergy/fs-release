@@ -13,6 +13,7 @@ On macOS: open the app once, then System Settings > Privacy & Security > "Open A
 | Doc | Content |
 |-----|---------|
 | [docs/usage.md](docs/usage.md) | calling the workflows, inputs, example callers |
+| [DESIGN.md](DESIGN.md) | pattern map of the packaging scripts, state |
 | [docs/signing.md](docs/signing.md) | OpenPGP key, secrets, verification |
 | [docs/formats.md](docs/formats.md) | formats, tools, licences, free vs paid |
 | [docs/standards.md](docs/standards.md) | OpenPGP, SPDX, SLSA, SemVer, Reproducible Builds |

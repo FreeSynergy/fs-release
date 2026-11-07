@@ -2,7 +2,8 @@
 
 Rule (ADR 0015/0016): everything we ship is free; tools we run in CI may have any OSS licence, nothing proprietary
 is ever part of a release. File names: `<name>-<version>-<os>-<arch>.<ext>`; deb, rpm and Arch packages keep the
-naming their package managers expect.
+naming their package managers expect. `.deb` and `.rpm` are built **per Cargo package that provides a binary** (a repo with an app
+package and a server package gets two of each; see [usage.md](usage.md)); every other format is one file with all binaries.
 
 | Platform | Format | Built with | Tool licence | Default for |
 |----------|--------|-----------|--------------|-------------|

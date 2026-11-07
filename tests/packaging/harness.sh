@@ -55,8 +55,10 @@ make_pkg() {
 make_plan() {
   local d=$1; shift
   : > "$T/out"
+  local rc=0
   (cd "$d" && env TAG=v0.1.1 LINUX_TARGETS=x86_64,aarch64 WINDOWS_TARGETS=x86_64 MACOS=true "$@" \
-    GITHUB_OUTPUT="$T/out" python3 -I "$ROOT/actions/plan/plan.py" >/dev/null)
+    GITHUB_OUTPUT="$T/out" python3 -I "$ROOT/actions/plan/plan.py" >/dev/null) || rc=$?
+  [[ $rc -eq 0 ]] || return "$rc"
   sed -n 's/^plan=//p' "$T/out" | jq -S .
 }
 

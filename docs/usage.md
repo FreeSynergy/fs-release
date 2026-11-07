@@ -77,7 +77,7 @@ Full examples: [`examples/callers/`](../examples/callers/) (fs-capnpc as CLI, fs
 | `kind` | `cli` | `cli`, `daemon`, `app`: selects default formats (below) |
 | `app-id` | | reverse-DNS id; needed for AppImage, Flatpak, macOS bundle |
 | `app-name`, `description`, `name` | Cargo values | display name, one-liner, artefact base name |
-| `cargo-package` | | `-p` for workspaces; also selects the package for deb/rpm/msi |
+| `cargo-package` | | `-p` for workspaces; preferred owner of the binaries it provides (msi uses it too). Binaries of other packages are still built and packaged per their own package |
 | `working-directory`, `features` | `.`, | Cargo workspace dir, `--features` for release builds |
 | `linux-targets` | `x86_64,aarch64` | empty disables Linux |
 | `windows-targets` | `x86_64` | `aarch64` adds a zip only; empty disables Windows |
@@ -109,11 +109,44 @@ Inside fs-release, nested workflows and composite actions are referenced as `Fre
 
 ### Local checks
 
-`actionlint` and `shellcheck -x -S warning scripts/lib.sh actions/*/*.sh` (the `lint` workflow runs both).
+`actionlint`, `shellcheck -x -S warning scripts/*.sh tests/packaging/*.sh actions/*/*.sh` and `scripts/test-packaging.sh`
+(run it under `limited.sh`; the `lint` workflow runs all three). The packaging tests run the real `plan.py` and `package.sh` on
+throwaway workspaces; the golden files in `tests/golden/` pin the output for the single-package fs-capnpc.
+
+## Workspaces with several binary packages (one deb and one rpm per package)
+
+`binaries` may list binaries that live in different Cargo packages, e.g. `binaries: fs-tasks-app,fs-tasks-server`
+with `fs-tasks-app` in package `tasks-app` and `fs-tasks-server` in `tasks-server`. fs-release then
+
+- builds each package on its own: `cargo build -p <package> --bin <binary>` (never one package for all binaries),
+- builds **one `.deb` and one `.rpm` per package** (`cargo deb -p`, `cargo generate-rpm -p <package dir>`), named by
+  the package manager's own rules (`tasks-app-<ver>-1.x86_64.rpm`, `tasks-server-<ver>-1.x86_64.rpm`),
+- keeps **one** `tar.gz`, AppImage, Arch package, zip and macOS artefact with all binaries, named after `name`
+  (set `name`, otherwise the first package's name is used).
+
+A repo with one package behaves exactly as before (no `-p`, same file names). Set `name` when a repo has several packages.
+
+**App depends on server.** fs-release does not invent dependencies; the app repo declares them in the manifest of the
+app package, where the rpm and the deb are described anyway:
+
+```toml
+# app/Cargo.toml
+[package.metadata.generate-rpm]
+assets = [{ source = "target/release/fs-tasks-app", dest = "/usr/bin/fs-tasks-app", mode = "755" }]
+[package.metadata.generate-rpm.requires]
+tasks-server = "*"                 # or ">= 0.1.0"
+
+[package.metadata.deb]
+depends = "$auto, tasks-server"    # cargo-deb
+```
+
+A package without a `generate-rpm` table gets a default one (its binaries to `/usr/bin`); a package with its own table is
+left untouched, so add `assets` there (the default is not merged in). Note: `features` is passed to every package build; a
+feature that a package does not have makes that build fail.
 
 ## Required package metadata
 
-The plan step fails early unless the package that owns the binaries declares `authors`, `description`,
+The plan step fails early unless every package that owns binaries declares `authors`, `description`,
 `license` and `repository` in `Cargo.toml` — `cargo-deb`, `cargo-wix` and the rpm builder need them.
 Declare `rust-version` too; the CI `msrv` input should match it.
 
