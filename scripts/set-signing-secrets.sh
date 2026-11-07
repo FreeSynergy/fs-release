@@ -31,7 +31,7 @@ die() { echo "error: $*" >&2; exit 1; }
 [ $# -ge 1 ] || die "name at least one repository, or 'all'"
 [ -f "$PASSFILE" ] || die "passphrase file $PASSFILE not found"
 [ "$(stat -c %a "$PASSFILE")" = 600 ] || die "$PASSFILE must have mode 600 (chmod 600 $PASSFILE)"
-command -v gpg >/dev/null && command -v gh >/dev/null && command -v curl >/dev/null || die "gpg, gh and curl are needed"
+for tool in gpg gh curl; do command -v "$tool" >/dev/null || die "$tool is needed"; done
 
 who=$(gh api user -q .login) || die "gh is not logged in (gh auth login)"
 [ "$who" = "$OWNER_ACCOUNT" ] || die "gh is logged in as '$who', not '$OWNER_ACCOUNT' (gh auth switch -u $OWNER_ACCOUNT)"
