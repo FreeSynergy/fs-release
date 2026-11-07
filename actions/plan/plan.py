@@ -84,6 +84,16 @@ def main():
     owners = [p for p in chosen if any(t["name"] in binaries and "bin" in t["kind"] for t in p["targets"])]
     if not owners:
         fail(f"no cargo package provides the binaries {binaries}")
+    # Binaries that cargo-package does not provide belong to other packages of the workspace (one deb/rpm per package).
+    have = {t["name"] for p in owners for t in p["targets"] if "bin" in t["kind"]}
+    for b in binaries:
+        if b in have:
+            continue
+        extra = [p for p in pkgs if any(t["name"] == b and "bin" in t["kind"] for t in p["targets"])]
+        if not extra:
+            fail(f"no cargo package provides the binary '{b}'")
+        owners += [p for p in extra[:1] if p not in owners]
+        have.add(b)
     # Packaging tools (cargo-deb, cargo-wix, rpm) need these; fail here, not after 20 minutes of builds.
     for p in owners:
         missing = [k for k in ("authors", "description", "license", "repository") if not p.get(k)]

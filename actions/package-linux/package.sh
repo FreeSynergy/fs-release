@@ -3,6 +3,8 @@
 set -euo pipefail
 # shellcheck source=../../scripts/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/lib.sh"
+# shellcheck source=../../scripts/linux-pkg.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/linux-pkg.sh"
 
 # Pinned appimagetool (MIT). Bump together with the checksums.
 APPIMAGETOOL_VERSION=1.9.1
@@ -16,7 +18,10 @@ dist=$(dist_dir)
 in_workdir
 base="$name-$version-linux-$ARCH"
 read -ra bins <<<"$(plan_get binaries | tr ',' ' ')"
-pkg=(); while IFS= read -r _l; do pkg+=("$_l"); done < <(cargo_pkg_args)   # bash 3.2 (macOS) has no mapfile
+groups=(); group_list   # one entry per cargo package: "<package>TAB<bin,bin>"
+
+# for_each_group FUNC -> FUNC PKG BINS, once per cargo package (deb and rpm are built per package).
+for_each_group() { local g; for g in "${groups[@]}"; do "$1" "${g%%$'\t'*}" "${g#*$'\t'}"; done; }
 
 group "build $TRIPLE"
 cargo_build "$TRIPLE"
@@ -36,25 +41,11 @@ make_tarball() {
     --mtime="@${SOURCE_DATE_EPOCH:-0}" -czf "$dist/$base.tar.gz" "$base"
 }
 
-make_deb() { cargo deb --no-build --target "$TRIPLE" ${pkg[@]+"${pkg[@]}"} --output "$dist/"; }
+make_deb() { for_each_group deb_one; }
+deb_one() { deb_package "$1" "$TRIPLE" "$dist"; }
 
-make_rpm() {
-  # cargo-generate-rpm can only overwrite an existing [package.metadata.generate-rpm] table, not create one.
-  # If the package has none, append it to the manifest of this CI checkout only (never committed).
-  local manifest b assets=""
-  manifest=$(cargo metadata --format-version 1 --no-deps \
-    | jq -r --arg b "${bins[0]}" '.packages[] | select(any(.targets[]; .name == $b and (.kind | index("bin")))) | .manifest_path' | head -n1)
-  [[ -n "$manifest" ]] || die "no package provides binary ${bins[0]}"
-  if ! grep -q 'package.metadata.generate-rpm' "$manifest"; then
-    for b in "${bins[@]}"; do
-      assets+="{ source = \"$(bin_path "$TRIPLE" "$b")\", dest = \"/usr/bin/$b\", mode = \"755\" }, "
-    done
-    printf '\n[package.metadata.generate-rpm]\nassets = [%s]\n' "${assets%, }" >> "$manifest"
-  fi
-  # RPM forbids '-' in versions; a SemVer pre-release becomes '~' (sorts before the release, e.g. 1.0~rc.1 < 1.0).
-  local v; v=$(plan_get version); v=${v/-/\~}
-  cargo generate-rpm --target "$TRIPLE" ${pkg[@]+"${pkg[@]}"} -s "version = \"$v\"" --output "$dist/"
-}
+make_rpm() { for_each_group rpm_one; }
+rpm_one() { rpm_package "$1" "$2" "$TRIPLE" "$dist"; }
 
 make_appimage() {
   local app_id app_name appdir main tool

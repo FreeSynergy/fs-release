@@ -38,10 +38,10 @@ for cp in "" "CARGO_PACKAGE=tasks-app"; do
   out=$(run_linux "$T3" "$plan" tar.gz,deb,rpm)
   l="[${cp:-no cargo-package}]"
   for p in "app:tasks-app:fs-tasks-app" "server:tasks-server:fs-tasks-server"; do
-    IFS=: read -r _ pk bn <<<"$p"
+    IFS=: read -r dir pk bn <<<"$p"
     check_has "$l build per package: $pk" "$out" "cargo build --release --locked --target $X -p $pk --bin $bn"
     check_has "$l deb per package: $pk" "$out" "cargo deb --no-build --target $X -p $pk --output @R@/dist/"
-    check_has "$l rpm per package: $pk" "$out" "cargo generate-rpm --target $X -p $pk -s version = \"0.1.1\" --output @R@/dist/"
+    check_has "$l rpm per package: $pk" "$out" "cargo generate-rpm --target $X -p $dir -s version = \"0.1.1\" --output @R@/dist/"
   done
   check_lacks "$l no build mixes both binaries" "$(grep '^cargo build' <<<"$out")" "--bin fs-tasks-app --bin fs-tasks-server"
   check_has "$l one tar.gz with the shared name" "$out" "fs-tasks-0.1.1-linux-x86_64.tar.gz"
@@ -53,3 +53,9 @@ for cp in "" "CARGO_PACKAGE=tasks-app"; do
   # restore the server manifest (the flow appends to it)
   make_pkg "$T3/server" tasks-server 0.1.1 fs-tasks-server
 done
+
+# --- plan.py: binaries outside cargo-package are accepted when another package provides them; unknown ones fail early
+if make_plan "$T3" BINARIES=fs-tasks-app,nope CARGO_PACKAGE=tasks-app >/dev/null 2>&1; then
+  fail "plan: unknown binary must fail"; else pass "plan: unknown binary fails"; fi
+check_has "plan: cargo-package + binary of the other package" \
+  "$(make_plan "$T3" BINARIES=fs-tasks-app,fs-tasks-server CARGO_PACKAGE=tasks-app NAME=fs-tasks | jq -r '.binaries | join(",")')" "fs-tasks-app,fs-tasks-server"

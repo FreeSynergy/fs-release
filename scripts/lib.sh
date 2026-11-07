@@ -31,19 +31,43 @@ cargo_pkg_args() { local p; p=$(plan_get cargo_package); [[ -n "$p" ]] && printf
 #                         Fails (non-zero, ::error::) when a requested binary has no owning package.
 #   pkg_select PKG        stdout: "-p" and PKG on two lines when the package must be named (cargo_package is set or the plan
 #                         has more than one group); nothing for a single-package repo without cargo_package (as before).
-package_groups() { die "package_groups: not implemented"; }
-pkg_select() { die "pkg_select: not implemented"; }
+package_groups() {
+  local out
+  out=$(cargo metadata --format-version 1 --no-deps | jq -r --arg bins "$(plan_get binaries)" --arg want "$(plan_get cargo_package)" '
+    .packages as $p
+    | reduce ($bins | split(",") | map(select(length > 0)))[] as $b ([];
+        ([$p[] | select(any(.targets[]; .name == $b and (.kind | index("bin"))))] | map(.name)) as $o
+        | (if ($o | index($want)) != null then $want else $o[0] end) as $owner
+        | if $owner == null then error("no cargo package provides binary " + $b)
+          elif any(.[]; .pkg == $owner) then map(if .pkg == $owner then .bins += [$b] else . end)
+          else . + [{pkg: $owner, bins: [$b]}] end)
+    | .[] | "\(.pkg)\t\(.bins | join(","))"') || die "cannot plan packages for binaries: $(plan_get binaries)"
+  printf '%s\n' "$out"
+}
 
-# cargo_build TRIPLE -> release build of every requested binary.
+pkg_select() {
+  if [[ -n "$(plan_get cargo_package)" || $(package_groups | wc -l) -gt 1 ]]; then printf -- '-p\n%s\n' "$1"; fi
+  return 0
+}
+
+# group_list -> fills the global array `groups` with the lines of package_groups (bash 3.2 safe, no mapfile).
+group_list() { groups=(); while IFS= read -r _l; do groups+=("$_l"); done < <(package_groups); }
+
+# cargo_build TRIPLE -> release build, one cargo invocation per package group (a workspace may keep binaries in several packages).
 cargo_build() {
-  local triple=$1 b f
-  local -a args=(build --release --locked --target "$triple")
-  pkg=(); while IFS= read -r _l; do pkg+=("$_l"); done < <(cargo_pkg_args)   # bash 3.2 (macOS) has no mapfile
-  args+=(${pkg[@]+"${pkg[@]}"})
-  for b in $(plan_get binaries | tr ',' ' '); do args+=(--bin "$b"); done
+  local triple=$1 g p bl b f sel
+  local -a args groups
+  group_list
   f=$(plan_get features)
-  [[ -n "$f" ]] && args+=(--features "$f")
-  cargo "${args[@]}"
+  for g in "${groups[@]}"; do
+    p=${g%%$'\t'*} bl=${g#*$'\t'}
+    args=(build --release --locked --target "$triple")
+    sel=(); while IFS= read -r _l; do sel+=("$_l"); done < <(pkg_select "$p")
+    args+=(${sel[@]+"${sel[@]}"})
+    for b in ${bl//,/ }; do args+=(--bin "$b"); done
+    [[ -n "$f" ]] && args+=(--features "$f")
+    cargo "${args[@]}"
+  done
 }
 
 # target_dir -> cargo's target directory (workspace aware).
