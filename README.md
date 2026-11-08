@@ -29,6 +29,7 @@ All release files and packages are signed with OpenPGP (RFC 9580):
 
 - Key: `FreeSynergy Release <support@freesynergy.net>`, Ed25519, valid until 2029-11-05
 - Fingerprint: `16A4 A3EE 563A EF51 FCF0  C55D ED7B 57C4 A190 4342` (since 2026-11-07, valid until 2029-11-07)
+- Signing subkey (used by the workflows, the primary key stays offline): `372A 583D 05BF 8362 604C  F25D E26A 2347 F2B1 C097` (valid until 2027-11-07). Secrets are set per repository with `scripts/set-signing-secrets.sh`.
 - The earlier key `C40F 0FBA 5C4C F71D 7BEB  B5C6 5478 A473 8FFE EB69` must not be trusted: an AI agent created it and knew its passphrase. It was revoked on 2026-11-07; the revocation is in `revoked-release-key-C40F0FBA.asc` and on keys.openpgp.org.
 - Public key: [`release-signing-key.asc`](release-signing-key.asc)
 
