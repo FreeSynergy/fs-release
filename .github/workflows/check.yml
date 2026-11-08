@@ -7,6 +7,7 @@ on:
       working-directory: { type: string, default: ".", description: "Directory of the Cargo workspace (and root for the rules checker)" }
       apt-packages: { type: string, default: "", description: "System packages needed to build/test" }
       runs-on: { type: string, default: ubuntu-24.04, description: "Runner label" }
+      test-env: { type: string, default: "", description: "Environment for the test step, one KEY=VALUE per line (for tests that need a tool the runner lacks and say so)" }
 
 permissions:
   contents: read
@@ -42,6 +43,11 @@ jobs:
         run: cargo fmt --check
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+      - name: Test environment
+        if: inputs.test-env != ''
+        env:
+          TEST_ENV: ${{ inputs.test-env }}
+        run: printf '%s\n' "$TEST_ENV" >> "$GITHUB_ENV"
       - name: cargo test
         run: cargo test --workspace --all-features
       - name: FreeSynergy coding rules (ADR 0043)
