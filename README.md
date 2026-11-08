@@ -79,7 +79,7 @@ sha256sum -c SHA256SUMS.txt
 
 ### Status (2026-11-06)
 
-First real run green on `FreeSynergy/fs-capnpc` (tag `v0.1.1-rc.5`, draft release, not public):
+First real run green on `FreeSynergy/fs-capnpc` (draft release, not public; version numbers count `0.0.N` since the reset, ADR 0064):
 `.tar.gz` (Linux x86_64/aarch64, macOS universal), `.deb` (amd64/arm64), `.rpm` (x86_64/aarch64),
 Arch `.pkg.tar.zst`, Windows `.msi` + `.zip`, SPDX SBOM, `SHA256SUMS.txt`. CI (`ci.yml`) green incl. MSRV.
 
