@@ -30,7 +30,7 @@ runs:
   steps:
     - id: plan
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
+      # no working-directory here: plan.py enters WORKDIR itself (a relative one would be applied twice)
       env:
         TAG: ${{ inputs.tag }}
         NAME: ${{ inputs.name }}
