@@ -31,20 +31,20 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+      - uses: FreeSynergy/fs-release/actions/setup-rust@thread-d-selftest
         with:
           targets: ${{ matrix.triple }}
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
           cache-key: release-${{ matrix.arch }}
       - if: contains(fromJSON(inputs.plan).linux_formats, 'deb')
-        uses: FreeSynergy/fs-release/actions/install-tools@main
+        uses: FreeSynergy/fs-release/actions/install-tools@thread-d-selftest
         with:
           tools: cargo-deb
       - if: contains(fromJSON(inputs.plan).linux_formats, 'rpm')
-        uses: FreeSynergy/fs-release/actions/install-tools@main
+        uses: FreeSynergy/fs-release/actions/install-tools@thread-d-selftest
         with:
           tools: cargo-generate-rpm
-      - uses: FreeSynergy/fs-release/actions/package-linux@main
+      - uses: FreeSynergy/fs-release/actions/package-linux@thread-d-selftest
         with:
           plan: ${{ inputs.plan }}
           arch: ${{ matrix.arch }}
@@ -68,7 +68,7 @@ jobs:
         with:
           name: dist-linux-x86_64
           path: dist
-      - uses: FreeSynergy/fs-release/actions/package-arch@main
+      - uses: FreeSynergy/fs-release/actions/package-arch@thread-d-selftest
         with:
           plan: ${{ inputs.plan }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -96,7 +96,7 @@ jobs:
         with:
           name: dist-linux-${{ matrix.entry.arch }}
           path: dist
-      - uses: FreeSynergy/fs-release/actions/smoke@main
+      - uses: FreeSynergy/fs-release/actions/smoke@thread-d-selftest
         with:
           plan: ${{ inputs.plan }}
           format: deb

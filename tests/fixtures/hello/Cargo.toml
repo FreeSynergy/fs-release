@@ -1,0 +1,12 @@
+[package]
+name = "fs-hello"
+version = "0.0.1"
+edition = "2021"
+authors = ["FreeSynergy <info@freesynergy.net>"]
+description = "Test program for the release smoke test"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/FreeSynergy/fs-release"
+
+[[bin]]
+name = "fs-hello"
+path = "src/main.rs"

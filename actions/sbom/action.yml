@@ -8,7 +8,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: FreeSynergy/fs-release/actions/install-tools@main
+    - uses: FreeSynergy/fs-release/actions/install-tools@thread-d-selftest
       with:
         tools: cargo-sbom
     - shell: bash

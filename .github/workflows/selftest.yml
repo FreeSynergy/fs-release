@@ -1,0 +1,32 @@
+name: selftest
+on:
+  push: { branches: [thread-d-selftest] }
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - id: plan
+        uses: FreeSynergy/fs-release/actions/plan@thread-d-selftest
+        with:
+          tag: v0.0.1
+          binaries: fs-hello
+          working-directory: tests/fixtures/hello
+          kind: app
+          app-id: net.freesynergy.Hello
+          macos: "false"
+          linux-targets: x86_64,aarch64
+          windows-targets: x86_64
+  linux:
+    needs: plan
+    uses: ./.github/workflows/_release-linux.yml
+    with: { plan: "${{ needs.plan.outputs.plan }}" }
+  windows:
+    needs: plan
+    uses: ./.github/workflows/_release-windows.yml
+    with: { plan: "${{ needs.plan.outputs.plan }}" }

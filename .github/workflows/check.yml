@@ -34,7 +34,7 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+      - uses: FreeSynergy/fs-release/actions/setup-rust@thread-d-selftest
         with:
           components: rustfmt,clippy
           working-directory: ${{ inputs.working-directory }}
@@ -51,6 +51,6 @@ jobs:
       - name: cargo test
         run: cargo test --workspace --all-features
       - name: FreeSynergy coding rules (ADR 0043)
-        uses: FreeSynergy/fs-release/actions/rust-rules@main
+        uses: FreeSynergy/fs-release/actions/rust-rules@thread-d-selftest
         with:
           working-directory: ${{ inputs.working-directory }}
