@@ -14,7 +14,7 @@ package and a server package gets two of each; see [usage.md](usage.md)); every 
 | | Arch `.pkg.tar.zst` | makepkg in an `archlinux` container (x86_64 only; built around our tar.gz) | GPL-2.0-or-later | all |
 | | Flatpak (optional) | flatpak-builder in the flathub-infra container | LGPL-2.1-or-later | opt-in; CLI tools may skip |
 | Windows x64 (aarch64: zip only) | `.zip` portable | 7-Zip | LGPL-2.1 | all |
-| | `.msi` | cargo-wix + WiX Toolset 3 | MIT OR Apache-2.0; MS-RL | `cli`, `app` |
+| | `.msi` | cargo-wix + WiX Toolset 3 | MIT OR Apache-2.0; MS-RL | all |
 | | `-setup.exe` | NSIS `makensis`, our `installer.nsi` | zlib/libpng | `app` |
 | macOS universal | `.tar.gz` | lipo + ad-hoc `codesign -s -` | Apple system tools on the runner | `cli`, `daemon` |
 | | `.dmg` | hdiutil (app bundle generated) | Apple system tool on the runner | `app` |
@@ -41,3 +41,10 @@ installs the tools above), Swatinem/rust-cache (MIT), actionlint (MIT), shellche
 - **Linux**: no payment needed. OpenPGP-signed packages and checksums are the trust path on every platform.
 - **iOS**: only built, never distributed (no Apple account). **Android**: via F-Droid, which signs the apps itself.
 - **GitHub Actions minutes** are free for public repositories, including the arm64 Linux and Windows runners.
+
+## Install test (smoke)
+
+Before the release draft exists, every package is installed on the system it is meant for and every binary is started once
+(`--version`, must exit 0; input `smoke-args`): `.deb` in `debian:13` and `ubuntu:24.04` containers (x86_64 and aarch64),
+Windows `.zip`, `.msi` (`msiexec /qn`) and `-setup.exe` (`/S`) on the Windows runner, each followed by the uninstall.
+A failure stops the run. Not covered yet: `.rpm` (no Fedora container test), Arch, AppImage, dmg.

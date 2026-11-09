@@ -8,6 +8,7 @@
 | `actions/plan/plan.py` | Facade | caller inputs in, one validated JSON plan out |
 | `scripts/lib.sh` `package_groups` | Value object | a group (cargo package + its binaries) is a plain `pkg<TAB>bin,bin` line, no behaviour |
 | `scripts/linux-pkg.sh` `deb_package`, `rpm_package` | Strategy | one function per native format, each builds ONE cargo package; the Template method calls it per group |
+| `actions/smoke/smoke.sh` | Strategy | one function per format (deb, zip, msi, exe): install like a person, start every binary, remove again |
 | `tests/packaging/` | none | test support |
 
 ## Rules
@@ -33,6 +34,7 @@
 
 - Done: per-package build, deb, rpm; tests with stubs and a real `cargo generate-rpm` build.
 - Unsupported / not done: `cargo-deb` is not installed locally, so the real deb build is tested only in CI-like environments that have it.
+- Smoke test (Thread D, 2026-11-10): `actions/smoke`, called from `_release-linux.yml` (job `smoke-deb`: `debian:13` and `ubuntu:24.04`, both architectures, `docker run` with the artefacts mounted) and `_release-windows.yml` (job `smoke`: zip, msi via `msiexec /qn`, `-setup.exe /S`, uninstall checked). Every binary is started with `smoke-args` (default `--version`) and must exit 0; a failure stops `finalize`, so no draft is created. Switch off with `smoke: false`. Tested here: the deb step in real `debian:13` and `ubuntu:24.04` containers (podman) with a hand-made deb, and the call/failure paths with stubs. **Not yet run on GitHub:** the Windows steps and the whole chain run for the first time in the first real release; arm64 Windows is smoke-tested as zip only (msi and exe are x86_64 only).
 - AppImage, Flatpak, Arch: unchanged. AppImage/Arch/zip/dmg bundle all binaries into one artefact on purpose; Flatpak builds from the app repo's manifest.
 
 * **One measure (2026-11-08, Strategy).** `scripts/gates.sh <root>` and `.github/workflows/check.yml` run exactly the same four checks: `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`, `cargo test --workspace --all-features`, `check_rust_rules.py`. Change both together; the local copy used by the threads is `/srv/FreeSynergy/.scratch/t5-gates/gates.sh` (a copy of this file).

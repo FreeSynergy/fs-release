@@ -1,0 +1,19 @@
+name: smoke
+description: Install the built packages on their own system, start every binary once, remove them again (deb in a container, zip/msi/exe on the Windows runner).
+inputs:
+  plan: { description: "JSON from actions/plan", required: true }
+  format: { description: "deb, zip, msi or exe", required: true }
+  directory: { description: "Directory with the downloaded artefacts of one platform and architecture", default: dist }
+  image: { description: "deb only - container image to install in, e.g. debian:13", default: "" }
+  args: { description: "Arguments for the start test of every binary", default: "--version" }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        PLAN: ${{ inputs.plan }}
+        FORMAT: ${{ inputs.format }}
+        DIST: ${{ github.workspace }}/${{ inputs.directory }}
+        IMAGE: ${{ inputs.image }}
+        SMOKE_ARGS: ${{ inputs.args }}
+      run: '"$GITHUB_ACTION_PATH/smoke.sh"'

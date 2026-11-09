@@ -4,6 +4,8 @@ on:
   workflow_call:
     inputs:
       plan: { type: string, required: true }
+      smoke: { type: boolean, default: true }
+      smoke-args: { type: string, default: "--version" }
 
 permissions:
   contents: read
@@ -39,3 +41,40 @@ jobs:
           name: dist-windows-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
+
+  # Install each package as a person would (unzip, msiexec, setup.exe /S), start each binary, uninstall it again.
+  smoke:
+    name: smoke ${{ matrix.arch }}
+    needs: build
+    if: inputs.smoke
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.plan).windows_matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-windows-${{ matrix.arch }}
+          path: dist
+      - if: contains(fromJSON(inputs.plan).windows_formats, 'zip')
+        uses: FreeSynergy/fs-release/actions/smoke@main
+        with:
+          plan: ${{ inputs.plan }}
+          format: zip
+          args: ${{ inputs.smoke-args }}
+      - if: contains(fromJSON(inputs.plan).windows_formats, 'msi') && matrix.arch == 'x86_64'
+        uses: FreeSynergy/fs-release/actions/smoke@main
+        with:
+          plan: ${{ inputs.plan }}
+          format: msi
+          args: ${{ inputs.smoke-args }}
+      - if: contains(fromJSON(inputs.plan).windows_formats, 'exe') && matrix.arch == 'x86_64'
+        uses: FreeSynergy/fs-release/actions/smoke@main
+        with:
+          plan: ${{ inputs.plan }}
+          format: exe
+          args: ${{ inputs.smoke-args }}

@@ -26,7 +26,7 @@ WINDOWS = {
 }
 DEFAULT_FORMATS = {
     "linux": {"app": "tar.gz,deb,rpm,appimage,arch", "cli": "tar.gz,deb,rpm,arch", "daemon": "tar.gz,deb,rpm,arch"},
-    "windows": {"app": "zip,msi,exe", "cli": "zip,msi", "daemon": "zip"},
+    "windows": {"app": "zip,msi,exe", "cli": "zip,msi", "daemon": "zip,msi"},
     "macos": {"app": "dmg", "cli": "tar.gz", "daemon": "tar.gz"},
 }
 

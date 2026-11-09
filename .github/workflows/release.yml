@@ -29,6 +29,8 @@ on:
       container-push: { type: boolean, default: false, description: "Push the image (public!) - default only exports an OCI archive" }
       android: { type: boolean, default: false, description: "TODO - Android build (arrives with the first Blinc app)" }
       ios: { type: boolean, default: false, description: "TODO - iOS build (build only)" }
+      smoke: { type: boolean, default: true, description: "Install each package on its system (Debian 13, Ubuntu 24.04, Windows) and start every binary; a failure stops the release" }
+      smoke-args: { type: string, default: "--version", description: "Arguments for that start test; the binary must exit 0" }
       attest: { type: boolean, default: true, description: "SLSA provenance (private repos need GitHub Enterprise)" }
     secrets:
       GPG_PRIVATE_KEY: { required: false, description: "ASCII-armoured OpenPGP secret key; unsigned without it" }
@@ -74,6 +76,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.plan }}
       apt-packages: ${{ inputs.apt-packages }}
+      smoke: ${{ inputs.smoke }}
+      smoke-args: ${{ inputs.smoke-args }}
 
   windows:
     needs: plan
@@ -81,6 +85,8 @@ jobs:
     uses: FreeSynergy/fs-release/.github/workflows/_release-windows.yml@main
     with:
       plan: ${{ needs.plan.outputs.plan }}
+      smoke: ${{ inputs.smoke }}
+      smoke-args: ${{ inputs.smoke-args }}
 
   macos:
     needs: plan

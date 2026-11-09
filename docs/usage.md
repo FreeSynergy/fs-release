@@ -98,6 +98,7 @@ Full examples: [`examples/callers/`](../examples/callers/) (fs-capnpc as CLI, fs
 | `windows-targets` | `x86_64` | `aarch64` adds a zip only; empty disables Windows |
 | `macos` | `true` | universal build |
 | `linux-formats`, `windows-formats`, `macos-formats` | by kind | override, see [formats.md](formats.md) |
+| `smoke`, `smoke-args` | `true`, `--version` | after the build, install every `.deb` in `debian:13` and `ubuntu:24.04` and the Windows packages (zip, msi, setup.exe) on the Windows runner, start each binary with `smoke-args` (must exit 0) and remove it again; a failure stops the release before the draft exists |
 | `apt-packages` | | build dependencies on Linux |
 | `flatpak`, `flatpak-manifest` | off | Flatpak bundle; the app repo owns the manifest |
 | `container`, `containerfile`, `container-image`, `container-push` | off | OCI image from the Linux binaries; push only when explicitly set |
