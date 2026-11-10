@@ -48,8 +48,8 @@ for cp in "" "CARGO_PACKAGE=tasks-app"; do
   [[ "$(sha256sum "$T3/app/Cargo.toml")" == "$app_sum" ]] && pass "$l app rpm metadata (own requires) untouched" || fail "$l app manifest changed"
   check_lacks "$l server default assets list only the server" \
     "$(grep -A1 'rpm metadata in server' <<<"$out" | tail -n1)" "fs-tasks-app"
-  tar -tzf "$T3/dist/fs-tasks-0.1.1-linux-x86_64.tar.gz" | sort | tr '\n' ' ' > "$T/tarlist"
-  check_has "$l tar.gz holds both binaries" "$(cat "$T/tarlist")" "fs-tasks-0.1.1-linux-x86_64/ fs-tasks-0.1.1-linux-x86_64/fs-tasks-app fs-tasks-0.1.1-linux-x86_64/fs-tasks-server fs-tasks-0.1.1-linux-x86_64/LICENSE-MIT "
+  tar -tzf "$T3/dist/fs-tasks-0.1.1-linux-x86_64.tar.gz" | LC_ALL=C sort | tr '\n' ' ' > "$T/tarlist"
+  check_has "$l tar.gz holds both binaries" "$(cat "$T/tarlist")" "fs-tasks-0.1.1-linux-x86_64/ fs-tasks-0.1.1-linux-x86_64/LICENSE-MIT fs-tasks-0.1.1-linux-x86_64/fs-tasks-app fs-tasks-0.1.1-linux-x86_64/fs-tasks-server "
   # restore the server manifest (the flow appends to it)
   make_pkg "$T3/server" tasks-server 0.1.1 fs-tasks-server
 done
