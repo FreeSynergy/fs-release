@@ -21,13 +21,16 @@ focus() {
   IFS=, read -r x y <<<"$TT_CLICK"
   c "move $x $y" 0.4; c "click $x $y" 1
 }
-[ -n "${TT_SCENARIO:-}" ] && . "$TT_SCENARIO"
+if [ -n "${TT_SCENARIO:-}" ]; then
+  # shellcheck disable=SC1090
+  . "$TT_SCENARIO"
+fi
 
 # Seconds the injector needs for a text (about 0.16 s per character) plus time for the last picture.
 wait_for() { awk -v n="${#1}" 'BEGIN { print n * 0.2 + 1.2 }'; }
 
 # Characters whose keys differ between layouts; "a" is the control. Shift: Ä. AltGr: the rest.
-CHARS=(a Ä ä ö ü ß @ € '{' '}' '[' ']' '\' '|' '~' µ)
+CHARS=(a Ä ä ö ü ß @ € '{' '}' '[' ']' "\\" '|' '~' µ)
 FULL='aÄäöüß@€{}[]\|~µ'
 LAT='Müller Wilhelm @ {x} [y] lilli ÄÖÜ äöüß 123'
 
@@ -52,4 +55,4 @@ stop_app
 
 c quit 0.3
 kill "$INJ" 2>/dev/null
-echo done > "$D/.session-done"
+echo ok > "$D/.session-done"
