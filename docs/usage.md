@@ -173,3 +173,6 @@ When `finalize` succeeds, `release.yml` runs `publish`: draft -> Pre-release, on
 `.asc` are attached; an already published release is left alone. It uses the repo's own `GITHUB_TOKEN` (callers already grant
 `contents: write`); no secret, nothing cross-repo. `dry-run: true` runs the guards only.
 The catalog is raised by fs-catalog itself, within 15 minutes (see DESIGN.md "Release to catalog").
+
+Recommendation: switch on "Immutable releases" (repo Settings, General) in every program repo, so a published release and its
+assets can never be changed or replaced, not even by an owner. Not switched on by this workflow; the repo owner does it.

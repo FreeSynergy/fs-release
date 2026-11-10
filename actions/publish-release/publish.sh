@@ -39,7 +39,7 @@ done <"$tmp/SHA256SUMS.txt"
 # every other asset is in the list
 while IFS= read -r a; do
   [[ "$a" == *.asc || "$a" == SHA256SUMS.txt ]] && continue
-  grep -qE "^[0-9a-f]{64} [ *]?${a//./\\.}\$" "$tmp/SHA256SUMS.txt" || fail "$a is attached but missing from SHA256SUMS.txt"
+  awk -v n="$a" '{ f = $2; sub(/^\*/, "", f); if (f == n) hit = 1 } END { exit !hit }' "$tmp/SHA256SUMS.txt" || fail "$a is attached but missing from SHA256SUMS.txt"
 done <<<"$names"
 grep -qxF SHA256SUMS.txt.asc <<<"$names" || fail "SHA256SUMS.txt has no detached signature"
 
