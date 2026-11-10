@@ -9,6 +9,8 @@
 | `scripts/lib.sh` `package_groups` | Value object | a group (cargo package + its binaries) is a plain `pkg<TAB>bin,bin` line, no behaviour |
 | `scripts/linux-pkg.sh` `deb_package`, `rpm_package` | Strategy | one function per native format, each builds ONE cargo package; the Template method calls it per group |
 | `actions/smoke/smoke.sh` | Strategy | one function per format (deb, zip, msi, exe): install like a person, start every binary, remove again |
+| `scripts/bump-components.sh` | Template method | per program repo the same steps: worktree, set the tag, `cargo update`, gates, push the branch |
+| `scripts/check_rust_rules.py` `check_blinc` | none | rule: no `blinc*` dependency and no blinc `[patch]` outside fs-components |
 | `tests/packaging/` | none | test support |
 
 ## Rules
@@ -52,3 +54,9 @@ Drafts and releases with missing files are skipped with a warning, never a red r
 
 Recommendation: switch on "Immutable releases" (repo Settings, General) in every program repo, so a published release and its
 assets can never be changed or replaced, not even by an owner. Not switched on by this workflow; the repo owner does it.
+
+## Blinc in one place
+
+- `scripts/bump-components.sh [--dry-run] <tag> [repo ...]` lives here and not in fs-components: it is release machinery over many repos (it uses `gates.sh`, the same measure as CI, which also lives here); fs-components is a library and must not know its dependants. It works in `.wt-bump-<repo>` worktrees from `origin/main`, sets the tag on every `fs-components*` git dependency, runs `cargo update -p` for those packages, `gates.sh`, and pushes the branch `bump-components-<tag>` only when green. Never a tag, never a merge; `--dry-run` stops before the push. Each repo runs in its own shell, so one red repo does not stop the others (exit 1 at the end).
+- Rule in `check_rust_rules.py`: every repo except the one with a crate `crates/fs-components` fails on a `blinc*` dependency (also renamed through `package =`, also `target.*`, dev and build tables) or a `[patch]` entry that names blinc. Cargo applies `[patch]` only at the top of a build, so such a line in a program is either redundant or a second, diverging pin.
+- Tests: `tests/packaging/rules.sh`, `tests/packaging/bump.sh` (a fake origin, stub gates).
