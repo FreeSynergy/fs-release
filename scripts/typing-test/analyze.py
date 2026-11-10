@@ -191,7 +191,7 @@ for n, text in enumerate(PARTS, 1):
     gap = None
     if os.path.exists(f"{out}/shots/full{n}.b.png"):
         ink_px = fc.ink(img, rect)
-        bar = fc.caret_bar(img, shot(f"full{n}.b"))
+        bar = fc.caret_bar(img, shot(f"full{n}.b")) or fc.caret_bar_single(img)
         if bar and ink_px:
             gap = bar[0] - rect[0] - max(x for x, _ in ink_px) - 1
     result["visible"][f"part{n}"]["caret_gap_px"] = gap

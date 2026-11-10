@@ -3,7 +3,7 @@
 
   fieldcheck.py window A.png          x0,y0,x1,y1 of everything that is not the black screen (exit 1: nothing there)
   fieldcheck.py rect A.png B.png      the text area of the focused field, found by its blinking caret (the narrow bar
-                                      that differs between two pictures); TT_NEAR=x,y picks the bar nearest to it
+                                      that differs between two pictures, else a narrow saturated-blue bar); TT_NEAR=x,y picks the bar nearest to it
   fieldcheck.py same A.png B.png      exit 0 if the field (TT_RECT) looks the same in both, a caret apart
   fieldcheck.py arrived A.png BLANK   exit 0 if the field shows a typed glyph instead of what BLANK showed
   fieldcheck.py caretx A.png B.png    x of the caret (column in the picture) from two pictures"""
@@ -83,6 +83,16 @@ def caret_bar(a, b, near=None):
     return found[0]
 
 
+def caret_bar_single(img, near=None):
+    """Fallback when the caret does not blink between two pictures: a narrow bar in a saturated blue."""
+    w, h = img.size
+    px = img.load()
+    found = bars({(x, y) for x in range(w) for y in range(h) if px[x, y][2] - px[x, y][0] > 100 and px[x, y][0] < 130})
+    if not found:
+        return None
+    return min(found, key=lambda t: abs(t[0] - near[0]) + abs(t[1] - near[1])) if near else found[0]
+
+
 def main():
     mode = sys.argv[1]
     if mode == "window":
@@ -97,15 +107,15 @@ def main():
         return 0
     if mode == "rect":
         near = tuple(int(v) for v in os.environ["TT_NEAR"].split(",")) if os.environ.get("TT_NEAR") else None
-        bar = caret_bar(load(sys.argv[2]), load(sys.argv[3]), near)
+        bar = caret_bar(load(sys.argv[2]), load(sys.argv[3]), near) or caret_bar_single(load(sys.argv[2]), near)
         if not bar:
             return 1
         cx, y0, y1 = bar
-        width = int(os.environ.get("TT_TEXT_WIDTH", "170"))
+        width = int(os.environ.get("TT_TEXT_WIDTH", "110"))
         print(f"{cx - 4},{y0 - 4},{cx + width},{y1 + 4}")
         return 0
     if mode == "caretx":
-        bar = caret_bar(load(sys.argv[2]), load(sys.argv[3]))
+        bar = caret_bar(load(sys.argv[2]), load(sys.argv[3])) or caret_bar_single(load(sys.argv[2]))
         if not bar:
             return 1
         print(bar[0])
