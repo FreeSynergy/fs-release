@@ -5,8 +5,7 @@
 set -uo pipefail
 D="$TT_OUT"
 export WAYLAND_DISPLAY=tt-probe
-IFS=$'\x1f' read -r -d '' -a APP_ARGS <<<"${TT_APP_ARGS:-}" || true
-[ "${#APP_ARGS[@]}" -gt 0 ] && [ -z "${APP_ARGS[-1]}" ] && unset 'APP_ARGS[-1]'
+mapfile -d $'\x1f' -t APP_ARGS < <(printf '%s' "${TT_APP_ARGS:-}")
 
 fifo="$D/.inject-in"; rm -f "$fifo"; mkfifo "$fifo"
 "$TT_INJECT" repl < "$fifo" >> "$D/inject.log" 2>&1 &

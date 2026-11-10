@@ -57,7 +57,8 @@ DESK
 
 SIZE="${TT_SIZE:-1280x800}"
 export TT_OUT="$OUT" TT_BIN="$BIN" TT_INJECT TT_LAYOUT="${TT_LAYOUT:-${LAYOUT:-de}}" TT_SIZE="$SIZE"
-TT_APP_ARGS="$(printf '%s\x1f' "$@")"
+TT_APP_ARGS=""
+for a in "$@"; do TT_APP_ARGS+="$a"$'\x1f'; done
 export TT_APP_ARGS
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 export XDG_DATA_DIRS="$OUT/.xdg:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
