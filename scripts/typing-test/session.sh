@@ -87,7 +87,8 @@ if [ "${TT_PHASE:-all}" != latency ]; then
   if [ -z "${TT_FIELD:-}" ]; then
     for _ in 1 2 3 4 5 6 7 8; do
       shot ca; sleep "0.$((RANDOM % 7 + 1))"; shot cb
-      if r="$(python3 -I "$TT_DIR/fieldcheck.py" rect "$D/shots/ca.png" "$D/shots/cb.png")"; then TT_RECT="$r"; export TT_RECT; break; fi
+      if r="$(python3 -I "$TT_DIR/fieldcheck.py" rect "$D/shots/ca.png" "$D/shots/cb.png" 2>> "$D/fieldcheck.log")"; then TT_RECT="$r"; export TT_RECT; break; fi
+      echo "no caret in pair near ${TT_NEAR:-?}" >> "$D/fieldcheck.log"
     done
   fi
   echo "$TT_RECT" > "$D/rect.txt"
