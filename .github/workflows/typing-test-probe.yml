@@ -8,7 +8,7 @@ on:
       max-ms: { description: "Limit for the median key-to-picture time in ms", default: "8" }
   push:
     branches: [q1b-typing-test]
-    paths: [".github/actions/typing-test/**", "scripts/typing-test*", "scripts/typing-test/**", ".github/workflows/typing-test-probe.yml"]
+    paths: ["actions/typing-test/**", "scripts/typing-test*", "scripts/typing-test/**", ".github/workflows/typing-test-probe.yml"]
 
 permissions:
   contents: read
@@ -48,9 +48,26 @@ jobs:
           name: form-binary
           path: components/target/release/examples/form
           retention-days: 1
-      - uses: ./release/.github/actions/typing-test
+      - uses: ./release/actions/typing-test
         with:
           app-binary: components/target/release/examples/form
-          click: "480,212"
+          click-in-window: "220,177"
           max-ms: ${{ inputs.max-ms || '8' }}
           name: fields-form
+      - name: Isolation of the test from the session
+        run: release/tests/typing-test/isolation.sh
+      - name: A wrong layout must turn the test red
+        id: wrong
+        continue-on-error: true
+        uses: ./release/actions/typing-test
+        with:
+          app-binary: components/target/release/examples/form
+          click-in-window: "220,177"
+          layout: us
+          install: "false"
+          name: fields-form-us
+      - name: The wrong layout was caught
+        if: steps.wrong.outcome != 'failure'
+        run: |
+          echo "the typing test passed with layout us: it does not check the characters" >&2
+          exit 1

@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Runs inside the virtual KWin (started by ../typing-test.sh): drives the app and takes the pictures.
-# Phase A types one character at a time and takes a picture of each; phase B types a text with the app's
-# Wayland trace switched on, for the key-to-picture time.
+# Phase A waits for the window, finds the field by its caret, types one character at a time and takes a picture of
+# each, then two parts of a text; phase B types a text with the app's Wayland trace switched on, for the
+# key-to-picture time. A scenario file may use c, shot, WX0/WY0 (the window's corner) and set TT_NEAR="x,y"
+# (a point in the field, for finding the caret).
 set -uo pipefail
 D="$TT_OUT"
-export WAYLAND_DISPLAY=tt-probe
+export WAYLAND_DISPLAY="${TT_SOCKET:-tt-probe}"
+WX0=0; WY0=0
 mapfile -d $'\x1f' -t APP_ARGS < <(printf '%s' "${TT_APP_ARGS:-}")
 
 fifo="$D/.inject-in"; rm -f "$fifo"; mkfifo "$fifo"
@@ -34,11 +37,32 @@ shot_stable() {
   done
 }
 
-start_app() { "$TT_BIN" "${APP_ARGS[@]}" > "$D/app-$1.log" 2>&1 & APP=$!; sleep "${TT_SETTLE:-7}"; }
+start_app() { "$TT_BIN" "${APP_ARGS[@]}" > "$D/app-$1.log" 2>&1 & APP=$!; sleep "${2:-${TT_SETTLE:-7}}"; }
 stop_app() { kill "$APP" 2>/dev/null; wait "$APP" 2>/dev/null; true; }
+# The click point is absolute (TT_CLICK) or relative to the window's corner (TT_CLICK_REL), which does not depend on
+# where this KWin places the window.
 focus() {
-  IFS=, read -r x y <<<"$TT_CLICK"
+  local x y
+  if [ -n "${TT_CLICK_REL:-}" ]; then
+    IFS=, read -r x y <<<"$TT_CLICK_REL"; x=$((WX0 + x)); y=$((WY0 + y))
+  else
+    IFS=, read -r x y <<<"$TT_CLICK"
+  fi
+  TT_NEAR="$x,$y"; export TT_NEAR
   c "move $x $y" 0.4; c "click $x $y" 1
+}
+# Wait until the app's window is on the screen and has stopped moving; sets WX0, WY0.
+wait_window() {
+  local prev="" cur name="${1:-blank0}"
+  for _ in $(seq 1 $((${TT_SETTLE:-30} * 2))); do
+    shot "$name"
+    if cur="$(python3 -I "$TT_DIR/fieldcheck.py" window "$D/shots/$name.png")"; then
+      [ "$cur" = "$prev" ] && { IFS=, read -r WX0 WY0 _ <<<"$cur"; sleep 1; return 0; }
+      prev="$cur"
+    fi
+    sleep 0.5
+  done
+  return 1
 }
 if [ -n "${TT_SCENARIO:-}" ]; then
   # shellcheck disable=SC1090
@@ -50,40 +74,64 @@ wait_for() { awk -v n="${#1}" 'BEGIN { print n * 0.2 + 1.2 }'; }
 
 # Characters whose keys differ between layouts; "a" is the control. Shift: Ä. AltGr: the rest.
 CHARS=(a Ä ä ö ü ß @ € '{' '}' '[' ']' "\\" '|' '~' µ)
-FULL='aÄäöüß@€{}[]\|~µ'
+PARTS=('aÄäöüß@€' '{}[]\|~µ')  # eight characters each
 LAT='Müller Wilhelm @ {x} [y] lilli ÄÖÜ äöüß 123'
 
-start_app A
-shot blank0
-focus
-sleep 0.6
-# Where the field is: given (TT_FIELD), else found by its caret in the first pictures after the focus click.
-if [ -z "${TT_FIELD:-}" ]; then
-  for _ in 1 2 3 4 5 6 7 8; do
-    shot blank
-    if r="$(python3 -I "$TT_DIR/fieldcheck.py" rect "$D/shots/blank.png")"; then TT_RECT="$r"; export TT_RECT; break; fi
-    sleep 0.3
+if [ "${TT_PHASE:-all}" != latency ]; then
+  TT_SETTLE_KEEP="${TT_SETTLE:-30}"
+  start_app A 0
+  if ! wait_window; then echo "no window after ${TT_SETTLE_KEEP} s" > "$D/.session-failed"; stop_app; kill "$INJ" 2>/dev/null; exit 0; fi
+  focus
+  sleep 0.6
+  # Where the field is: given (TT_FIELD), else found by its caret (it blinks, so two pictures differ by a narrow bar).
+  if [ -z "${TT_FIELD:-}" ]; then
+    for _ in 1 2 3 4 5 6 7 8; do
+      shot ca; sleep 0.35; shot cb
+      if r="$(python3 -I "$TT_DIR/fieldcheck.py" rect "$D/shots/ca.png" "$D/shots/cb.png")"; then TT_RECT="$r"; export TT_RECT; break; fi
+    done
+  fi
+  echo "$TT_RECT" > "$D/rect.txt"
+  IFS=, read -r rx0 ry0 rx1 ry1 <<<"$TT_RECT"
+  NX=$(((rx0 + rx1) / 2)); NY=$(((ry0 + ry1) / 2))
+  shot_stable blank
+  for i in "${!CHARS[@]}"; do
+    c "text ${CHARS[$i]}" 0.3
+    nudge
+    shot_arrived "g$(printf %02d "$i")"
+    c "key 14" 0.3
+    nudge
   done
+  # Two parts of eight characters, so the text stays inside the field; the caret is found in a second picture.
+  n=0
+  for text in "${PARTS[@]}"; do
+    n=$((n + 1))
+    c "text $text" "$(wait_for "$text")"
+    nudge
+    shot_stable "full$n"
+    for _ in 1 2 3 4 5 6; do
+      shot "full$n.b"
+      python3 -I "$TT_DIR/fieldcheck.py" caretx "$D/shots/full$n.png" "$D/shots/full$n.b.png" > /dev/null && break
+      sleep 0.3
+    done
+    for _ in 1 2 3 4 5 6 7 8; do c "key 14" 0.12; done
+    nudge
+  done
+  stop_app
 fi
-echo "$TT_RECT" > "$D/rect.txt"
-IFS=, read -r rx0 ry0 rx1 ry1 <<<"$TT_RECT"
-NX=$(((rx0 + rx1) / 2)); NY=$(((ry0 + ry1) / 2))
-shot_stable blank
-for i in "${!CHARS[@]}"; do
-  c "text ${CHARS[$i]}" 0.3
-  nudge
-  shot_arrived "g$(printf %02d "$i")"
-  c "key 14" 0.3
-  nudge
-done
-c "text $FULL" "$(wait_for "$FULL")"
-nudge
-shot_stable full
-stop_app
 
-WAYLAND_DEBUG=1 start_app B
+WAYLAND_DEBUG=1 start_app B 0
+if ! wait_window blank0b; then echo "no window after ${TT_SETTLE:-30} s" > "$D/.session-failed"; stop_app; kill "$INJ" 2>/dev/null; exit 0; fi
 focus
+# TT_SAMPLE=1: what the app's main thread waits in, every 50 ms, to see what it does while keys pile up.
+if [ -n "${TT_SAMPLE:-}" ]; then
+  ( while kill -0 "$APP" 2>/dev/null; do
+      echo "$(date +%s.%N) $(cat "/proc/$APP/wchan" 2>/dev/null) $(awk '{print $3}' "/proc/$APP/stat" 2>/dev/null)"
+      sleep 0.05
+    done ) > "$D/wchan.log" 2>&1 &
+  SAMPLER=$!
+fi
 c "text $LAT" "$(wait_for "$LAT")"
+[ -n "${SAMPLER:-}" ] && kill "$SAMPLER" 2>/dev/null
 stop_app
 
 c quit 0.3
