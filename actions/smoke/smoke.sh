@@ -13,12 +13,16 @@ smoke_args=${SMOKE_ARGS---version}
 read -ra bins <<<"$(plan_get binaries | tr ',' ' ')"
 [[ ${#bins[@]} -gt 0 ]] || die "the plan lists no binaries - nothing to start"
 
+# Who starts the binaries. Empty = the current user. In the container we are root, and a program may (rightly) refuse to
+# run as root (fs-store does), so deb_inside starts them as a plain user, like a person would.
+runas=()
+
 # start_one PATH -> the binary starts and exits 0 (stdin closed, so a program waiting for input ends instead of hanging).
 start_one() {
   local out rc=0
   # shellcheck disable=SC2086  # the arguments are a word list on purpose; globbing is off so `*` stays a `*`
   set -f
-  out=$(timeout 30 "$1" $smoke_args </dev/null 2>&1) || rc=$?
+  out=$("${runas[@]}" timeout 30 "$1" $smoke_args </dev/null 2>&1) || rc=$?
   set +f
   [[ $rc -eq 0 ]] || die "$1 $smoke_args exited with $rc: $out"
   printf 'started %s -> %s\n' "$1" "$(head -n1 <<<"$out")"
@@ -32,6 +36,8 @@ deb_inside() {
   apt-get update -qq >/dev/null
   apt-get install -y --no-install-recommends "${debs[@]}" >/dev/null   # apt resolves the dependencies, like a person would
   for d in "${debs[@]}"; do pkgs+=("$(dpkg-deb -f "$d" Package)"); done
+  useradd --create-home smoke   # passwd is part of every Debian and Ubuntu image
+  runas=(runuser -u smoke --)
   for b in "${bins[@]}"; do
     command -v "$b" >/dev/null || die "$b is not on PATH after installing ${pkgs[*]}"
     start_one "$(command -v "$b")"
