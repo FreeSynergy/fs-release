@@ -22,12 +22,7 @@ MAX_GLYPH_INK = 120
 
 
 def field_rect():
-    if os.environ.get("TT_FIELD"):
-        x, y, w, h = (int(v) for v in os.environ["TT_FIELD"].split(","))
-    else:
-        cx, cy = (int(v) for v in os.environ["TT_CLICK"].split(","))
-        x, y, w, h = cx - 150, cy - 20, 300, 40
-    return x, y, x + w, y + h
+    return tuple(int(v) for v in open(f"{out}/rect.txt").read().strip().split(","))
 
 
 def shot(name):
@@ -54,6 +49,14 @@ def scan(img, rect):
     return ink, caret
 
 
+def faint(img, rect):
+    """Every pixel that is not the field's background and not the caret: thin parts like the dots of an umlaut too."""
+    crop = img.crop(rect)
+    w, h = crop.size
+    px = crop.load()
+    return {(x, y) for x in range(w) for y in range(h) if sum(px[x, y]) < 700 and not is_caret(px[x, y])}
+
+
 def signature(ink):
     if not ink:
         return None
@@ -64,12 +67,16 @@ def signature(ink):
 
 def latency(path):
     def ts(line):
+        # libwayland prints [HH:MM:SS.uuuuuu] (new) or [<milliseconds>.<microseconds>] (old).
         m = re.match(r"\[(\d+):(\d+):(\d+)\.(\d+)\]", line)
-        return int(m[1]) * 3600 + int(m[2]) * 60 + int(m[3]) + int(m[4]) / 1e6 if m else None
+        if m:
+            return int(m[1]) * 3600 + int(m[2]) * 60 + int(m[3]) + int(m[4]) / 1e6
+        m = re.match(r"\[\s*(\d+)\.(\d+)\]", line)
+        return (int(m[1]) + int(m[2]) / 1000) / 1000 if m else None
 
     keys, commits = [], []
-    key_re = re.compile(r"^\[[\d:.]+\]\s+(?:\{[^}]*\}\s+)?wl_keyboard#\d+\.key\(\d+, \d+, (\d+), 1\)")
-    commit_re = re.compile(r"\s->\s+wl_surface#\d+\.commit\(\)")
+    key_re = re.compile(r"^\[[\s\d:.]+\]\s+(?:\{[^}]*\}\s+)?wl_keyboard[#@]\d+\.key\(\d+, \d+, (\d+), 1\)")
+    commit_re = re.compile(r"\s->\s+wl_surface[#@]\d+\.commit\(\)")
     modifiers = {42, 54, 29, 97, 56, 100}
     for line in open(path, errors="ignore"):
         if "wl_keyboard" not in line and "commit" not in line:
@@ -109,17 +116,21 @@ result = {"layout": os.environ.get("TT_LAYOUT", "de"), "app": os.path.basename(o
 sigs = {}
 for i, ch in enumerate(CHARS):
     ink, _ = scan(shot(f"g{i:02d}"), rect)
-    sig = signature(ink)
-    sigs[ch] = sig
+    sigs[ch] = signature(faint(shot(f"g{i:02d}"), rect))
     result["chars"][ch] = {"ink_pixels": len(ink)}
     # A single glyph has few ink pixels; many mean the placeholder text is still showing (nothing arrived).
     case(f"char {ch!r} arrives", 3 <= len(ink) <= MAX_GLYPH_INK, f"{len(ink)} ink pixels in the field")
-for i, a in enumerate(CHARS):
-    for b in CHARS[i + 1 :]:
-        if sigs[a] is not None and sigs[a] == sigs[b]:
-            case(f"char {a!r} differs from {b!r}", False, "same picture (missing glyph or wrong key)")
-if all(c[1] for c in cases if "differs" in c[0]):
-    case("all 16 glyphs differ", True)
+same = [(a, b) for i, a in enumerate(CHARS) for b in CHARS[i + 1 :] if sigs[a] is not None and sigs[a] == sigs[b]]
+case("all 16 glyphs differ", not same, "same picture (missing glyph or wrong key): " + ", ".join(f"{a!r}={b!r}" for a, b in same[:12]))
+
+# Glyphs that showed only after waiting (the picture lagged behind the key): reported, not a failure.
+late = {}
+if os.path.exists(f"{out}/late.log"):
+    for line in open(f"{out}/late.log"):
+        name, _, n = line.partition(" ")
+        if n.strip() not in ("", "0"):
+            late[CHARS[int(name[1:])]] = int(n)
+result["late_pictures"] = late
 
 # 2. the whole text is visible: not black, ink share, caret right behind the last glyph
 full = shot("full")
@@ -147,7 +158,10 @@ ms = latency(f"{out}/app-B.log")
 if len(ms) >= MIN_KEYS:
     lat = {"keys": len(ms), "median_ms": round(statistics.median(ms), 2), "p90_ms": round(ms[int(len(ms) * 0.9)], 2),
            "max_ms": round(ms[-1], 2), "min_ms": round(ms[0], 2), "limit_ms": MAX_MS}
-    case("key to picture, median", lat["median_ms"] <= MAX_MS, f"median {lat['median_ms']} ms, p90 {lat['p90_ms']}, max {lat['max_ms']}, limit {MAX_MS}")
+    enforced = not os.environ.get("TT_SOFTWARE") or os.environ.get("TT_ENFORCE_MS")
+    lat["enforced"] = bool(enforced)
+    note = f"median {lat['median_ms']} ms, p90 {lat['p90_ms']}, max {lat['max_ms']}, limit {MAX_MS}"
+    case("key to picture, median", lat["median_ms"] <= MAX_MS or not enforced, note + ("" if enforced else " (software rendering: reported, not enforced)"))
 else:
     lat = {"keys": len(ms)}
     case("key to picture, median", False, f"only {len(ms)} keys measured")
@@ -170,7 +184,7 @@ with open(f"{out}/junit.xml", "w", encoding="utf-8") as f:
     f.write("</testsuite>\n")
 
 lines = [f"typing-test {name} (layout {result['layout']}): {'PASS' if not failed else 'FAIL'}"]
-lines += [f"  {'ok  ' if ok else 'FAIL'} {n}: {m}" if m else f"  {'ok  ' if ok else 'FAIL'} {n}" for n, ok, m in cases if not ok or "differs" not in n]
+lines += [f"  {'ok  ' if ok else 'FAIL'} {n}: {m}" if m else f"  {'ok  ' if ok else 'FAIL'} {n}" for n, ok, m in cases]
 print("\n".join(lines))
 summary = os.environ.get("GITHUB_STEP_SUMMARY")
 if summary:

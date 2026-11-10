@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends kwin-wayland kwin-wayland-backend-virtual kde-spectacle qtwayland5 \
+        sudo apt-get install -y --no-install-recommends kwin-wayland kwin-wayland-backend-virtual kwin-style-breeze kde-spectacle qtwayland5 \
           dbus python3-pil mesa-vulkan-drivers libgl1-mesa-dri libegl1 fonts-dejavu-core xkb-data
     - name: Typing test
       shell: bash
