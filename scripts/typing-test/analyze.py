@@ -92,6 +92,9 @@ def latency(path):
     return ms
 
 
+if not os.path.exists(f"{out}/shots/full.png") or not os.path.exists(f"{out}/shots/g00.png"):
+    sys.exit(f"typing-test: no pictures in {out}/shots (screenshot tool failed, see spectacle.log); the test did not run")
+
 cases = []  # (name, passed, message)
 
 
