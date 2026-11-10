@@ -8,3 +8,10 @@ grep -q 'gates.sh' "$ROOT/actions/gates/action.yml" && pass "gates: actions/gate
 grep -q 'toolchain: pinned' "$W" && pass "gates: check.yml uses the pinned toolchain" || fail "gates: check.yml toolchain not pinned"
 grep -q 'RUST_VERSION' "$G" && pass "gates: gates.sh reads RUST_VERSION" || fail "gates: gates.sh ignores RUST_VERSION"
 grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' "$ROOT/RUST_VERSION" && pass "gates: RUST_VERSION is an exact x.y.z" || fail "gates: RUST_VERSION must be exact x.y.z"
+# Release builds use the same pinned toolchain as the gates: no 'stable', no other 'toolchain:' value (one allowed: the msrv input in ci.yml).
+bad=$(grep -rnE '(^|[^a-z-])stable([^a-z-]|$)|toolchain:' "$ROOT/.github/workflows" "$ROOT/actions" --include='*.yml' | grep -vE 'toolchain: pinned$|toolchain: \$\{\{ inputs\.msrv \}\}$|actions/setup-rust/action.yml' || true)
+[ -z "$bad" ] && pass "gates: no workflow/action names stable or an unpinned toolchain" || fail "gates: unpinned toolchain: $bad"
+for w in linux macos windows; do
+  grep -A2 'actions/setup-rust@' "$ROOT/.github/workflows/_release-$w.yml" | grep -q 'toolchain: pinned' && pass "gates: _release-$w.yml builds with the pinned toolchain" || fail "gates: _release-$w.yml setup-rust not pinned"
+done
+grep -q 'default: pinned' "$ROOT/actions/setup-rust/action.yml" && pass "gates: setup-rust defaults to pinned" || fail "gates: setup-rust default is not pinned"

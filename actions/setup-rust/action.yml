@@ -1,7 +1,7 @@
 name: setup-rust
-description: Rust toolchain (default newest stable, ADR 0026; "pinned" = the version in fs-release/RUST_VERSION) plus Swatinem/rust-cache.
+description: Rust toolchain (default "pinned" = the one version in fs-release/RUST_VERSION, used by gates AND release builds; the only other allowed value is an MSRV for the msrv check) plus Swatinem/rust-cache.
 inputs:
-  toolchain: { description: "Toolchain, e.g. stable, an MSRV like 1.85, or pinned (the central version file RUST_VERSION of fs-release)", default: stable }
+  toolchain: { description: "Toolchain: pinned (the central version file RUST_VERSION of fs-release) or, only for the msrv check, an MSRV like 1.85", default: pinned }
   targets: { description: "Comma separated extra targets", default: "" }
   components: { description: "Comma separated components", default: "" }
   working-directory: { description: "Cargo workspace directory", default: "." }

@@ -33,6 +33,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends $PACKAGES
       - uses: FreeSynergy/fs-release/actions/setup-rust@main
         with:
+          toolchain: pinned
           targets: ${{ matrix.triple }}
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
           cache-key: release-${{ matrix.arch }}

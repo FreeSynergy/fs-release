@@ -18,6 +18,7 @@ jobs:
           persist-credentials: false
       - uses: FreeSynergy/fs-release/actions/setup-rust@main
         with:
+          toolchain: pinned
           targets: x86_64-apple-darwin,aarch64-apple-darwin
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
           cache-key: release-macos
