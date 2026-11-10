@@ -20,7 +20,8 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends kwin-wayland kwin-wayland-backend-virtual kwin-style-breeze kde-spectacle qtwayland5 \
-          dbus python3-pil mesa-vulkan-drivers libgl1-mesa-dri libegl1 fonts-dejavu-core xkb-data
+          dbus python3-pil fontconfig fonts-dejavu-core xkb-data libgl1-mesa-dri libegl1 \
+          mesa-vulkan-drivers  # the software Vulkan (lavapipe) that wgpu apps draw with on a runner without GPU
     - name: Typing test
       shell: bash
       working-directory: ${{ inputs.working-directory }}
@@ -28,15 +29,21 @@ runs:
         APP: ${{ inputs.app-binary }}
         APP_ARGS: ${{ inputs.app-args }}
         TT_CLICK: ${{ inputs.click }}
+        TT_CLICK_REL: ${{ inputs.click-in-window }}
         TT_FIELD: ${{ inputs.field }}
+        TT_TEXT_WIDTH: ${{ inputs.text-width }}
+        TT_SIZE: ${{ inputs.size }}
+        TT_SETTLE: ${{ inputs.settle }}
+        TT_ENFORCE_MS: ${{ inputs.enforce-ms }}
+        TT_INJECT: ${{ inputs.inject }}
         TT_SCENARIO: ${{ inputs.scenario }}
         TT_LAYOUT: ${{ inputs.layout }}
         TT_MAX_MS: ${{ inputs.max-ms }}
         TT_NAME: ${{ inputs.name }}
         TT_OUT: ${{ runner.temp }}/typing-test-out
       run: |
-        # shellcheck disable=SC2086  # app args are split on purpose
-        "$GITHUB_ACTION_PATH/../../../scripts/typing-test.sh" "$APP" $APP_ARGS
+        read -r -a args <<<"$APP_ARGS"
+        "$GITHUB_ACTION_PATH/../../scripts/typing-test.sh" "$APP" "${args[@]}"
     - name: Result (junit.xml, result.json, pictures)
       if: always()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

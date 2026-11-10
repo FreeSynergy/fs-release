@@ -11,7 +11,18 @@
 | `actions/smoke/smoke.sh` | Strategy | one function per format (deb, zip, msi, exe): install like a person, start every binary, remove again |
 | `scripts/bump-components.sh` | Template method | per program repo the same steps: fresh worktree, set the tag (`set_components_tag.py`), `cargo update`, gates, push the branch (does not convert programs) |
 | `scripts/check_rust_rules.py` `check_blinc` | none | rule, per repo on via `.fs-rules.toml` `blinc = "components-only"`: no `blinc*` dependency, `[patch]`/`[replace]`, one fs-components tag |
-| `tests/packaging/` | none | test support |
+| `scripts/typing-test.sh` + `scripts/typing-test/` | Facade | one command (binary in, exit code and junit/json out) over a virtual KWin, the key injector (`inject/`, a small Wayland client: Adapter to KWin's `org_kde_kwin_fake_input`), the pictures (`session.sh`) and the checks (`analyze.py`, `fieldcheck.py`) |
+| `scripts/typing-test/session.sh` | Template method | wait for the window, find the field by its caret, type one character, picture, clear; then two text parts; then the timed run. Apps may replace `focus()` with a scenario file |
+| `actions/typing-test` | Facade | the same script as a composite action for the app repos (see below) |
+| `tests/packaging/`, `tests/typing-test/` | none | test support |
+
+## Typing test (`actions/typing-test`, `scripts/typing-test.sh`)
+
+Interface of the action (inputs): `app-binary` (required), `app-args`, `click-in-window` (x,y from the window's top left corner; preferred) or `click` (on the 1280x800 screen) or `scenario` (bash fragment defining `focus()` for apps that need clicks to reach the field), `field`, `text-width`, `layout` (default `de`), `max-ms` (default 8), `enforce-ms`, `size`, `settle`, `inject`, `name`, `install`. Outputs: artefact `typing-test-<name>` with `junit.xml`, `result.json`, `shots/` and logs; the step fails if a check fails (exit 1) or the test could not run (exit 2).
+
+What is checked: each of `a Ä ä ö ü ß @ € { } [ ] \ | ~ µ` (Shift and AltGr) arrives in the focused field and is drawn as that glyph (compared with a reference rendering of all printable ASCII and the German extras in DejaVu Sans, the typed one must be among the best three; `|` is only told apart from bars), the text is visible and the caret stands right behind it, and the median key-to-picture time (client Wayland trace) is within `max-ms`. A wrong layout turns it red. Without a GPU (GitHub runner) the time is reported, not enforced.
+
+Isolation: own runtime directory and private D-Bus, own Wayland socket, no `DISPLAY`, toolkits forced to Wayland, own process group killed at the end; `tests/typing-test/isolation.sh` proves it. Known limits: picture-based (no accessibility read-out); window placement is by KWin 5.27 (Ubuntu) or 6.x (laptop), so clicks are relative to the window; pictures cost about one second each, a run takes minutes. The probe workflow `typing-test-probe` runs on push to the branch only; after the merge it is `workflow_dispatch` only.
 
 ## Rules
 
