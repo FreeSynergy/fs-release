@@ -66,8 +66,13 @@ jobs:
           layout: us
           install: "false"
           name: fields-form-us
-      - name: The wrong layout was caught
-        if: steps.wrong.outcome != 'failure'
+      - name: The wrong layout was caught (exit 1), not just "the test did not run" (exit 2)
+        if: always() && steps.wrong.outcome != 'skipped'
+        env:
+          CODE: ${{ steps.wrong.outputs.exit-code }}
         run: |
-          echo "the typing test passed with layout us: it does not check the characters" >&2
-          exit 1
+          case "$CODE" in
+            1) echo "layout us turned the test red (exit 1), as wanted" ;;
+            0) echo "the typing test passed with layout us: it does not check the characters" >&2; exit 1 ;;
+            *) echo "the typing test did not run with layout us (exit '$CODE'): nothing was checked" >&2; exit 1 ;;
+          esac

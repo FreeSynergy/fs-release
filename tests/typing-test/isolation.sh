@@ -7,6 +7,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+host_home="$HOME"
 host_runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 cat > "$work/spy.sh" <<SPY
 #!/usr/bin/env bash
@@ -32,6 +33,10 @@ check grep -q '^GDK_BACKEND=wayland$' "$work/seen.env"
 check grep -q '^QT_QPA_PLATFORM=wayland$' "$work/seen.env"
 check not grep -q "^XDG_RUNTIME_DIR=$host_runtime\$" "$work/seen.env"
 check not grep -q "^WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}\$" "$work/seen.env"
+for v in HOME XDG_DATA_HOME XDG_CACHE_HOME XDG_CONFIG_HOME; do
+  check grep -q "^$v=.*/tt-run\\." "$work/seen.env"
+done
+check not grep -q "^\(HOME\|XDG_[A-Z_]*_HOME\)=$host_home\(/\|\$\)" "$work/seen.env"
 check not pgrep -f "socket tt-iso-$$" > /dev/null
 check test -z "$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'tt-run.*' -newer "$work/spy.sh" 2> /dev/null)"
 [ "$fail" = 0 ] && echo "typing-test isolation: ok"

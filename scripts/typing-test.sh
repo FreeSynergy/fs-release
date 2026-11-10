@@ -95,7 +95,9 @@ export XKB_DEFAULT_LAYOUT="$TT_LAYOUT"
 # A laptop's KWin takes the layout from the user's kxkbrc, not from XKB_DEFAULT_LAYOUT: give it a config of its own.
 mkdir -p "$RUNTIME/config"
 printf '[Layout]\nLayoutList=%s\nUse=true\nVariantList=\n' "$TT_LAYOUT" > "$RUNTIME/config/kxkbrc"
-export XDG_CONFIG_HOME="$RUNTIME/config"
+# The app must not write into the real home either: HOME and the XDG directories live in the run directory.
+mkdir -p "$RUNTIME/home" "$RUNTIME/data" "$RUNTIME/cache"
+export HOME="$RUNTIME/home" XDG_DATA_HOME="$RUNTIME/data" XDG_CACHE_HOME="$RUNTIME/cache" XDG_CONFIG_HOME="$RUNTIME/config"
 export KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1
 # Without a GPU (GitHub runner) KWin composes with OpenGL 2 in software (llvmpipe); its screenshot service needs OpenGL.
 if [ ! -e /dev/dri/renderD128 ]; then
