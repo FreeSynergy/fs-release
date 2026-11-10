@@ -92,13 +92,11 @@ exe_package() {
     exe=$(find_installed "$b"); [[ -n "$exe" ]] || die "$b.exe not found below Program Files after the setup.exe"
     start_one "$exe"
   done
-  # NSIS copies the uninstaller to a temp file and returns at once, so wait (up to 60 s) until the files are gone.
-  un=$(find_installed uninstall); [[ -n "$un" ]] || die "uninstall.exe not found"
-  ps_run "$(cygpath -w "$un")" /S "_?=$(cygpath -w "$(dirname "$un")")" || { ls -la "$(dirname "$un")"; die "uninstall.exe /S failed"; }
-  for b in "${bins[@]}"; do
-    for _ in $(seq 60); do [[ -z "$(find_installed "$b")" ]] && break; sleep 1; done
-    [[ -z "$(find_installed "$b")" ]] || die "$b.exe is still there 60 s after uninstalling"
-  done
+  # The uninstaller sits next to the binaries (other programs on the runner have an Uninstall.exe too: never search for it).
+  # NSIS copies it to a temp file and returns at once unless told where it lives with _?=, so give it and wait for the end.
+  un="$(dirname "$exe")/uninstall.exe"; [[ -f "$un" ]] || die "$un not found"
+  ps_run "$(cygpath -w "$un")" /S "_?=$(cygpath -w "$(dirname "$un")")" || die "uninstall.exe /S failed"
+  for b in "${bins[@]}"; do [[ -z "$(find_installed "$b")" ]] || die "$b.exe is still there after uninstalling"; done
   echo "exe ok"
 }
 
