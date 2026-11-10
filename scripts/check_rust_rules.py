@@ -6,9 +6,10 @@ Checks (exit 1 on any violation):
   * every `src/**/*.rs` starts with a `//!` module doc
   * every module doc names its pattern (`Pattern:` line) — except mod.rs/lib.rs/main.rs which may only re-export
   * `lib.rs`/`mod.rs` contain no `fn` bodies (only declarations/re-exports)
-  * Blinc lives in one place: no repo except fs-components (the one with a crate `crates/fs-components`) has a
-    `blinc*` dependency or a `[patch]` entry for blinc in any Cargo.toml; programs take Blinc through
-    `fs_components::blinc` (Cargo applies `[patch]` only at the top, so a patch never reaches dependants).
+  * Blinc lives in one place, ONLY in a repo whose root has `.fs-rules.toml` with `blinc = "components-only"` (default
+    off until the repo is migrated by hand): no `blinc*` dependency, `[patch]`/`[replace]` (also in
+    `.cargo/config.toml`) naming blinc, and one single fs-components tag/rev. fs-components itself (a real
+    `crates/fs-components` package of that name) is exempt. Programs take Blinc through `fs_components::blinc`.
 
     python3 scripts/check_rust_rules.py /srv/FreeSynergy/fs-store [/srv/FreeSynergy/fs-hub …]
 """
@@ -18,6 +19,16 @@ from pathlib import Path
 HARD, SOFT = 300, 200
 
 DEP_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
+SWITCH_FILE = ".fs-rules.toml"
+SKIP_DIRS = {"target", ".git", "node_modules"}
+COMPONENTS_GIT = re.compile(r"/fs-components(\.git)?/?$", re.I)
+
+def _walk(repo: Path, pattern: str):
+    """rglob without target/, .git/, node_modules/ and nested worktrees (.wt-*)."""
+    for f in sorted(repo.rglob(pattern)):
+        parts = f.relative_to(repo).parts[:-1]
+        if any(p in SKIP_DIRS or p.startswith(".wt-") for p in parts): continue
+        yield f
 
 def _dep_tables(doc):
     """Yield every dependency table of a parsed Cargo.toml (also `target.*` and workspace ones)."""
@@ -26,14 +37,46 @@ def _dep_tables(doc):
     for t in doc.get("target", {}).values(): yield from _dep_tables(t)
     if isinstance(doc.get("workspace"), dict): yield from _dep_tables(doc["workspace"])
 
+def blinc_mode(repo: Path):
+    """(mode, errors) from `.fs-rules.toml`: blinc = "off" (default, repo not migrated) | "components-only"."""
+    f = repo / SWITCH_FILE
+    if not f.is_file(): return "off", []
+    try: mode = tomllib.loads(f.read_text(encoding="utf-8")).get("blinc", "off")
+    except tomllib.TOMLDecodeError as e: return "off", [f"{SWITCH_FILE}: not valid TOML ({e})"]
+    if mode not in ("off", "components-only"):
+        return "off", [f'{SWITCH_FILE}: blinc = {mode!r}: use "off" or "components-only"']
+    return mode, []
+
+def is_components_repo(repo: Path) -> bool:
+    """The one repo that may carry Blinc: it has crates/fs-components whose package is named fs-components
+    (and, when it names a repository, that is fs-components). An empty Cargo.toml at that path is not enough."""
+    f = repo / "crates" / "fs-components" / "Cargo.toml"
+    if not f.is_file(): return False
+    try: pkg = tomllib.loads(f.read_text(encoding="utf-8")).get("package", {})
+    except tomllib.TOMLDecodeError: return False
+    if pkg.get("name") != "fs-components": return False
+    return "repository" not in pkg or bool(COMPONENTS_GIT.search(str(pkg["repository"])))
+
+def _blinc_text(*parts) -> bool:
+    return "blinc" in " ".join(str(p) for p in parts).lower()
+
+def _patch_errors(rel, doc):
+    for source, entries in ((doc.get("patch") or {}).items()):
+        for name, spec in (entries or {}).items():
+            if _blinc_text(source, name, spec):
+                yield f"{rel}: [patch.{source}] `{name}`: Blinc is pinned only in fs-components, a patch never reaches dependants"
+    for name, spec in (doc.get("replace") or {}).items():
+        if _blinc_text(name, spec):
+            yield f"{rel}: [replace] `{name}`: Blinc is pinned only in fs-components"
+
 def check_blinc(repo: Path):
-    """A program (every repo but fs-components) has no blinc dependency and no blinc [patch]."""
-    if (repo / "crates" / "fs-components" / "Cargo.toml").is_file():
-        return []
-    errors = []
-    for f in sorted(repo.rglob("Cargo.toml")):
-        p = f.as_posix()
-        if "/target/" in p or "/.git/" in p: continue
+    """Only when `.fs-rules.toml` says blinc = "components-only" (the repo is migrated); fs-components is exempt.
+    A program then has no blinc dependency, no blinc [patch]/[replace] (Cargo.toml or .cargo/config.toml) and
+    one single fs-components tag/rev in all its Cargo.toml."""
+    mode, errors = blinc_mode(repo)
+    if mode != "components-only" or is_components_repo(repo): return errors
+    pins = {}
+    for f in _walk(repo, "Cargo.toml"):
         rel = f.relative_to(repo).as_posix()
         try: doc = tomllib.loads(f.read_text(encoding="utf-8"))
         except tomllib.TOMLDecodeError as e:
@@ -41,20 +84,27 @@ def check_blinc(repo: Path):
         for table in _dep_tables(doc):
             for name, spec in table.items():
                 real = spec.get("package", name) if isinstance(spec, dict) else name
-                if name.lower().startswith("blinc") or str(real).lower().startswith("blinc"):
+                git = spec.get("git", "") if isinstance(spec, dict) else ""
+                if _blinc_text(name, real, git):
                     errors.append(f"{rel}: dependency `{name}`: programs take Blinc through fs_components::blinc")
-        for source, entries in (doc.get("patch") or {}).items():
-            for name, spec in entries.items():
-                text = f"{source} {name} {spec}".lower()
-                if "blinc" in text:
-                    errors.append(f"{rel}: [patch.{source}] `{name}`: Blinc is pinned only in fs-components, a patch never reaches dependants")
+                if COMPONENTS_GIT.search(str(git)):
+                    pins.setdefault(next((f"{k} {spec[k]}" for k in ("tag", "rev", "branch") if k in spec), "unpinned"), []).append(rel)
+        errors.extend(_patch_errors(rel, doc))
+    for name in ("config.toml", "config"):
+        for f in _walk(repo, f".cargo/{name}"):
+            rel = f.relative_to(repo).as_posix()
+            try: errors.extend(_patch_errors(rel, tomllib.loads(f.read_text(encoding="utf-8"))))
+            except tomllib.TOMLDecodeError as e: errors.append(f"{rel}: not valid TOML ({e})")
+    if len(pins) > 1:
+        errors.append("two fs-components versions in one program (two Blinc): " +
+                      "; ".join(f"{k} in {', '.join(sorted(set(v)))}" for k, v in sorted(pins.items())))
     return errors
 
 def check(repo: Path):
     errors, warns = check_blinc(repo), []
-    for f in sorted(repo.rglob("*.rs")):
+    for f in _walk(repo, "*.rs"):
         p = f.as_posix()
-        if "/target/" in p or "/generated/" in p or f.name.endswith("_capnp.rs"):
+        if "/generated/" in p or f.name.endswith("_capnp.rs"):
             continue
         lines = f.read_text(encoding="utf-8").splitlines()
         rel = f.relative_to(repo).as_posix()
