@@ -10,7 +10,8 @@
 #   TT_SCENARIO  file       bash fragment that defines focus(), using c "<inject command>" [secs] and shot NAME
 #   TT_FIELD     "x,y,w,h"  the field's rectangle in the screenshot (default: a band of 60 px at the click point)
 #   TT_LAYOUT    xkb layout (default de)      TT_SIZE  WxH (default 1280x800)
-#   TT_MAX_MS    limit for the median key-to-picture time (default 8)
+#   TT_MAX_MS    limit for the median key-to-picture time (default 8). Without a GPU the compositor sets the pace,
+#                so there the time is reported but not enforced (TT_ENFORCE_MS=1 enforces it).
 #   TT_OUT       result directory (default ./typing-test-out): result.json, junit.xml, shots/, logs
 #   TT_SETTLE    seconds to wait for the first picture (default 7)
 #   TT_INJECT    prebuilt fs-typing-inject (default: built with cargo into the user cache)
@@ -55,8 +56,17 @@ X-KDE-Wayland-Interfaces=org_kde_kwin_fake_input
 NoDisplay=true
 DESK
 
+# The field's rectangle on screen as x0,y0,x1,y1: TT_FIELD, else 300x40 around the click point.
+if [ -n "${TT_FIELD:-}" ]; then
+  IFS=, read -r fx fy fw fh <<<"$TT_FIELD"
+else
+  IFS=, read -r cx cy <<<"$TT_CLICK"
+  fx=$((cx - 150)); fy=$((cy - 20)); fw=300; fh=40
+fi
+export TT_RECT="$fx,$fy,$((fx + fw)),$((fy + fh))"
+
 SIZE="${TT_SIZE:-1280x800}"
-export TT_OUT="$OUT" TT_BIN="$BIN" TT_INJECT TT_LAYOUT="${TT_LAYOUT:-${LAYOUT:-de}}" TT_SIZE="$SIZE"
+export TT_DIR="$TT" TT_OUT="$OUT" TT_BIN="$BIN" TT_INJECT TT_LAYOUT="${TT_LAYOUT:-${LAYOUT:-de}}" TT_SIZE="$SIZE"
 TT_APP_ARGS=""
 for a in "$@"; do TT_APP_ARGS+="$a"$'\x1f'; done
 export TT_APP_ARGS
@@ -64,8 +74,10 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 export XDG_DATA_DIRS="$OUT/.xdg:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 export XKB_DEFAULT_LAYOUT="$TT_LAYOUT"
 export KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1
-# Without a GPU (GitHub runner) KWin composes in software.
-[ -e /dev/dri/renderD128 ] || export KWIN_COMPOSE="${KWIN_COMPOSE:-Q}"
+# Without a GPU (GitHub runner) KWin composes with OpenGL 2 in software (llvmpipe); its screenshot service needs OpenGL.
+if [ ! -e /dev/dri/renderD128 ]; then
+  export LIBGL_ALWAYS_SOFTWARE=1 KWIN_COMPOSE="${TT_KWIN_COMPOSE:-O2}" TT_SOFTWARE=1
+fi
 
 rc=0
 timeout "${TT_TIMEOUT:-300}" dbus-run-session -- kwin_wayland --virtual --width "${SIZE%x*}" --height "${SIZE#*x}" \

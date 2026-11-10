@@ -51,7 +51,6 @@ jobs:
       - uses: ./release/.github/actions/typing-test
         with:
           app-binary: components/target/release/examples/form
-          click: "390,366"
-          field: "294,349,198,34"
+          click: "480,212"
           max-ms: ${{ inputs.max-ms || '8' }}
           name: fields-form
