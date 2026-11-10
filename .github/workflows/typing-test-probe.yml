@@ -1,0 +1,51 @@
+# Probe for actions/typing-test: builds the fields example of fs-components (a window with text inputs) and runs
+# the typing test on it under a virtual KWin. The app repos call the action the same way with their own binary.
+name: typing-test-probe
+on:
+  workflow_dispatch:
+    inputs:
+      components-ref: { description: "fs-components ref to build", default: q0-blinc-one-place }
+      max-ms: { description: "Limit for the median key-to-picture time in ms", default: "8" }
+  push:
+    branches: [q1b-typing-test]
+    paths: [".github/actions/typing-test/**", "scripts/typing-test*", "scripts/typing-test/**", ".github/workflows/typing-test-probe.yml"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: release
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: FreeSynergy/fs-components
+          ref: ${{ inputs.components-ref || 'q0-blinc-one-place' }}
+          path: components
+          persist-credentials: false
+      - name: Build packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libxkbcommon-dev libwayland-dev libfontconfig1-dev libssl-dev
+      - uses: ./release/actions/setup-rust
+        with:
+          working-directory: components
+          cache-key: typing-probe
+      - name: Build the fields example (release)
+        working-directory: components
+        run: cargo build --release -p fs-components-fields --example form
+      - uses: ./release/.github/actions/typing-test
+        with:
+          app-binary: components/target/release/examples/form
+          click: "390,366"
+          field: "294,349,198,34"
+          max-ms: ${{ inputs.max-ms || '8' }}
+          name: fields-form
