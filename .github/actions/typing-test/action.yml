@@ -1,0 +1,50 @@
+name: typing-test
+description: Start a built app under a virtual KWin with a keyboard layout, type @ € { } [ ] \ | ~ ä ö ü ß µ (AltGr and Shift) into a text field, check the text arrives and is visible, and measure key-to-picture time. Same script as scripts/typing-test.sh on a laptop.
+inputs:
+  app-binary: { description: "Path to the built (release) binary", required: true }
+  app-args: { description: "Arguments for the app, one line, split on spaces", default: "" }
+  click: { description: "x,y - where to click to focus the text field (1280x800 screen)", default: "" }
+  field: { description: "x,y,w,h - the field's rectangle on screen (default: 300x40 around the click point)", default: "" }
+  scenario: { description: "App-specific bash fragment defining focus() (uses c '<inject command>' [secs] and shot NAME); replaces click", default: "" }
+  layout: { description: "xkb keyboard layout", default: de }
+  max-ms: { description: "Limit for the median key-to-picture time in ms", default: "8" }
+  name: { description: "Name of the app in the report and the artefact", default: "" }
+  install: { description: "Install kwin, spectacle and the other packages with apt (ubuntu runner)", default: "true" }
+  working-directory: { description: "Directory to run the app in", default: "." }
+runs:
+  using: composite
+  steps:
+    - name: Packages for the virtual screen
+      if: inputs.install == 'true'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends kwin-wayland kwin-wayland-backend-virtual spectacle \
+          dbus python3-pil mesa-vulkan-drivers libgl1-mesa-dri libegl1 fonts-dejavu-core xkb-data
+    - name: Typing test
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        APP: ${{ inputs.app-binary }}
+        APP_ARGS: ${{ inputs.app-args }}
+        TT_CLICK: ${{ inputs.click }}
+        TT_FIELD: ${{ inputs.field }}
+        TT_SCENARIO: ${{ inputs.scenario }}
+        TT_LAYOUT: ${{ inputs.layout }}
+        TT_MAX_MS: ${{ inputs.max-ms }}
+        TT_NAME: ${{ inputs.name }}
+        TT_OUT: ${{ runner.temp }}/typing-test-out
+      run: |
+        # shellcheck disable=SC2086  # app args are split on purpose
+        "$GITHUB_ACTION_PATH/../../../scripts/typing-test.sh" "$APP" $APP_ARGS
+    - name: Result (junit.xml, result.json, pictures)
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: typing-test-${{ inputs.name != '' && inputs.name || 'app' }}
+        path: |
+          ${{ runner.temp }}/typing-test-out/result.json
+          ${{ runner.temp }}/typing-test-out/junit.xml
+          ${{ runner.temp }}/typing-test-out/shots
+          ${{ runner.temp }}/typing-test-out/*.log
+        if-no-files-found: warn
