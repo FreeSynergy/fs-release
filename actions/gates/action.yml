@@ -1,0 +1,10 @@
+name: gates
+description: Run scripts/gates.sh (fmt, clippy pedantic, test, coding rules ADR 0043) from this repo, at the same ref as the action. The toolchain is the one in RUST_VERSION.
+inputs:
+  working-directory: { description: "Cargo workspace root", default: "." }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: '"$GITHUB_ACTION_PATH/../../scripts/gates.sh" "$PWD"'
