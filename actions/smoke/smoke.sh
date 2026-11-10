@@ -11,12 +11,15 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/lib.sh"
 
 smoke_args=${SMOKE_ARGS---version}
 read -ra bins <<<"$(plan_get binaries | tr ',' ' ')"
+[[ ${#bins[@]} -gt 0 ]] || die "the plan lists no binaries - nothing to start"
 
 # start_one PATH -> the binary starts and exits 0 (stdin closed, so a program waiting for input ends instead of hanging).
 start_one() {
   local out rc=0
-  # shellcheck disable=SC2086  # the arguments are a word list on purpose
+  # shellcheck disable=SC2086  # the arguments are a word list on purpose; globbing is off so `*` stays a `*`
+  set -f
   out=$(timeout 30 "$1" $smoke_args </dev/null 2>&1) || rc=$?
+  set +f
   [[ $rc -eq 0 ]] || die "$1 $smoke_args exited with $rc: $out"
   printf 'started %s -> %s\n' "$1" "$(head -n1 <<<"$out")"
 }
