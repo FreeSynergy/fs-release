@@ -7,10 +7,11 @@
 #                                      default assets when the package has no [package.metadata.generate-rpm]; writes into DIST.
 set -euo pipefail
 
+# --no-strip: package.sh already stripped the binary; a second strip by cargo-deb made the deb binary differ from the tar.gz and rpm one (same BuildID, other bytes; found by R5, v0.0.8).
 deb_package() {
   local sel=() f; while IFS= read -r _l; do sel+=("$_l"); done < <(pkg_select "$1")
   f=$(pkg_features "$1"); [[ -n "$f" ]] && sel+=(--features "$f")
-  cargo deb --no-build --target "$2" ${sel[@]+"${sel[@]}"} --output "$3/"
+  cargo deb --no-build --no-strip --target "$2" ${sel[@]+"${sel[@]}"} --output "$3/"
 }
 
 rpm_package() {

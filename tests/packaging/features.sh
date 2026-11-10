@@ -11,8 +11,8 @@ plan=$(make_plan "$TF" BINARIES=fapp-bin,fserver-bin KIND=app NAME=fx FEATURES=f
 out=$(run_linux "$TF" "$plan" tar.gz,deb,rpm)
 check_has "features: first package build" "$out" "cargo build --release --locked --target $X -p fapp --bin fapp-bin --features fast"
 check_has "features: second package build" "$out" "cargo build --release --locked --target $X -p fserver --bin fserver-bin --features fast,only-server"
-check_has "features: deb of first package" "$out" "cargo deb --no-build --target $X -p fapp --features fast --output @R@/dist/"
-check_has "features: deb of second package" "$out" "cargo deb --no-build --target $X -p fserver --features fast,only-server --output @R@/dist/"
+check_has "features: deb of first package" "$out" "cargo deb --no-build --no-strip --target $X -p fapp --features fast --output @R@/dist/"
+check_has "features: deb of second package" "$out" "cargo deb --no-build --no-strip --target $X -p fserver --features fast,only-server --output @R@/dist/"
 # a feature no package declares fails before any build
 plan=$(make_plan "$TF" BINARIES=fapp-bin,fserver-bin KIND=app NAME=fx FEATURES=nope)
 rm -rf "$TF/dist" "$TF/target"; mkdir -p "$T/stage"; : > "$T/log"; rc=0

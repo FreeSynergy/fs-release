@@ -40,7 +40,7 @@ for cp in "" "CARGO_PACKAGE=tasks-app"; do
   for p in "app:tasks-app:fs-tasks-app" "server:tasks-server:fs-tasks-server"; do
     IFS=: read -r dir pk bn <<<"$p"
     check_has "$l build per package: $pk" "$out" "cargo build --release --locked --target $X -p $pk --bin $bn"
-    check_has "$l deb per package: $pk" "$out" "cargo deb --no-build --target $X -p $pk --output @R@/dist/"
+    check_has "$l deb per package: $pk" "$out" "cargo deb --no-build --no-strip --target $X -p $pk --output @R@/dist/"
     check_has "$l rpm per package: $pk" "$out" "cargo generate-rpm --target $X -p $dir -s version = \"0.1.1\" --output @R@/dist/"
   done
   check_lacks "$l no build mixes both binaries" "$(grep '^cargo build' <<<"$out")" "--bin fs-tasks-app --bin fs-tasks-server"
