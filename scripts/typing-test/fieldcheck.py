@@ -111,7 +111,7 @@ def main():
         if not bar:
             return 1
         cx, y0, y1 = bar
-        width = int(os.environ.get("TT_TEXT_WIDTH", "110"))
+        width = int(os.environ.get("TT_TEXT_WIDTH") or "110")
         print(f"{cx - 4},{y0 - 4},{cx + width},{y1 + 4}")
         return 0
     if mode == "caretx":
