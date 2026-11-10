@@ -38,3 +38,13 @@
 - AppImage, Flatpak, Arch: unchanged. AppImage/Arch/zip/dmg bundle all binaries into one artefact on purpose; Flatpak builds from the app repo's manifest.
 
 * **One measure (2026-11-08, Strategy).** `scripts/gates.sh <root>` and `.github/workflows/check.yml` run exactly the same four checks: `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`, `cargo test --workspace --all-features`, `check_rust_rules.py`. Change both together; the local copy used by the threads is `/srv/FreeSynergy/.scratch/t5-gates/gates.sh` (a copy of this file).
+
+## Release to catalog (Q2b, 2026-11-10)
+
+Flow: (0) Opus review of the change BEFORE the tag, never inside a workflow -> (1) tag `vX.Y.Z` pushed by hand -> (2) `release.yml`:
+plan, build, smoke test, SBOM, signatures, SHA256SUMS, attestation, draft -> (3) job `publish` (`_release-publish.yml`, `actions/publish-release`):
+draft -> Pre-release, only when SHA256SUMS.txt, every file and every `.asc` are attached; idempotent; own `GITHUB_TOKEN`
+(`contents: write`) -> (4) fs-catalog's `bump` workflow (every 15 minutes) finds the new published Pre-release, raises the tag in
+`packages.toml` and starts `sign`. **No secret and nothing cross-repo:** direction is pull (fs-catalog reads public releases), so no
+token for fs-catalog is passed to the program repos. Delay between publish and catalog: up to 15 minutes (plus the sign run).
+Drafts and releases with missing files are skipped with a warning, never a red run.
