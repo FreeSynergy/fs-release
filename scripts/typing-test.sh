@@ -25,7 +25,10 @@ BIN="$(readlink -f "$1")"; shift
 [ -x "$BIN" ] || { echo "typing-test: $BIN is not executable" >&2; exit 2; }
 [ -n "${TT_CLICK:-}${TT_SCENARIO:-}" ] || { echo "typing-test: set TT_CLICK=x,y or TT_SCENARIO" >&2; exit 2; }
 [ -n "${TT_CLICK:-}${TT_FIELD:-}" ] || { echo "typing-test: with TT_SCENARIO also set TT_FIELD=x,y,w,h" >&2; exit 2; }
-[ -z "${TT_SCENARIO:-}" ] || export TT_SCENARIO="$(readlink -f "$TT_SCENARIO")"
+if [ -n "${TT_SCENARIO:-}" ]; then
+  TT_SCENARIO="$(readlink -f "$TT_SCENARIO")"
+  export TT_SCENARIO
+fi
 for t in kwin_wayland dbus-run-session spectacle python3; do
   command -v "$t" >/dev/null || { echo "typing-test: $t is missing" >&2; exit 2; }
 done
@@ -54,7 +57,8 @@ DESK
 
 SIZE="${TT_SIZE:-1280x800}"
 export TT_OUT="$OUT" TT_BIN="$BIN" TT_INJECT TT_LAYOUT="${TT_LAYOUT:-${LAYOUT:-de}}" TT_SIZE="$SIZE"
-export TT_APP_ARGS="$(printf '%s\x1f' "$@")"
+TT_APP_ARGS="$(printf '%s\x1f' "$@")"
+export TT_APP_ARGS
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 export XDG_DATA_DIRS="$OUT/.xdg:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 export XKB_DEFAULT_LAYOUT="$TT_LAYOUT"
