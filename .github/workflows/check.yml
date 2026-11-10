@@ -1,5 +1,6 @@
 # Reusable check gate for every FreeSynergy Rust repo, meant to run on every push. No secrets. Usage: docs/usage.md
 # Stricter than ci.yml (workspace-wide, clippy::pedantic); ci.yml additionally offers MSRV and cargo-deny.
+# The checks and their flags live ONLY in scripts/gates.sh (actions/gates runs it); the toolchain version ONLY in RUST_VERSION.
 name: check
 on:
   workflow_call:
@@ -36,21 +37,16 @@ jobs:
           sudo apt-get install -y --no-install-recommends $PACKAGES
       - uses: FreeSynergy/fs-release/actions/setup-rust@main
         with:
+          toolchain: pinned
           components: rustfmt,clippy
           working-directory: ${{ inputs.working-directory }}
           cache-key: check
-      - name: cargo fmt
-        run: cargo fmt --check
-      - name: cargo clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
       - name: Test environment
         if: inputs.test-env != ''
         env:
           TEST_ENV: ${{ inputs.test-env }}
         run: printf '%s\n' "$TEST_ENV" >> "$GITHUB_ENV"
-      - name: cargo test
-        run: cargo test --workspace --all-features
-      - name: FreeSynergy coding rules (ADR 0043)
-        uses: FreeSynergy/fs-release/actions/rust-rules@main
+      - name: Gates (fmt, clippy pedantic, test, FreeSynergy coding rules - ADR 0043)
+        uses: FreeSynergy/fs-release/actions/gates@main
         with:
           working-directory: ${{ inputs.working-directory }}

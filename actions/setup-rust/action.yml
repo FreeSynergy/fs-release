@@ -1,7 +1,7 @@
 name: setup-rust
-description: Newest stable Rust (ADR 0026) plus Swatinem/rust-cache.
+description: Rust toolchain (default newest stable, ADR 0026; "pinned" = the version in fs-release/RUST_VERSION) plus Swatinem/rust-cache.
 inputs:
-  toolchain: { description: "Toolchain, e.g. stable or an MSRV like 1.85", default: stable }
+  toolchain: { description: "Toolchain, e.g. stable, an MSRV like 1.85, or pinned (the central version file RUST_VERSION of fs-release)", default: stable }
   targets: { description: "Comma separated extra targets", default: "" }
   components: { description: "Comma separated components", default: "" }
   working-directory: { description: "Cargo workspace directory", default: "." }
@@ -9,9 +9,17 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Resolve toolchain
+      id: tc
+      shell: bash
+      env:
+        WANTED: ${{ inputs.toolchain }}
+      run: |
+        if [ "$WANTED" = pinned ]; then WANTED=$(tr -d '[:space:]' < "$GITHUB_ACTION_PATH/../../RUST_VERSION"); fi
+        echo "toolchain=$WANTED" >> "$GITHUB_OUTPUT"
     - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
       with:
-        toolchain: ${{ inputs.toolchain }}
+        toolchain: ${{ steps.tc.outputs.toolchain }}
         targets: ${{ inputs.targets }}
         components: ${{ inputs.components }}
     - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
