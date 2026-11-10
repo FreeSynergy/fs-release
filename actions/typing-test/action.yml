@@ -54,4 +54,5 @@ runs:
           ${{ runner.temp }}/typing-test-out/junit.xml
           ${{ runner.temp }}/typing-test-out/shots
           ${{ runner.temp }}/typing-test-out/*.log
+          ${{ runner.temp }}/typing-test-out/rect.txt
         if-no-files-found: warn
