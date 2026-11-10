@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 out = sys.argv[1]
 CHARS = ["a", "Ä", "ä", "ö", "ü", "ß", "@", "€", "{", "}", "[", "]", "\\", "|", "~", "µ"]
 PARTS = ["aÄäöüß@€", "{}[]\\|~µ"]
-MAX_MS = float(os.environ.get("TT_MAX_MS", "8"))
+MAX_MS = float(os.environ.get("TT_MAX_MS") or "8")
 MIN_KEYS = 10
 CARET_GAP_PX = 4
 # What a wrong layout could have produced instead: printable ASCII and the German extras.
