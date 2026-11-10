@@ -1,0 +1,17 @@
+name: publish-release
+description: Publish a signed DRAFT release as a Pre-release, but only when every artefact, signature and SHA256SUMS.txt is there. Idempotent.
+inputs:
+  tag: { description: "Release tag", required: true }
+  repo: { description: "owner/name of the program repo", default: "${{ github.repository }}" }
+  token: { description: "Token with contents write on that repo", required: true }
+  dry-run: { description: "true - check and report only, change nothing", default: "false" }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        REPO: ${{ inputs.repo }}
+        GH_TOKEN: ${{ inputs.token }}
+        DRY_RUN: ${{ inputs.dry-run }}
+      run: '"$GITHUB_ACTION_PATH/publish.sh"'

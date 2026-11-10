@@ -1,0 +1,36 @@
+# Internal: after a successful finalize - publish the draft as Pre-release, then raise the tag in fs-catalog.
+# `catalog` failing leaves the release published (Pre-release) and turns the run red, so it is seen and can be re-run.
+name: _release-publish
+on:
+  workflow_call:
+    inputs:
+      tag: { type: string, required: true }
+      repo: { type: string, default: "", description: "owner/name of the program repo (default - the calling repo)" }
+      dry-run: { type: boolean, default: false }
+    secrets:
+      CATALOG_TOKEN: { required: false, description: "Token with Contents write on FreeSynergy/fs-catalog" }
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: FreeSynergy/fs-release/actions/publish-release@main
+        with:
+          tag: ${{ inputs.tag }}
+          repo: ${{ inputs.repo || github.repository }}
+          token: ${{ github.token }}
+          dry-run: ${{ inputs.dry-run }}
+
+  catalog:
+    needs: publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: FreeSynergy/fs-release/actions/catalog-bump@main
+        with:
+          tag: ${{ inputs.tag }}
+          repo: ${{ inputs.repo || github.repository }}
+          token: ${{ secrets.CATALOG_TOKEN }}
+          dry-run: ${{ inputs.dry-run }}

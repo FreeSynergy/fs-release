@@ -166,3 +166,15 @@ The plan step fails early unless every package that owns binaries declares `auth
 `license` and `repository` in `Cargo.toml` — `cargo-deb`, `cargo-wix` and the rpm builder need them.
 Declare `rust-version` too; the CI `msrv` input should match it.
 
+
+## After the draft: Pre-release and catalog (automatic)
+
+When `finalize` succeeds, `release.yml` runs `publish` (draft -> Pre-release, only when SHA256SUMS.txt, every file and every
+`.asc` are attached; an already published release is left alone) and then `catalog` (raises `tag` of the program in
+`FreeSynergy/fs-catalog/packages.toml` and pushes; fs-catalog's `sign` workflow then regenerates and signs `catalog.xml`).
+Only plain `vX.Y.Z` tags of programs listed in the catalog touch it; the same tag again changes nothing; an older tag never
+lowers the catalog. If `catalog` fails the release stays a Pre-release and the run is red.
+
+The caller passes one more secret: `CATALOG_TOKEN: ${{ secrets.CATALOG_TOKEN }}` (fine-grained token or GitHub App token,
+Contents write on fs-catalog). Input `dry-run: true` runs the guards and prints the diff without changing anything.
+Manual fallback: the `publish-release` workflow (workflow_dispatch: repo, tag, dry-run) in this repo.

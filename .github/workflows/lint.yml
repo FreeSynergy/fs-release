@@ -21,7 +21,7 @@ jobs:
       - name: shellcheck
         run: shellcheck -x -S warning scripts/*.sh tests/packaging/*.sh actions/*/*.sh
       - name: python
-        run: python3 -I -m py_compile actions/plan/plan.py actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py
+        run: python3 -I -m py_compile actions/plan/plan.py actions/catalog-bump/bump_toml.py actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py
   packaging-tests:
     runs-on: ubuntu-24.04
     steps:

@@ -1,4 +1,4 @@
-# Reusable release pipeline: plan -> platform jobs -> signed, attested DRAFT release. Usage: docs/usage.md
+# Reusable release pipeline: plan -> platform jobs -> signed, attested draft -> Pre-release -> catalog. Usage: docs/usage.md
 name: release
 on:
   workflow_call:
@@ -32,9 +32,11 @@ on:
       smoke: { type: boolean, default: true, description: "Install each package on its system (Debian 13, Ubuntu 24.04, Windows) and start every binary; a failure stops the release" }
       smoke-args: { type: string, default: "--version", description: "Arguments for that start test; the binary must exit 0" }
       attest: { type: boolean, default: true, description: "SLSA provenance (private repos need GitHub Enterprise)" }
+      dry-run: { type: boolean, default: false, description: "Check what publish and catalog would do (guards, diff) but change nothing" }
     secrets:
       GPG_PRIVATE_KEY: { required: false, description: "ASCII-armoured OpenPGP secret key; unsigned without it" }
       GPG_PASSPHRASE: { required: false, description: "Passphrase of that key" }
+      CATALOG_TOKEN: { required: false, description: "Contents write on FreeSynergy/fs-catalog; without it the catalog step fails (red) after publishing" }
 
 permissions:
   contents: read
@@ -139,3 +141,16 @@ jobs:
     secrets:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+  # After the draft: publish as Pre-release (only when every file and signature is there), then raise the tag in fs-catalog.
+  publish:
+    needs: [plan, finalize]
+    if: ${{ needs.finalize.result == 'success' }}
+    uses: FreeSynergy/fs-release/.github/workflows/_release-publish.yml@main
+    permissions:
+      contents: write
+    with:
+      tag: ${{ fromJSON(needs.plan.outputs.plan).tag }}
+      dry-run: ${{ inputs.dry-run }}
+    secrets:
+      CATALOG_TOKEN: ${{ secrets.CATALOG_TOKEN }}

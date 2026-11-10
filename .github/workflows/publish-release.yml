@@ -1,0 +1,31 @@
+# Manual fallback: publish an existing draft as Pre-release and/or raise its tag in fs-catalog.
+# Needs the secret CATALOG_TOKEN (Contents write on fs-catalog and on the program repo, for the publish step).
+name: publish-release
+on:
+  workflow_dispatch:
+    inputs:
+      repo: { description: "Program repo, e.g. FreeSynergy/fs-store", required: true }
+      tag: { description: "Release tag, e.g. v0.0.9", required: true }
+      dry-run: { description: "Only check and report", type: boolean, default: true }
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: FreeSynergy/fs-release/actions/publish-release@main
+        with:
+          tag: ${{ inputs.tag }}
+          repo: ${{ inputs.repo }}
+          token: ${{ secrets.CATALOG_TOKEN }}
+          dry-run: ${{ inputs.dry-run }}
+  catalog:
+    needs: publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: FreeSynergy/fs-release/actions/catalog-bump@main
+        with:
+          tag: ${{ inputs.tag }}
+          repo: ${{ inputs.repo }}
+          token: ${{ secrets.CATALOG_TOKEN }}
+          dry-run: ${{ inputs.dry-run }}
