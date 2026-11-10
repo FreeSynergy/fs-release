@@ -50,6 +50,7 @@ check_golden() {
 # check_has NAME TEXT NEEDLE -> TEXT contains the exact line NEEDLE.
 check_has() { if grep -qxF -- "$3" <<<"$2"; then pass "$1"; else fail "$1 (missing line: $3)"; fi; }
 check_lacks() { if grep -qF -- "$3" <<<"$2"; then fail "$1 (unexpected: $3)"; else pass "$1"; fi; }
+check_in() { if grep -qF -- "$3" <<<"$2"; then pass "$1"; else fail "$1 (missing text: $3)"; fi; }
 
 # make_pkg DIR NAME VERSION BIN... -> a cargo package with the given binaries.
 make_pkg() {

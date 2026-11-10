@@ -8,6 +8,7 @@ The files are edited line by line (comments and layout stay), the parser is the 
 dependency whose `git` is the fs-components repo, under any name or `package =`, in `dependencies`,
 `dev-`/`build-dependencies`, `target.*` and `workspace.dependencies`, must have exactly `tag = <tag>` and no rev/branch.
 Handled forms: inline tables, `[dependencies.name]` tables (also `[target.'cfg(..)'.dependencies.name]`).
+A `[patch]`/`[replace]` on the fs-components repo is an error (exit 1, nothing written): never set silently there.
 Anything else fails the check and exits 1, nothing is written then.
 """
 import re, sys, tomllib
@@ -40,14 +41,22 @@ def components_deps(doc):
 def _inline(line: str, tag: str) -> str:
     """`name = { git = "…/fs-components", rev = "x" }` -> tag = "<tag>" right after git."""
     if not re.search(r"git\s*=\s*[\"'][^\"']*/fs-components(\.git)?/?[\"']", line, re.I): return line
-    line = re.sub(r",?\s*\b(rev|branch|tag)\s*=\s*(\"[^\"]*\"|'[^']*')", "", line)
+    val = r"(\"[^\"]*\"|'[^']*')"
+    line = re.sub(rf"\b(rev|branch|tag)\s*=\s*{val}\s*,\s*", "", line)       # `{ tag = "v1", git = .. }`: key followed by comma
+    line = re.sub(rf",\s*\b(rev|branch|tag)\s*=\s*{val}", "", line)          # key at the end
     return re.sub(r"(\bgit\s*=\s*(\"[^\"]*\"|'[^']*'))", lambda m: f'{m.group(1)}, tag = "{tag}"', line, count=1)
 
+def patch_hits(doc):
+    """[patch.*] / [replace] entries that point at the fs-components git repo (never edited, reported)."""
+    hits = [f"[patch.{src}] {n}" for src, e in (doc.get("patch") or {}).items() if isinstance(e, dict)
+            for n, s in e.items() if is_components(s)]
+    return hits + [f"[replace] {n}" for n, s in (doc.get("replace") or {}).items() if is_components(s)]
+
 def edit(text: str, tag: str) -> str:
-    out, section = [], []                       # section: lines of the current [table] (header excluded)
+    out, section, skip = [], [], [False]                       # section: lines of the current [table] (header excluded)
     def flush():
         body = "".join(section)
-        if re.search(r"^\s*git\s*=\s*[\"'][^\"']*/fs-components(\.git)?/?[\"']", body, re.M | re.I):
+        if not skip[0] and re.search(r"^\s*git\s*=\s*[\"'][^\"']*/fs-components(\.git)?/?[\"']", body, re.M | re.I):
             kept = [l for l in section if not re.match(r"\s*(rev|branch|tag)\s*=", l)]
             i = next(i for i, l in enumerate(kept) if re.match(r"\s*git\s*=", l))
             kept.insert(i + 1, f'tag = "{tag}"\n')
@@ -56,8 +65,9 @@ def edit(text: str, tag: str) -> str:
     for line in text.splitlines(keepends=True):
         if re.match(r"\s*\[", line):
             flush(); out.append(line)
+            skip[0] = bool(re.match(r"\s*\[+\s*(patch|replace)\b", line))      # never touch [patch]/[replace] sections
         else:
-            section.append(_inline(line, tag) if "=" in line and "{" in line else line)
+            section.append(_inline(line, tag) if "=" in line and "{" in line and not skip[0] else line)
     flush()
     return "".join(out)
 
@@ -69,6 +79,8 @@ def main(argv):
         text = f.read_text(encoding="utf-8")
         try: doc = tomllib.loads(text)
         except tomllib.TOMLDecodeError as e: print(f"{f}: not valid TOML ({e})", file=sys.stderr); return 1
+        if patch_hits(doc):
+            print(f"{f}: [patch]/[replace] on fs-components ({', '.join(patch_hits(doc))}): a patch hides the tag; remove it by hand", file=sys.stderr); return 1
         if not components_deps(doc): continue
         found += len(components_deps(doc))
         new = edit(text, tag)

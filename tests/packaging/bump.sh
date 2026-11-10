@@ -50,7 +50,8 @@ left=$(grep -rE '(rev|branch)[[:space:]]*=' "$W" --include=Cargo.toml || true)
 n=$(grep -rc 'tag = "v0.4.0"' "$W" --include=Cargo.toml | awk -F: '{s+=$2} END{print s}')
 [ "$n" = 8 ] && pass "bump: all 8 dependencies (any name, package =, tables, workspace, target, build, deep) on the tag" || fail "bump: $n of 8 dependencies on the tag"
 check_has "bump: other fields stay" "$(wtg renamed)" "renamed = { package = \"fs-components-words\", git = \"$CU\", tag = \"v0.4.0\", features = [\"x\"] }"
-if run v0.4.0 fs-prog; then fail "bump: an existing worktree must not be reused"; else pass "bump: an existing worktree is an error, not reused"; fi
+if out=$(run v0.4.0 fs-prog 2>&1); then fail "bump: an existing worktree must not be reused"; else pass "bump: an existing worktree is an error, not reused"; fi
+check_in "bump: the existing-worktree message says what to do" "$out" "remove it yourself"
 git -C "$TB/base/fs-prog" worktree remove --force "$W"
 run v0.4.0 fs-prog && pass "bump: green run succeeds" || fail "bump: green run must succeed"
 git -C "$TB/origin-fs-prog.git" rev-parse -q --verify refs/heads/bump-components-v0.4.0 >/dev/null && pass "bump: green run pushes the branch" || fail "bump: green run must push"
@@ -60,6 +61,30 @@ cp "$TB/bad.sh" "$TB/scripts/gates.sh"; git -C "$TB/base/fs-prog" worktree remov
 run v0.2.0 fs-prog && fail "bump: red gates must fail" || pass "bump: red gates fail"
 git -C "$TB/origin-fs-prog.git" rev-parse -q --verify refs/heads/bump-components-v0.2.0 >/dev/null && fail "bump: red gates must not push" || pass "bump: red gates push nothing"
 cp "$TB/ok.sh" "$TB/scripts/gates.sh"; git -C "$TB/base/fs-prog" worktree remove --force "$W"
+# second run after a green push: the branch is on origin, clear message, nothing deleted, nothing created
+if out=$(run v0.4.0 fs-prog 2>&1); then fail "bump: a branch already on origin must be refused"; else pass "bump: a branch already on origin is refused"; fi
+check_in "bump: the message names the remote branch" "$out" "already exists on origin"
+[ ! -e "$W" ] && git -C "$TB/origin-fs-prog.git" rev-parse -q --verify refs/heads/bump-components-v0.4.0 >/dev/null && pass "bump: the refusal deletes and creates nothing" || fail "bump: the refusal must leave everything as it was"
+# branch checked out in another worktree
+git -C "$TB/base/fs-prog" worktree add -q "$TB/elsewhere" -b bump-components-v0.1.0 origin/main
+if out=$(run v0.1.0 fs-prog 2>&1); then fail "bump: a branch checked out elsewhere must be refused"; else pass "bump: a branch checked out in another worktree is refused"; fi
+check_in "bump: the message names the other worktree" "$out" "another worktree"
+git -C "$TB/base/fs-prog" worktree remove --force "$TB/elsewhere"
+
+# a repo without Cargo.lock: clear message
+mkrepo fs-nolock; printf '[package]\nname = "n"\nversion = "0"\n[dependencies]\nx = { git = "%s", rev = "abc" }\n' "$CU" > "$TB/base/fs-nolock/Cargo.toml"; commit_repo fs-nolock
+if out=$(run v0.4.0 fs-nolock 2>&1); then fail "bump: no Cargo.lock must fail"; else pass "bump: a repo without Cargo.lock fails"; fi
+check_in "bump: the message names Cargo.lock" "$out" "no Cargo.lock"
+git -C "$TB/origin-fs-nolock.git" rev-parse -q --verify refs/heads/bump-components-v0.4.0 >/dev/null && fail "bump: no Cargo.lock must push nothing" || pass "bump: no Cargo.lock pushes nothing"
+
+# [patch]/[replace] on fs-components: error, never set silently
+mkrepo fs-patch; printf '[package]\nname = "n"\nversion = "0"\n[dependencies]\nx = { git = "%s", rev = "abc" }\n[patch."%s"]\nx = { git = "%s", branch = "main" }\n' "$CU" "$CU" "$CU" > "$TB/base/fs-patch/Cargo.toml"; commit_repo fs-patch
+if out=$(run v0.4.0 fs-patch 2>&1); then fail "bump: a [patch] on fs-components must fail"; else pass "bump: a [patch] on fs-components fails"; fi
+check_in "bump: the message names the patch" "$out" "[patch]/[replace]"
+# tag before git
+mkrepo fs-order; printf '[package]\nname = "n"\nversion = "0"\n[dependencies]\nx = { tag = "v0.1.0", git = "%s", features = ["a"] }\ny = { rev = "abc", git = "%s" }\n' "$CU" "$CU" > "$TB/base/fs-order/Cargo.toml"; printf "$LOCK" "$CU" > "$TB/base/fs-order/Cargo.lock"; commit_repo fs-order
+run --dry-run v0.4.0 fs-order && pass "bump: { tag = .., git = .. } and { rev = .., git = .. } are handled" || fail "bump: tag before git must work"
+check_has "bump: tag-first form is rewritten" "$(grep -h '^x =' "$TB/base/.wt-bump-fs-order/Cargo.toml")" "x = { git = \"$CU\", tag = \"v0.4.0\", features = [\"a\"] }"
 
 # idempotence: a repo already on the tag is ok and pushes nothing; no fs-components dependency at all is a failure
 mkrepo fs-done; mkdir -p "$TB/base/fs-done"

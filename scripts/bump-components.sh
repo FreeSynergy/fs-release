@@ -7,8 +7,9 @@
 # Repos default to every /srv/FreeSynergy/fs-* with a Cargo.toml (any depth, not target/ or .wt-*) that names
 # fs-components, except fs-components itself. Before anything: the tag must exist in the fs-components repo
 # ($FS_COMPONENTS_URL, default https://github.com/FreeSynergy/fs-components; `git ls-remote --tags`).
-# Per repo: a FRESH worktree .wt-bump-<repo> from origin/main on branch bump-components-<tag> (an existing worktree
-# is an error: remove it yourself, it may hold old state); scripts/set_components_tag.py sets tag = "<tag>" on EVERY
+# Per repo: a FRESH worktree .wt-bump-<repo> from origin/main on branch bump-components-<tag> (an existing worktree, the branch
+# checked out elsewhere, or the branch already on origin is an error with a clear message: nothing is removed or
+# force-pushed, clean up yourself; a repo without Cargo.lock is an error too, its worktree is kept); scripts/set_components_tag.py sets tag = "<tag>" on EVERY
 # dependency on the fs-components git repo (any name, package =, table form, workspace/dev/build/target tables;
 # rev/branch removed; parser-verified); `cargo update -p <pkg-spec>` for every package from that git source;
 # gates.sh (fmt, clippy, tests, rules); only when green `git push origin HEAD:refs/heads/<branch>`.
@@ -44,12 +45,16 @@ bump_one() {
   repo="$1"; wt="$2"
   git -C "$repo" fetch -q origin
   git -C "$repo" worktree prune
-  [ ! -e "$wt" ] || { echo "   worktree $wt exists (old state?): remove it with git worktree remove, then run again" >&2; return 1; }
+  [ ! -e "$wt" ] || { echo "   worktree $wt exists (left over from an earlier run or a failed gate?): inspect it, remove it yourself with 'git -C $repo worktree remove --force $wt', then run again. Nothing was changed." >&2; return 1; }
+  other="$(git -C "$repo" worktree list --porcelain | awk -v b="refs/heads/$branch" '/^worktree /{w=$2} $1=="branch" && $2==b{print w}')"
+  [ -z "$other" ] || { echo "   branch $branch is checked out in another worktree ($other): remove that worktree yourself, then run again. Nothing was changed." >&2; return 1; }
+  [ -z "$(git -C "$repo" ls-remote --heads origin "refs/heads/$branch" 2>/dev/null)" ] || { echo "   branch $branch already exists on origin (an earlier run pushed it): review or delete that branch (or its pull request) yourself, then run again. Nothing was changed, nothing is deleted or force-pushed." >&2; return 1; }
   git -C "$repo" worktree add -q "$wt" -B "$branch" origin/main
   cd "$wt"
   set +e; python3 -I "$here/set_components_tag.py" "$tag" "$wt"; rc=$?; set -e
   [ "$rc" -eq 0 ] || { echo "   could not set the tag (exit $rc)" >&2; return 1; }
   if git diff --quiet; then echo "   already on $tag, nothing to do"; return 0; fi
+  [ -f Cargo.lock ] || { echo "   no Cargo.lock in $name: nothing to lock (library, or the lock file is not committed). The tag was set in the worktree $wt but not committed or pushed; commit a Cargo.lock to the repo first, or bump this repo by hand." >&2; return 1; }
   # every package from the fs-components git source moves to the new tag; the spec carries url#name@version so a
   # same-named package from another source cannot be meant
   mapfile -t pkgs < <(awk '/^name = /{n=$3; gsub("\"","",n)} /^version = /{v=$3; gsub("\"","",v)} /^source = "git\+[^"]*\/fs-components(\.git)?[?#]/{u=$3; gsub("\"","",u); sub(/^git\+/,"",u); sub(/[?#].*/,"",u); print u "#" n "@" v}' Cargo.lock | sort -u)
