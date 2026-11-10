@@ -46,11 +46,36 @@ def _inline(line: str, tag: str) -> str:
     line = re.sub(rf",\s*\b(rev|branch|tag)\s*=\s*{val}", "", line)          # key at the end
     return re.sub(r"(\bgit\s*=\s*(\"[^\"]*\"|'[^']*'))", lambda m: f'{m.group(1)}, tag = "{tag}"', line, count=1)
 
+def _mentions(*parts) -> bool:
+    return "fs-components" in " ".join(str(p) for p in parts).lower()
+
 def patch_hits(doc):
-    """[patch.*] / [replace] entries that point at the fs-components git repo (never edited, reported)."""
+    """[patch.<url>] / [replace] entries naming fs-components in url, key or value (path, git, anything): never edited, reported.
+    Also a non-empty `paths` (cargo config)."""
     hits = [f"[patch.{src}] {n}" for src, e in (doc.get("patch") or {}).items() if isinstance(e, dict)
-            for n, s in e.items() if is_components(s)]
-    return hits + [f"[replace] {n}" for n, s in (doc.get("replace") or {}).items() if is_components(s)]
+            for n, s in e.items() if _mentions(src, n, s)]
+    hits += [f"[replace] {n}" for n, s in (doc.get("replace") or {}).items() if _mentions(n, s)]
+    return hits + (["paths"] if doc.get("paths") else [])
+
+def config_files(root: Path):
+    """`.cargo/config(.toml)` below root (same skips) and the files they `include`."""
+    seen = set()
+    def load(f):
+        f = f.resolve()
+        if f in seen or not f.is_file(): return
+        seen.add(f)
+        try: doc = tomllib.loads(f.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError: yield f, None; return
+        yield f, doc
+        inc = doc.get("include") or []
+        for i in ([inc] if isinstance(inc, (str, dict)) else inc):
+            p = i.get("path") if isinstance(i, dict) else i
+            if isinstance(p, str): yield from load(f.parent / p)
+    for n in ("config.toml", "config"):
+        for f in sorted(root.rglob(f".cargo/{n}")):
+            parts = f.relative_to(root).parts[:-2]
+            if any(p in SKIP or p.startswith(".wt-") for p in parts): continue
+            yield from load(f)
 
 def edit(text: str, tag: str) -> str:
     out, section, skip = [], [], [False]                       # section: lines of the current [table] (header excluded)
@@ -75,6 +100,10 @@ def main(argv):
     if len(argv) != 3: print(__doc__, file=sys.stderr); return 2
     tag, root = argv[1], Path(argv[2])
     found, writes = 0, {}
+    for f, doc in config_files(root):
+        if doc is None: print(f"{f}: not valid TOML", file=sys.stderr); return 1
+        if patch_hits(doc):
+            print(f"{f}: cargo config overrides fs-components ({', '.join(patch_hits(doc))}): it hides the tag; remove it by hand", file=sys.stderr); return 1
     for f in cargo_tomls(root):
         text = f.read_text(encoding="utf-8")
         try: doc = tomllib.loads(text)

@@ -15,7 +15,7 @@ def code(line: str) -> str:
 
 def main(root: Path) -> int:
     out = []
-    files = [f for d in ("/.github/workflows", "/actions") for f in sorted(Path(str(root) + d).rglob("*.yml"))]
+    files = [f for d in ("/.github/workflows", "/actions") for f in sorted(Path(str(root) + d).rglob("*.y*ml")) if f.suffix in (".yml", ".yaml")]
     for f in files:
         if f.parent.name == "setup-rust": continue          # the action that resolves `pinned` itself
         lines = [code(l) for l in f.read_text(encoding="utf-8").splitlines()]
@@ -33,7 +33,7 @@ def main(root: Path) -> int:
                 key = len(l) - len(l.lstrip(" ")) + (2 if l.lstrip().startswith("- ") else 0)
                 step = []
                 for k in lines[n + 1:]:
-                    if k.strip().startswith("- ") and len(k) - len(k.lstrip()) < key: break
+                    if k.strip() and len(k) - len(k.lstrip()) < key: break      # next step or end of the job
                     step.append(k)
                 if not any(re.search(r"toolchain:\s*pinned$", k) for k in step):
                     out.append(f"{rel}:{n + 1}: setup-rust without toolchain: pinned")

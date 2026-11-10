@@ -62,3 +62,23 @@ rm -rf "$TR/.cargo"
 printf '[package]\nname = "p"\n[dependencies]\na = { git = "https://github.com/evil/fs-components", tag = "v0.4.0" }\n' > "$TR/Cargo.toml"; bad "a fork of fs-components with the same tag fails"
 printf '[package]\nname = "p"\n[dependencies]\na = { git = "https://github.com/FreeSynergy/fs-components.git", tag = "v0.4.0" }\n' > "$TR/Cargo.toml"; ok "the official git url (.git suffix) passes"
 rm -rf "$TR/Cargo.toml" "$TR/.fs-rules.toml"
+# fs-components by NAME or package must be the official git url with a tag: no path, registry, other url, rev, branch
+printf 'blinc = "components-only"\n' > "$TR/.fs-rules.toml"
+FSC='fs-components = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.4.0" }'
+printf '[package]\nname = "p"\n[dependencies]\n%s\n' "$FSC" > "$TR/Cargo.toml"; ok "fs-components by official url and tag passes"
+printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://www.github.com/FreeSynergy/fs-components.git", tag = "v0.4.0" }\n' > "$TR/Cargo.toml"; ok "www. and .git variants of the official url pass"
+printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://github.com/evil/fsc", tag = "v0.4.0" }\n' > "$TR/Cargo.toml"; bad "fs-components from a differently named fork fails"
+printf '[package]\nname = "p"\n[dependencies]\nfs-components = { path = "vendor/x" }\n' > "$TR/Cargo.toml"; bad "fs-components by path fails"
+printf '[package]\nname = "p"\n[dependencies]\nfs-components = "0.4"\n' > "$TR/Cargo.toml"; bad "fs-components from the registry fails"
+printf '[package]\nname = "p"\n[dependencies]\nx = { package = "fs-components", version = "0.4" }\n' > "$TR/Cargo.toml"; bad "package = fs-components from the registry fails"
+printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://github.com/FreeSynergy/fs-components", branch = "main" }\n' > "$TR/Cargo.toml"; bad "fs-components without a tag fails"
+# cargo config: `include` is followed
+mkdir -p "$TR/.cargo"; printf '[package]\nname = "p"\n' > "$TR/Cargo.toml"
+printf 'include = "extra.toml"\n' > "$TR/.cargo/config.toml"; printf '[patch."https://github.com/FreeSynergy/fs-components"]\nfs-components = { path = "../c" }\n' > "$TR/.cargo/extra.toml"; bad "a patch in an included cargo config fails"
+printf 'include = [{ path = "extra.toml", optional = true }]\n' > "$TR/.cargo/config.toml"; bad "a patch in an include with a table form fails"
+rm -rf "$TR/.cargo" "$TR/Cargo.toml" "$TR/.fs-rules.toml"
+# origin decides over `repository`
+printf 'blinc = "components-only"\n' > "$TR/.fs-rules.toml"; printf '[package]\nname = "p"\n[dependencies]\nblinc_app = "1"\n' > "$TR/Cargo.toml"
+mkdir -p "$TR/crates/fs-components"; printf '[package]\nname = "fs-components"\nrepository = "https://github.com/FreeSynergy/fs-components"\n' > "$TR/crates/fs-components/Cargo.toml"
+git init -q "$TR"; git -C "$TR" remote add origin https://github.com/someone/fs-components.git; bad "a fork origin beats a claimed official repository"
+rm -rf "$TR/.git" "$TR/crates" "$TR/Cargo.toml" "$TR/.fs-rules.toml"

@@ -81,6 +81,20 @@ git -C "$TB/origin-fs-nolock.git" rev-parse -q --verify refs/heads/bump-componen
 mkrepo fs-patch; printf '[package]\nname = "n"\nversion = "0"\n[dependencies]\nx = { git = "%s", rev = "abc" }\n[patch."%s"]\nx = { git = "%s", branch = "main" }\n' "$CU" "$CU" "$CU" > "$TB/base/fs-patch/Cargo.toml"; commit_repo fs-patch
 if out=$(run v0.4.0 fs-patch 2>&1); then fail "bump: a [patch] on fs-components must fail"; else pass "bump: a [patch] on fs-components fails"; fi
 check_in "bump: the message names the patch" "$out" "[patch]/[replace]"
+for kind in 'patch-path:[patch."%s"]\nfs-components = { path = "../x" }' 'replace-path:[replace]\n"fs-components:0.1.0" = { path = "../x" }'; do
+  nm="fs-${kind%%:*}"; mkrepo "$nm"
+  # shellcheck disable=SC2059
+  { printf '[package]\nname = "n"\nversion = "0"\n[dependencies]\nx = { git = "%s", rev = "abc" }\n' "$CU"; printf "${kind#*:}\n" "$CU"; } > "$TB/base/$nm/Cargo.toml"; commit_repo "$nm"
+  if out=$(run v0.4.0 "$nm" 2>&1); then fail "bump: $nm must fail"; else pass "bump: $nm (path patch without own git url) fails"; fi
+  check_in "bump: $nm names the override" "$out" "[patch]/[replace]"
+done
+for cfg in config config.toml; do
+  nm="fs-cfg-$cfg"; nm="${nm//./-}"; mkrepo "$nm"; mkdir -p "$TB/base/$nm/.cargo"
+  printf '[package]\nname = "n"\nversion = "0"\n[dependencies]\nx = { git = "%s", rev = "abc" }\n' "$CU" > "$TB/base/$nm/Cargo.toml"
+  printf '[patch."%s"]\nfs-components = { path = "../x" }\n' "$CU" > "$TB/base/$nm/.cargo/$cfg"; commit_repo "$nm"
+  if out=$(run v0.4.0 "$nm" 2>&1); then fail "bump: .cargo/$cfg patch must fail"; else pass "bump: a .cargo/$cfg patch on fs-components fails"; fi
+  check_in "bump: .cargo/$cfg message" "$out" "cargo config overrides"
+done
 # tag before git
 mkrepo fs-order; printf '[package]\nname = "n"\nversion = "0"\n[dependencies]\nx = { tag = "v0.1.0", git = "%s", features = ["a"] }\ny = { rev = "abc", git = "%s" }\n' "$CU" "$CU" > "$TB/base/fs-order/Cargo.toml"; printf "$LOCK" "$CU" > "$TB/base/fs-order/Cargo.lock"; commit_repo fs-order
 run --dry-run v0.4.0 fs-order && pass "bump: { tag = .., git = .. } and { rev = .., git = .. } are handled" || fail "bump: tag before git must work"
