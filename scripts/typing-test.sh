@@ -10,7 +10,7 @@
 #                           included): does not depend on where KWin places the window
 #   TT_CLICK     "x,y"      the same on the screen; TT_SCENARIO: bash fragment defining focus() (see session.sh)
 #   TT_FIELD     "x,y,w,h"  the field's rectangle on screen (default: found by its blinking caret)
-#   TT_TEXT_WIDTH           pixels of text area right of the caret (default 170; the 16 characters go in two parts)
+#   TT_TEXT_WIDTH           pixels of text area right of the caret (default 110; the 16 characters go in two parts)
 #   TT_LAYOUT    xkb layout (default de)      TT_SIZE  WxH (default 1280x800)
 #   TT_MAX_MS    limit for the median key-to-picture time (default 8). Without a GPU the compositor sets the pace,
 #                so there the time is reported but not enforced (TT_ENFORCE_MS=1 enforces it).
@@ -92,6 +92,10 @@ export XDG_RUNTIME_DIR="$RUNTIME" WINIT_UNIX_BACKEND=wayland GDK_BACKEND=wayland
 export TT_SOCKET="${TT_SOCKET:-tt-$$}" TT_DIR="$TT" TT_OUT="$OUT" TT_BIN="$BIN" TT_INJECT TT_LAYOUT="${TT_LAYOUT:-${LAYOUT:-de}}" TT_SIZE="$SIZE"
 export XDG_DATA_DIRS="$OUT/.xdg:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 export XKB_DEFAULT_LAYOUT="$TT_LAYOUT"
+# A laptop's KWin takes the layout from the user's kxkbrc, not from XKB_DEFAULT_LAYOUT: give it a config of its own.
+mkdir -p "$RUNTIME/config"
+printf '[Layout]\nLayoutList=%s\nUse=true\nVariantList=\n' "$TT_LAYOUT" > "$RUNTIME/config/kxkbrc"
+export XDG_CONFIG_HOME="$RUNTIME/config"
 export KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1
 # Without a GPU (GitHub runner) KWin composes with OpenGL 2 in software (llvmpipe); its screenshot service needs OpenGL.
 if [ ! -e /dev/dri/renderD128 ]; then

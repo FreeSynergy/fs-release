@@ -22,7 +22,7 @@ nudge() { c "move $((NX + 1)) $NY" 0.1; c "move $NX $NY" 0.2; }
 shot_arrived() {
   shot_stable "$1"
   local n=0
-  until python3 -I "$TT_DIR/fieldcheck.py" arrived "$D/shots/$1.png" || [ "$n" -ge 5 ]; do
+  until python3 -I "$TT_DIR/fieldcheck.py" arrived "$D/shots/$1.png" "$D/shots/blank.png" || [ "$n" -ge 5 ]; do
     n=$((n + 1)); sleep 0.5; nudge; shot_stable "$1"
   done
   echo "$1 $n" >> "$D/late.log"
@@ -86,7 +86,7 @@ if [ "${TT_PHASE:-all}" != latency ]; then
   # Where the field is: given (TT_FIELD), else found by its caret (it blinks, so two pictures differ by a narrow bar).
   if [ -z "${TT_FIELD:-}" ]; then
     for _ in 1 2 3 4 5 6 7 8; do
-      shot ca; sleep 0.35; shot cb
+      shot ca; sleep "0.$((RANDOM % 7 + 1))"; shot cb
       if r="$(python3 -I "$TT_DIR/fieldcheck.py" rect "$D/shots/ca.png" "$D/shots/cb.png")"; then TT_RECT="$r"; export TT_RECT; break; fi
     done
   fi
@@ -109,7 +109,7 @@ if [ "${TT_PHASE:-all}" != latency ]; then
     nudge
     shot_stable "full$n"
     for _ in 1 2 3 4 5 6; do
-      shot "full$n.b"
+      sleep "0.$((RANDOM % 7 + 1))"; shot "full$n.b"
       python3 -I "$TT_DIR/fieldcheck.py" caretx "$D/shots/full$n.png" "$D/shots/full$n.b.png" > /dev/null && break
       sleep 0.3
     done
