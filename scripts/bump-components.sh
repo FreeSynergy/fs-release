@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # Move every program repo to a new fs-components tag, test it, and push a branch (no tag, no merge).
 #   scripts/bump-components.sh [--dry-run] <tag> [repo ...]     e.g. scripts/bump-components.sh v0.4.0
-# Repos default to every /srv/FreeSynergy/fs-* with a Cargo.toml that names fs-components, except fs-components itself.
-# Per repo: worktree from origin/main on branch bump-components-<tag>, set the tag on every fs-components* git
-# dependency (tag = or rev = become tag =), `cargo update -p fs-components*` (every package of that git source), then gates.sh (fmt, clippy, tests, rules),
-# and only when green push the branch. --dry-run does everything up to and including the gates but pushes nothing
-# and prints what it would push. Builds go through limited.sh. A failing repo does not stop the others; the exit
-# code is 1 when any repo failed.
+# WHAT IT DOES NOT DO: it does not convert programs. It removes no blinc* line, no [patch], rewrites no `use`.
+# The first move of a repo onto "Blinc only through fs-components" is manual work per repo (then add
+# `.fs-rules.toml` with `blinc = "components-only"`, see DESIGN.md); this script only moves the tag afterwards.
+# Repos default to every /srv/FreeSynergy/fs-* with a Cargo.toml (any depth, not target/ or .wt-*) that names
+# fs-components, except fs-components itself. Before anything: the tag must exist in the fs-components repo
+# ($FS_COMPONENTS_URL, default https://github.com/FreeSynergy/fs-components; `git ls-remote --tags`).
+# Per repo: a FRESH worktree .wt-bump-<repo> from origin/main on branch bump-components-<tag> (an existing worktree
+# is an error: remove it yourself, it may hold old state); scripts/set_components_tag.py sets tag = "<tag>" on EVERY
+# dependency on the fs-components git repo (any name, package =, table form, workspace/dev/build/target tables;
+# rev/branch removed; parser-verified); `cargo update -p <pkg-spec>` for every package from that git source;
+# gates.sh (fmt, clippy, tests, rules); only when green `git push origin HEAD:refs/heads/<branch>`.
+# No dependency found = FAILED. Already on the tag = ok, nothing pushed. --dry-run does everything up to and
+# including the gates but pushes nothing. Builds go through limited.sh. A failing repo does not stop the others;
+# the exit code is 1 when any repo failed.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 base="${FS_BASE:-/srv/FreeSynergy}"
@@ -15,13 +23,18 @@ dry=0
 if [ "${1:-}" = "--dry-run" ]; then dry=1; shift; fi
 tag="${1:?usage: bump-components.sh [--dry-run] <tag> [repo ...]}"; shift
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][A-Za-z0-9.]+)?$ ]] || { echo "not a version tag: $tag" >&2; exit 2; }
+comp_url="${FS_COMPONENTS_URL:-https://github.com/FreeSynergy/fs-components}"
+[ -n "$(git ls-remote --tags "$comp_url" "refs/tags/$tag" 2>/dev/null)" ] || { echo "tag $tag does not exist in $comp_url" >&2; exit 2; }
 branch="bump-components-$tag"
 repos=("$@")
+has_components() { # any Cargo.toml (not in target/, .git/, .wt-*) that mentions fs-components
+  find "$1" \( -name target -o -name .git -o -name 'node_modules' -o -name '.wt-*' \) -prune -o -name Cargo.toml -print0 | xargs -0 -r grep -ls 'fs-components' >/dev/null
+}
 if [ "${#repos[@]}" -eq 0 ]; then
   for d in "$base"/fs-*/; do
     d="${d%/}"
     [ "$(basename "$d")" = fs-components ] && continue
-    grep -qs 'fs-components' "$d/Cargo.toml" "$d"/crates/*/Cargo.toml && repos+=("$d")
+    has_components "$d" && repos+=("$d")
   done
 fi
 # One repo, in its own shell: `set -e` is ignored inside a subshell that is the left side of `||`, so a failing step
@@ -30,25 +43,25 @@ bump_one() {
   set -euo pipefail
   repo="$1"; wt="$2"
   git -C "$repo" fetch -q origin
-  [ -e "$wt" ] || git -C "$repo" worktree add -q "$wt" -B "$branch" origin/main
+  git -C "$repo" worktree prune
+  [ ! -e "$wt" ] || { echo "   worktree $wt exists (old state?): remove it with git worktree remove, then run again" >&2; return 1; }
+  git -C "$repo" worktree add -q "$wt" -B "$branch" origin/main
   cd "$wt"
-  mapfile -t tomls < <(grep -ls 'fs-components' Cargo.toml crates/*/Cargo.toml || true)
-  # a dependency line `fs-components... = { git = ".../fs-components", tag|rev = "..." }` gets tag = "<tag>"
-  sed -i -E '/^[[:space:]]*fs-components[A-Za-z0-9_-]*[[:space:]]*=.*github\.com\/FreeSynergy\/fs-components/ s/(tag|rev)[[:space:]]*=[[:space:]]*"[^"]*"/tag = "'"$tag"'"/' "${tomls[@]}"
-  if git diff --quiet && [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then echo "   already on $tag"; return 0; fi
-  if ! git diff --quiet; then
-    # every fs-components* package that comes from the fs-components git source moves to the new tag
-    pkgs=()
-    while read -r p; do pkgs+=(-p "$p"); done < <(awk '/^name = /{n=$3} /^source = .*FreeSynergy\/fs-components/{gsub("\"","",n); print n}' Cargo.lock | sort -u)
-    [ "${#pkgs[@]}" -gt 0 ] || { echo "   no fs-components package in Cargo.lock" >&2; return 1; }
-    "$limited" cargo update "${pkgs[@]}"
-    git add -A
-    git commit -q -m "fs-components $tag
+  set +e; python3 -I "$here/set_components_tag.py" "$tag" "$wt"; rc=$?; set -e
+  [ "$rc" -eq 0 ] || { echo "   could not set the tag (exit $rc)" >&2; return 1; }
+  if git diff --quiet; then echo "   already on $tag, nothing to do"; return 0; fi
+  # every package from the fs-components git source moves to the new tag; the spec carries url#name@version so a
+  # same-named package from another source cannot be meant
+  mapfile -t pkgs < <(awk '/^name = /{n=$3; gsub("\"","",n)} /^version = /{v=$3; gsub("\"","",v)} /^source = "git\+[^"]*\/fs-components(\.git)?[?#]/{u=$3; gsub("\"","",u); sub(/^git\+/,"",u); sub(/[?#].*/,"",u); print u "#" n "@" v}' Cargo.lock | sort -u)
+  [ "${#pkgs[@]}" -gt 0 ] || { echo "   no fs-components package in Cargo.lock" >&2; return 1; }
+  args=(); for p in "${pkgs[@]}"; do args+=(-p "$p"); done
+  "$limited" cargo update "${args[@]}" || { echo "   cargo update failed (ambiguous or unknown package spec?)" >&2; return 1; }
+  git add -A
+  git commit -q -m "fs-components $tag
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
-  fi
   "$limited" "$here/gates.sh" "$wt"
-  if [ "$dry" = 1 ]; then echo "   dry run: would push $branch of $name"; else git push -q origin "$branch"; echo "   pushed $branch"; fi
+  if [ "$dry" = 1 ]; then echo "   dry run: would push $branch of $name"; else git push -q origin "HEAD:refs/heads/$branch"; echo "   pushed $branch"; fi
 }
 failed=()
 for repo in "${repos[@]}"; do
