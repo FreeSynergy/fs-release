@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside the virtual KWin (started by ../typing-test.sh): drives the app and takes the pictures.
-# Phase A waits for the window, finds the field by its caret, types one character at a time and takes a picture of
-# each, then two parts of a text; phase B types a text with the app's Wayland trace switched on, for the
+# Phase A waits for the window, finds the field around the click, types one character at a time and takes a picture of
+# each, then two parts of a text (the caret is looked for inside the field only); phase B types a text with the app's Wayland trace switched on, for the
 # key-to-picture time. A scenario file may use c, shot, WX0/WY0 (the window's corner) and set TT_NEAR="x,y"
 # (a point in the field, for finding the caret).
 set -uo pipefail
@@ -83,14 +83,20 @@ if [ "${TT_PHASE:-all}" != latency ]; then
   if ! wait_window; then echo "no window after ${TT_SETTLE_KEEP} s" > "$D/.session-failed"; stop_app; kill "$INJ" 2>/dev/null; exit 0; fi
   focus
   sleep 0.6
-  # Where the field is: given (TT_FIELD), else found by its caret (it blinks, so two pictures differ by a narrow bar).
+  # Where the field is: given (TT_FIELD), else the rectangle around the click (edges against the background), never a
+  # guess from coloured columns of the page. Without an edge a box around the click is the fallback (logged).
   if [ -z "${TT_FIELD:-}" ]; then
-    for _ in 1 2 3 4 5 6 7 8; do
-      shot ca; sleep "0.$((RANDOM % 7 + 1))"; shot cb
-      if r="$(python3 -I "$TT_DIR/fieldcheck.py" rect "$D/shots/ca.png" "$D/shots/cb.png" 2>> "$D/fieldcheck.log")"; then TT_RECT="$r"; export TT_RECT; break; fi
-      echo "no caret in pair near ${TT_NEAR:-?}" >> "$D/fieldcheck.log"
-    done
+    shot fa
+    if r="$(python3 -I "$TT_DIR/fieldcheck.py" field "$D/shots/fa.png" 2>> "$D/fieldcheck.log")"; then
+      TT_RECT="$r"
+    else
+      IFS=, read -r nx0 ny0 <<<"$TT_NEAR"
+      TT_RECT="$((nx0 - 100)),$((ny0 - 14)),$((nx0 + 100)),$((ny0 + 14))"
+      echo "no field edges around ${TT_NEAR:-?}: fallback box $TT_RECT" >> "$D/fieldcheck.log"
+    fi
+    export TT_RECT
   fi
+  echo "${TT_NEAR:-}" > "$D/near.txt"
   echo "$TT_RECT" > "$D/rect.txt"
   IFS=, read -r rx0 ry0 rx1 ry1 <<<"$TT_RECT"
   NX=$(((rx0 + rx1) / 2)); NY=$(((ry0 + ry1) / 2))
@@ -109,10 +115,12 @@ if [ "${TT_PHASE:-all}" != latency ]; then
     c "text $text" "$(wait_for "$text")"
     nudge
     shot_stable "full$n"
-    for _ in 1 2 3 4 5 6; do
-      sleep "0.$((RANDOM % 7 + 1))"; shot "full$n.b"
-      python3 -I "$TT_DIR/fieldcheck.py" caretx "$D/shots/full$n.png" "$D/shots/full$n.b.png" > /dev/null && break
+    # The caret blinks: several pictures, more than 200 ms apart, until one pair shows it (the union decides).
+    frames=("$D/shots/full$n.png")
+    for suffix in b c d e f g; do
       sleep 0.3
+      shot "full$n.$suffix"; frames+=("$D/shots/full$n.$suffix.png")
+      [ "$suffix" != b ] && python3 -I "$TT_DIR/fieldcheck.py" caretx "${frames[@]}" > /dev/null && break
     done
     for _ in 1 2 3 4 5 6 7 8; do c "key 14" 0.12; done
     nudge

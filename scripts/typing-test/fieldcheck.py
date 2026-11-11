@@ -2,11 +2,10 @@
 """Picture helpers for the typing test, colours taken from the picture itself (no theme is assumed).
 
   fieldcheck.py window A.png          x0,y0,x1,y1 of everything that is not the black screen (exit 1: nothing there)
-  fieldcheck.py rect A.png B.png      the text area of the focused field, found by its blinking caret (the narrow bar
-                                      that differs between two pictures, else a narrow saturated-blue bar); TT_NEAR=x,y picks the bar nearest to it
+  fieldcheck.py field A.png           the inside of the input field around the click point TT_NEAR=x,y (exit 1: none found)
   fieldcheck.py same A.png B.png      exit 0 if the field (TT_RECT) looks the same in both, a caret apart
   fieldcheck.py arrived A.png BLANK   exit 0 if the field shows a typed glyph instead of what BLANK showed
-  fieldcheck.py caretx A.png B.png    x of the caret (column in the picture) from two pictures"""
+  fieldcheck.py caretx A.png B.png... x of the caret inside the field TT_RECT, from two or more pictures"""
 import os
 import sys
 import warnings
@@ -74,23 +73,83 @@ def diff(a, b, rect=None, thr=60):
     return {(x, y) for x in range(w) for y in range(h) if sum(abs(pa[x, y][i] - pb[x, y][i]) for i in range(3)) > thr}
 
 
-def caret_bar(a, b, near=None):
-    found = bars(diff(a, b))
-    if not found:
-        return None
-    if near:
-        return min(found, key=lambda t: abs(t[0] - near[0]) + abs(t[1] - near[1]))
-    return found[0]
+INSET = 4  # the focus ring and the border are left out of the field's inside
 
 
-def caret_bar_single(img, near=None):
-    """Fallback when the caret does not blink between two pictures: a narrow bar in a saturated blue."""
+def _far(px, x, y, bg, thr):
+    r, g, b = px[x, y]
+    return abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) > thr
+
+
+def field_around(img, point, thr=12, minline=40):
+    """The input field that contains `point` (the click): the nearest enclosing rectangle whose edge differs from the
+    field's own background. Top and bottom are rows with a long unbroken line across the click's column (glyphs and a
+    caret never make one), left and right are columns that are 'far' over the middle of that height (a caret is too short).
+    Buttons and other things beside or above the field are never looked at. Returns (x0, y0, x1, y1) of the inside
+    (ring and border cut off) or None."""
     w, h = img.size
     px = img.load()
-    found = bars({(x, y) for x in range(w) for y in range(h) if px[x, y][2] - px[x, y][0] > 100 and px[x, y][0] < 130})
+    cx, cy = point
+    if not (0 <= cx < w and 0 <= cy < h):
+        return None
+    box = img.crop((max(0, cx - 80), max(0, cy - 6), min(w, cx + 80), min(h, cy + 7)))
+    bg = background(box)
+
+    def hline(y):
+        lo = hi = cx
+        while lo > 0 and _far(px, lo - 1, y, bg, thr):
+            lo -= 1
+        while hi < w - 1 and _far(px, hi + 1, y, bg, thr):
+            hi += 1
+        return _far(px, cx, y, bg, thr) and hi - lo + 1 >= minline
+
+    top = next((y for y in range(cy, -1, -1) if hline(y)), None)
+    bottom = next((y for y in range(cy, h) if hline(y)), None)
+    if top is None or bottom is None or bottom - top < 12:
+        return None
+    height = bottom - top + 1
+
+    # Corners are rounded, so only the middle 60 % of the height must be an edge; a caret is shorter than that.
+    band = range(top + int(height * 0.2), bottom - int(height * 0.2) + 1)
+
+    def vline(x):
+        return sum(_far(px, x, y, bg, thr) for y in band) >= 0.9 * len(band)
+
+    left = next((x for x in range(cx, -1, -1) if vline(x)), None)
+    right = next((x for x in range(cx, w) if vline(x)), None)
+    if left is None or right is None or right - left < 20:
+        return None
+    return left + INSET, top + INSET, right - INSET, bottom - INSET
+
+
+def _blue_mask(img, rect):
+    px = img.load()
+    x0, y0, x1, y1 = rect
+    return {(x - x0, y - y0) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)
+            if px[x, y][2] - px[x, y][0] > 100 and px[x, y][0] < 130}
+
+
+def find_caret(frames, rect, after=None):
+    """The caret in the field `rect` (inside only, so a button or the focus ring in the same pixel column cannot be
+    taken for it): a narrow bar that differs between some of the pictures (it blinks; the union over all pairs), else
+    a narrow saturated-blue bar present in some picture. With several candidates the one nearest to x `after` (the end
+    of the text). Returns (x, y0, y1) in picture coordinates or None."""
+    x0, y0, x1, y1 = rect
+    maxh = y1 - y0 + 1
+    mask = set()
+    for i in range(len(frames)):
+        for j in range(i + 1, len(frames)):
+            mask |= diff(frames[i], frames[j], (x0, y0, x1 + 1, y1 + 1))
+    found = bars(mask, maxh=maxh)
+    if not found:
+        blue = set()
+        for f in frames:
+            blue |= _blue_mask(f, rect)
+        found = bars(blue, maxh=maxh)
     if not found:
         return None
-    return min(found, key=lambda t: abs(t[0] - near[0]) + abs(t[1] - near[1])) if near else found[0]
+    pick = min(found, key=lambda t: abs(t[0] - ((after if after is not None else 0) - x0)))
+    return pick[0] + x0, pick[1] + y0, pick[2] + y0
 
 
 def main():
@@ -105,17 +164,19 @@ def main():
             return 1
         print(f"{min(xs)},{min(ys)},{max(xs)},{max(ys)}")
         return 0
-    if mode == "rect":
-        near = tuple(int(v) for v in os.environ["TT_NEAR"].split(",")) if os.environ.get("TT_NEAR") else None
-        bar = caret_bar(load(sys.argv[2]), load(sys.argv[3]), near) or caret_bar_single(load(sys.argv[2]), near)
-        if not bar:
+    if mode == "field":
+        near = tuple(int(v) for v in os.environ["TT_NEAR"].split(","))
+        rect = field_around(load(sys.argv[2]), near)
+        if not rect:
             return 1
-        cx, y0, y1 = bar
-        width = int(os.environ.get("TT_TEXT_WIDTH") or "110")
-        print(f"{cx - 4},{y0 - 4},{cx + width},{y1 + 4}")
+        width = os.environ.get("TT_TEXT_WIDTH")
+        if width:
+            rect = (rect[0], rect[1], min(rect[2], rect[0] + int(width)), rect[3])
+        print(",".join(map(str, rect)))
         return 0
     if mode == "caretx":
-        bar = caret_bar(load(sys.argv[2]), load(sys.argv[3])) or caret_bar_single(load(sys.argv[2]))
+        frames = [load(p) for p in sys.argv[2:]]
+        bar = find_caret(frames, rect_from_env())
         if not bar:
             return 1
         print(bar[0])

@@ -4,6 +4,7 @@ visible, how fast does it show.
 
 Writes result.json and junit.xml, prints a table, exits 0 (all pass) or 1 (a check failed).
 Settings come from the TT_* environment (see ../typing-test.sh)."""
+import glob
 import json
 import os
 import warnings
@@ -190,11 +191,14 @@ for n, text in enumerate(PARTS, 1):
     case(f"part {n} is visible", px >= 0.6 * wanted and px >= 4 * len(text), f"{px} ink pixels, single glyphs {wanted}")
     case(f"part {n} typed in one go equals one by one", 0.6 * wanted <= px <= 1.4 * wanted, f"{px} vs {wanted}")
     gap = None
-    if os.path.exists(f"{out}/shots/full{n}.b.png"):
+    extra = sorted(glob.glob(f"{out}/shots/full{n}.?.png"))
+    if extra:
         ink_px = fc.ink(img, rect)
-        bar = fc.caret_bar(img, shot(f"full{n}.b")) or fc.caret_bar_single(img)
-        if bar and ink_px:
-            gap = bar[0] - rect[0] - max(x for x, _ in ink_px) - 1
+        if ink_px:
+            end = rect[0] + max(x for x, _ in ink_px)
+            bar = fc.find_caret([img] + [fc.load(p) for p in extra], rect, after=end)
+            if bar:
+                gap = bar[0] - end - 1
     result["visible"][f"part{n}"]["caret_gap_px"] = gap
     case(f"part {n} caret sits behind the last glyph", gap is not None and -1 <= gap <= CARET_GAP_PX, f"gap {gap} px")
 
