@@ -21,6 +21,10 @@ lk_bad "Blinc by branch is red" "blinc_app=$B?branch=main#$S3"
 lk_bad "a fork under a non-blinc name with a blinc source is red" "other=git+https://github.com/someone/blinc#$SX"
 lk_ok  "a lock without Blinc is green"
 if printf '' | LK; then pass "blinc-lock: an empty lock is green"; else fail "blinc-lock: empty lock must pass"; fi
+mkdir -p "$TB/nolock"
+if python3 -I "$ROOT/scripts/check_blinc_lock.py" --approved "$TB/approved.txt" "$TB/nolock" >"$TB/out" 2>&1; then pass "blinc-lock: a repo directory without Cargo.lock is green (nothing to check)"; else fail "blinc-lock: no Cargo.lock must pass, got: $(cat "$TB/out")"; fi
+check_lacks "blinc-lock: no Cargo.lock gives no traceback" "$(cat "$TB/out")" "Traceback"
+if python3 -I "$ROOT/scripts/check_blinc_lock.py" --approved "$TB/approved.txt" "$TB/nolock/Cargo.lock" >/dev/null 2>&1; then fail "blinc-lock: a named missing lock file must still fail"; else pass "blinc-lock: a named missing lock file still fails"; fi
 lock "blinc_app=git+https://github.com/FreeSynergy/blinc-app-fix#$SX" | LK || true; check_in "blinc-lock: the error names package, source and approved tag" "$(cat "$TB/out")" "package \`blinc_app\`"
 check_in "blinc-lock: the error names fs-components and the approve script for maintainers" "$(cat "$TB/out")" "only through fs-components"
 check_in "blinc-lock: the error counts the packages" "$(cat "$TB/out")" "1 Blinc package(s)"

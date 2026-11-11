@@ -94,7 +94,10 @@ def main(argv):
     a = args[0]
     if a == "-": text, label = sys.stdin.read(), "Cargo.lock"
     else:
-        p = Path(a); p = p / "Cargo.lock" if p.is_dir() else p
+        p = Path(a)
+        if p.is_dir():
+            p = p / "Cargo.lock"
+            if not p.is_file(): print(f"blinc lock ok (no Cargo.lock in {a}: nothing to check)"); return 0
         text, label = p.read_text(encoding="utf-8"), str(p)
     errors = lock_errors(text, approved, label)
     for e in errors: print("ERROR", e)
