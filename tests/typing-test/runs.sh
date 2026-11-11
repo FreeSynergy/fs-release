@@ -44,4 +44,10 @@ check "red beats could-not-run" "$(run "2 1 0" 3)" 1
 check "one run only" "$(run "0" 1)" 0
 check "default is three runs" "$(rm -f "$work/state"; rm -rf "$work/out"; FAKE_STATE="$work/state" FAKE_CODES="0 0 0 0" TT_RUN_CMD="$work/fake.sh" TT_OUT="$work/out" "$runs" app >/dev/null 2>&1; cat "$work/state")" 3
 check "runs 0 is refused" "$(run "0" 0)" 2
+check "runs 00 is refused" "$(run "0" 00)" 2
+check "runs 000 is refused" "$(run "0" 000)" 2
+check "runs empty is refused" "$(run "0" "")" 2
+check "runs 'x' is refused" "$(run "0" x)" 2
+check "runs 02 is accepted" "$(run "0 0" 02)" 0
+check "runs 02 means two runs" "$(cat "$work/state")" 2
 exit "$fail"

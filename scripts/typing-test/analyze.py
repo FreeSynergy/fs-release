@@ -32,8 +32,8 @@ LOOKALIKES = {"|": set("|lIi!1")}  # a plain bar cannot be told from these by sh
 # Near twins a wrong layout or a missing accent could produce: the typed character must rank above its twin, not only be in the
 # best three (a dead key gives a for ä, a missing AltGr a bracket of the wrong kind).
 RIVALS = {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "[": "(", "{": "(", "]": ")", "}": ")"}
-ACCENTED = set("ÄäöÜü")
-RANK_OK = 3# the typed character must be among the best three matches ("|" looks like "l" in many fonts)
+ACCENTED = set("Ääöü")
+RANK_OK = 3  # the typed character must be among the best three matches ("|" looks like "l" in many fonts)
 
 
 def shot(name):

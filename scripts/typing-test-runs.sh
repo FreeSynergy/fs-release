@@ -14,7 +14,9 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUNS="${TT_RUNS:-3}"
 RUN_CMD="${TT_RUN_CMD:-$HERE/typing-test.sh}"
-case "$RUNS" in '' | *[!0-9]* | 0) echo "typing-test-runs: TT_RUNS must be a number of at least 1, got '$RUNS'" >&2; exit 2 ;; esac
+case "$RUNS" in '' | *[!0-9]*) echo "typing-test-runs: TT_RUNS must be a number of at least 1, got '$RUNS'" >&2; exit 2 ;; esac
+RUNS=$((10#$RUNS))  # 00 and 000 are zero, too (and 08 is not an invalid octal number)
+if [ "$RUNS" -lt 1 ]; then echo "typing-test-runs: TT_RUNS must be a number of at least 1, got '$RUNS'" >&2; exit 2; fi
 
 OUT="$(mkdir -p "${TT_OUT:-typing-test-out}" && cd "${TT_OUT:-typing-test-out}" && pwd)"
 red=0 broken=0
