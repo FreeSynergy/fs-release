@@ -9,7 +9,7 @@
 #   TT_CLICK_REL "x,y"      where to click to focus the field, from the top left corner of the app window (decoration
 #                           included): does not depend on where KWin places the window
 #   TT_CLICK     "x,y"      the same on the screen; TT_SCENARIO: bash fragment defining focus() (see session.sh)
-#   TT_FIELD     "x,y,w,h"  the field's rectangle on screen (default: found by its blinking caret)
+#   TT_FIELD     "x,y,w,h"  the field's rectangle on screen (default: found inside the field around the click: blinking caret, else a blue bar)
 #   TT_TEXT_WIDTH           pixels of text area right of the caret (default 110; the 16 characters go in two parts)
 #   TT_LAYOUT    xkb layout (default de)      TT_SIZE  WxH (default 1280x800)
 #   TT_MAX_MS    limit for the median key-to-picture time (default 8). Without a GPU the compositor sets the pace,
@@ -63,7 +63,7 @@ NoDisplay=true
 DESK
 
 # The field's rectangle on screen as x0,y0,x1,y1: TT_FIELD, else 300x40 around the click point (a fallback; the
-# session finds the field by its caret).
+# session finds the field from the edges around the click, the caret inside it: blinking, else a blue bar).
 if [ -n "${TT_FIELD:-}" ]; then
   IFS=, read -r fx fy fw fh <<<"$TT_FIELD"
 elif [ -n "${TT_CLICK:-}" ]; then

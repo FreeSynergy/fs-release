@@ -7,7 +7,7 @@ on:
       components-ref: { description: "fs-components ref to build", default: q0-blinc-one-place }
       max-ms: { description: "Limit for the median key-to-picture time in ms", default: "8" }
   push:
-    branches: [q1b-typing-test, typing-test-caret]
+    branches: [q1b-typing-test]
     paths: ["actions/typing-test/**", "scripts/typing-test*", "scripts/typing-test/**", ".github/workflows/typing-test-probe.yml"]
 
 permissions:
