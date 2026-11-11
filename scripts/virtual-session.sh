@@ -32,6 +32,7 @@ _vs_under() { # _vs_under PATH DIR: PATH is DIR or below it, no ".." parts
 _vs_roots() { printf '%s\n' /tmp "${TMPDIR:-}" /srv/FreeSynergy/.scratch; printf '%s' "${VS_ROOTS:-}" | tr ':' '\n'; }
 _vs_in_roots() { local r; while IFS= read -r r; do _vs_under "$1" "$r" && return 0; done < <(_vs_roots); return 1; }
 
+# shellcheck disable=SC2120  # the optional argument "no-bus" is passed by callers
 vs_guard() {
   local rt="${XDG_RUNTIME_DIR:-}" bus="${DBUS_SESSION_BUS_ADDRESS:-}" real p why=""
   real="/run/user/$(id -u)"
