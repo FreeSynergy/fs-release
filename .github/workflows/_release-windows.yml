@@ -42,6 +42,7 @@ jobs:
           name: dist-windows-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 3
 
   # Install each package as a person would (unzip, msiexec, setup.exe /S), start each binary, uninstall it again.
   smoke:

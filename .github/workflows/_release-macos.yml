@@ -30,3 +30,4 @@ jobs:
           name: dist-macos-universal
           path: dist/*
           if-no-files-found: error
+          retention-days: 3

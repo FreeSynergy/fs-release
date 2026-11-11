@@ -55,6 +55,7 @@ jobs:
           name: dist-linux-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 3
 
   arch:
     name: arch x86_64
@@ -77,6 +78,7 @@ jobs:
           name: dist-arch
           path: dist/*.pkg.tar.zst
           if-no-files-found: error
+          retention-days: 3
 
   # Install every .deb on the systems we promise (Debian 13, Ubuntu 24.04), start each binary, remove it again.
   smoke-deb:
