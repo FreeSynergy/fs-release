@@ -28,6 +28,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: no composite action calls another fs-release action by a moving ref
+        run: |
+          # actions/ must not say `uses: FreeSynergy/fs-release/...@ref` (a pinned action would pull later main states of the
+          # other one): call the shared script by path from $GITHUB_ACTION_PATH instead. Reusable workflows cannot use `./`
+          # (it means the caller's repo) and are pinned by scripts/pin-refs.sh at release time.
+          if grep -rnE 'uses:[[:space:]]*FreeSynergy/fs-release/' actions; then echo "::error::composite action refers to fs-release by @ref"; exit 1; fi
       - name: packaging tests (plan, package groups, fs-capnpc compatibility)
         run: scripts/test-packaging.sh
       - name: typing test, caret and field detection on synthetic pictures

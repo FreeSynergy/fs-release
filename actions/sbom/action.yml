@@ -8,9 +8,13 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: FreeSynergy/fs-release/actions/install-tools@main
+    - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
       with:
-        tools: cargo-sbom
+        tool: cargo-binstall
+    - shell: bash
+      env:
+        TOOLS: cargo-sbom
+      run: '"$GITHUB_ACTION_PATH/../install-tools/install.sh"'
     - shell: bash
       env:
         OUT: ${{ github.workspace }}/${{ inputs.directory }}/${{ inputs.name }}-${{ inputs.version }}.spdx.json

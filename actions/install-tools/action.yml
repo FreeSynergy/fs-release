@@ -11,6 +11,4 @@ runs:
     - shell: bash
       env:
         TOOLS: ${{ inputs.tools }}
-      run: |
-        # shellcheck disable=SC2086  # word splitting of the tool list is intended
-        cargo binstall --no-confirm --locked $TOOLS
+      run: '"$GITHUB_ACTION_PATH/install.sh"'
