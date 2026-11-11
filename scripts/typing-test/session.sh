@@ -14,7 +14,7 @@ WX0=0; WY0=0
 mapfile -d $'\x1f' -t APP_ARGS < <(printf '%s' "${TT_APP_ARGS:-}")
 
 fifo="$D/.inject-in"; rm -f "$fifo"; mkfifo "$fifo"
-"$TT_INJECT" repl < "$fifo" >> "$D/inject.log" 2>&1 &
+INJECT_LAYOUT="${TT_INJECT_LAYOUT:-${TT_LAYOUT:-de}}" "$TT_INJECT" repl < "$fifo" >> "$D/inject.log" 2>&1 &
 INJ=$!
 exec 3>"$fifo"
 c() { printf '%s\n' "$1" >&3; sleep "${2:-1}"; }
@@ -75,10 +75,18 @@ fi
 # Seconds the injector needs for a text (about 0.16 s per character) plus time for the last picture.
 wait_for() { awk -v n="${#1}" 'BEGIN { print n * 0.2 + 1.2 }'; }
 
-# Characters whose keys differ between layouts; "a" is the control. Shift: Ä. AltGr: the rest.
-CHARS=(a Ä ä ö ü ß @ € '{' '}' '[' ']' "\\" '|' '~' µ)
-PARTS=('aÄäöüß@€' '{}[]\|~µ')  # eight characters each
-LAT='Müller Wilhelm @ {x} [y] lilli ÄÖÜ äöüß 123'
+# The characters typed one by one (one per line in chars-<layout>.txt: letters and digits that move between layouts, every
+# special sign of the layout, with the keys that need Shift, AltGr or a dead key). "a" comes first: it is the control and
+# its baseline is the ruler for the signs. Then they are typed in parts of eight, the text staying inside the field.
+mapfile -t CHARS < "$TT_DIR/chars-${TT_LAYOUT:-de}.txt"
+[ "${#CHARS[@]}" -ge 2 ] || { echo "no characters for layout ${TT_LAYOUT:-de} ($TT_DIR/chars-${TT_LAYOUT:-de}.txt)" > "$D/.session-failed"; exit 0; }
+PARTS=()
+for ((i = 0; i < ${#CHARS[@]}; i += 8)); do
+  part=""
+  for ((j = i; j < i + 8 && j < ${#CHARS[@]}; j++)); do part+="${CHARS[$j]}"; done
+  PARTS+=("$part")
+done
+if [ "${TT_LAYOUT:-de}" = de ]; then LAT='Müller Wilhelm @ {x} [y] lilli ÄÖÜ äöüß 123'; else LAT='Mueller Wilhelm @ {x} [y] lilli 123'; fi
 
 if [ "${TT_PHASE:-all}" != latency ]; then
   TT_SETTLE_KEEP="${TT_SETTLE:-30}"

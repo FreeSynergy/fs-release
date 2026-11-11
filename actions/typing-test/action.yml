@@ -1,12 +1,13 @@
 name: typing-test
-description: Start a built app under a virtual KWin with a keyboard layout, type @ € { } [ ] \ | ~ ä ö ü ß µ (AltGr and Shift) into a text field, check the text arrives and is visible, and measure key-to-picture time. Same script as scripts/typing-test.sh on a laptop.
+description: Start a built app under a virtual KWin with a keyboard layout (de and us), type every special sign of the layout (. , - _ + @ / : ; ' " ( ) [ ] { } ~ ^ \ | and on de € ä ö ü ß Ä Ö Ü µ; Shift, AltGr, the dead key) into a text field, check the text arrives and is visible, and measure key-to-picture time. Same script as scripts/typing-test.sh on a laptop.
 inputs:
   app-binary: { description: "Path to the built (release) binary", required: true }
   app-args: { description: "Arguments for the app, one line, split on spaces", default: "" }
   click: { description: "x,y - where to click to focus the text field (1280x800 screen)", default: "" }
   field: { description: "x,y,w,h - the field's rectangle on screen (default: 300x40 around the click point)", default: "" }
   scenario: { description: "App-specific bash fragment defining focus() (uses c '<inject command>' [secs] and shot NAME); replaces click", default: "" }
-  layout: { description: "xkb keyboard layout", default: de }
+  layout: { description: "xkb keyboard layouts to run, separated by spaces (de and us have a list of characters each: scripts/typing-test/chars-<layout>.txt)", default: "de us" }
+  inject-layout: { description: "Layout the injector types for (empty: the layout being run). Only to make a test red on purpose: the wrong layout must be caught", default: "", required: false }
   max-ms: { description: "Limit for the median key-to-picture time in ms", default: "8" }
   runs: { description: "How many times the test runs, each with a fresh app window; the result is green only if ALL runs are green (rare faults are the point). 3 in the mandatory gate, 10 locally before a tag", default: "3", required: false }
   name: { description: "Name of the app in the report and the artefact", default: "" }
@@ -52,15 +53,23 @@ runs:
         TT_ENFORCE_MS: ${{ inputs.enforce-ms }}
         TT_INJECT: ${{ inputs.inject }}
         TT_SCENARIO: ${{ inputs.scenario }}
-        TT_LAYOUT: ${{ inputs.layout }}
+        LAYOUTS: ${{ inputs.layout }}
+        TT_INJECT_LAYOUT: ${{ inputs.inject-layout }}
         TT_MAX_MS: ${{ inputs.max-ms }}
         TT_NAME: ${{ inputs.name }}
         TT_RUNS: ${{ inputs.runs }}
-        TT_OUT: ${{ runner.temp }}/typing-test-out
+        OUT_BASE: ${{ runner.temp }}/typing-test-out
       run: |
         read -r -a args <<<"$APP_ARGS"
+        read -r -a layouts <<<"$LAYOUTS"
         rc=0
-        "$GITHUB_ACTION_PATH/../../scripts/typing-test-runs.sh" "$APP" "${args[@]}" || rc=$?
+        # One directory per layout; the whole is as red as its worst layout (1 a check failed, 2 did not run).
+        for layout in "${layouts[@]}"; do
+          lrc=0
+          TT_LAYOUT="$layout" TT_OUT="$OUT_BASE/$layout" "$GITHUB_ACTION_PATH/../../scripts/typing-test-runs.sh" "$APP" "${args[@]}" || lrc=$?
+          echo "typing-test layout $layout: exit $lrc"
+          [ "$lrc" -gt "$rc" ] && rc=$lrc
+        done
         echo "exit-code=$rc" >> "$GITHUB_OUTPUT"
         exit "$rc"
     - name: Result (junit.xml, result.json, pictures)
@@ -69,13 +78,13 @@ runs:
       with:
         name: typing-test-${{ inputs.name != '' && inputs.name || 'app' }}
         path: |
-          ${{ runner.temp }}/typing-test-out/summary.json
-          ${{ runner.temp }}/typing-test-out/summary.txt
-          ${{ runner.temp }}/typing-test-out/run-*.log
-          ${{ runner.temp }}/typing-test-out/run-*/result.json
-          ${{ runner.temp }}/typing-test-out/run-*/junit.xml
-          ${{ runner.temp }}/typing-test-out/run-*/shots
-          ${{ runner.temp }}/typing-test-out/run-*/*.log
-          ${{ runner.temp }}/typing-test-out/run-*/rect.txt
+          ${{ runner.temp }}/typing-test-out/*/summary.json
+          ${{ runner.temp }}/typing-test-out/*/summary.txt
+          ${{ runner.temp }}/typing-test-out/*/run-*.log
+          ${{ runner.temp }}/typing-test-out/*/run-*/result.json
+          ${{ runner.temp }}/typing-test-out/*/run-*/junit.xml
+          ${{ runner.temp }}/typing-test-out/*/run-*/shots
+          ${{ runner.temp }}/typing-test-out/*/run-*/*.log
+          ${{ runner.temp }}/typing-test-out/*/run-*/rect.txt
         if-no-files-found: warn
         retention-days: ${{ inputs.retention-days }}

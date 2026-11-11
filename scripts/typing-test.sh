@@ -11,7 +11,9 @@
 #   TT_CLICK     "x,y"      the same on the screen; TT_SCENARIO: bash fragment defining focus() (see session.sh)
 #   TT_FIELD     "x,y,w,h"  the field's rectangle on screen (default: found inside the field around the click: blinking caret, else a blue bar)
 #   TT_TEXT_WIDTH           pixels of text area right of the caret (default 110; the 16 characters go in two parts)
-#   TT_LAYOUT    xkb layout (default de)      TT_SIZE  WxH (default 1280x800)
+#   TT_LAYOUT    xkb layout, de or us (default de; the characters typed: scripts/typing-test/chars-<layout>.txt)
+#   TT_INJECT_LAYOUT  layout the injector types for (default TT_LAYOUT; set another to make the test red on purpose)
+#   TT_SIZE  WxH (default 1280x800)
 #   TT_MAX_MS    limit for the median key-to-picture time (default 8). Without a GPU the compositor sets the pace,
 #                so there the time is reported but not enforced (TT_ENFORCE_MS=1 enforces it).
 #   TT_OUT       result directory (default ./typing-test-out): result.json, junit.xml, shots/, logs

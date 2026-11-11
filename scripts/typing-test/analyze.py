@@ -21,8 +21,13 @@ import fieldcheck as fc  # noqa: E402
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
 out = sys.argv[1]
-CHARS = ["a", "Ä", "ä", "ö", "ü", "ß", "@", "€", "{", "}", "[", "]", "\\", "|", "~", "µ"]
-PARTS = ["aÄäöüß@€", "{}[]\\|~µ"]
+HERE = os.path.dirname(os.path.abspath(__file__))
+LAYOUT = os.environ.get("TT_LAYOUT", "de")
+# The characters typed one by one: the same file session.sh types from (one per line), "a" first. The parts typed in one
+# go are eight of them each, as session.sh cuts them.
+with open(os.path.join(HERE, f"chars-{LAYOUT}.txt"), encoding="utf-8") as f:
+    CHARS = f.read().splitlines()
+PARTS = ["".join(CHARS[i:i + 8]) for i in range(0, len(CHARS), 8)]
 MAX_MS = float(os.environ.get("TT_MAX_MS") or "8")
 MIN_KEYS = 10
 CARET_GAP_PX = 4
@@ -31,8 +36,12 @@ CANDIDATES = [chr(c) for c in range(33, 127)] + list("äöüÄÖÜß€µ§°´�
 LOOKALIKES = {"|": set("|lIi!1")}  # a plain bar cannot be told from these by shape, so "|" is only checked that weakly
 # Near twins a wrong layout or a missing accent could produce: the typed character must rank above its twin, not only be in the
 # best three (a dead key gives a for ä, a missing AltGr a bracket of the wrong kind).
-RIVALS = {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "[": "(", "{": "(", "]": ")", "}": ")"}
-ACCENTED = set("Ääöü")
+RIVALS = {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "Ö": "O", "Ü": "U", "[": "(", "{": "(", "]": ")", "}": ")",
+          "(": "[", ")": "]", "/": "\\", "\\": "/", "+": "*", "@": "a", "ß": "B"}
+ACCENTED = set("ÄäöüÖÜ")
+# Signs that are small marks: their shape says little, WHERE they sit (against the baseline of the control "a") says
+# what they are. The typed one must be the best of all candidates, shape and place together.
+MARKS = set(".,-_'\":;^~`")
 RANK_OK = 3  # the typed character must be among the best three matches ("|" looks like "l" in many fonts)
 
 
@@ -60,6 +69,28 @@ def glyph(img, rect):
     x0, x1 = min(x for x, _ in ink), max(x for x, _ in ink)
     y0, y1 = min(y for _, y in ink), max(y for _, y in ink)
     return [[ink.get((x, y), 0.0) for x in range(x0, x1 + 1)] for y in range(y0, y1 + 1)]
+
+
+def glyph_box(img, rect):
+    """Where the ink of one glyph is: (x0, y0, x1, y1), y1 below the last row (like PIL's boxes), or None."""
+    ink = fc.ink(img, rect, thr=40, faint_caret=True)
+    if len(ink) < 3:
+        return None
+    return (min(x for x, _ in ink), min(y for _, y in ink), max(x for x, _ in ink) + 1, max(y for _, y in ink) + 1)
+
+
+def ref_place(font_file, size, ch):
+    """(top, bottom) of the reference glyph against the bottom of an "a" drawn at the same origin: the place of a sign on
+    the line."""
+    font = ImageFont.truetype(font_file, size)
+    boxes = []
+    for c in ("a", ch):
+        im = Image.new("L", (size * 2, size * 2), 0)
+        ImageDraw.Draw(im).text((size // 2, size // 2), c, fill=255, font=font)
+        boxes.append(im.getbbox())
+    if not boxes[1]:
+        return None
+    return (boxes[1][1] - boxes[0][3], boxes[1][3] - boxes[0][3])
 
 
 def ref_glyph(font_file, size, ch):
@@ -169,6 +200,7 @@ def arrived_in(i):
                            f"{out}/shots/blank.png"], env={**os.environ, "TT_RECT": ",".join(map(str, rect))}).returncode == 0
 
 
+boxes = {ch: glyph_box(shot(f"g{i:02d}"), rect) for i, ch in enumerate(CHARS)}
 arrived_all = {ch: arrived_in(i) for i, ch in enumerate(CHARS)}
 size = font_size_for(font_file, {ch: g for ch, g in glyphs.items() if arrived_all[ch]}) if font_file and any(arrived_all.values()) else None
 single_ink = {}
@@ -184,8 +216,18 @@ for i, ch in enumerate(CHARS):
     if size is None or glyphs[ch] is None:
         case(f"char {ch!r} is right", False, "no reference font (set TT_REF_FONT) or no glyph")
         continue
-    ranked = sorted(((similarity(glyphs[ch], rg), k) for k in CANDIDATES if (rg := ref_glyph(font_file, size, k))), reverse=True)
-    top = [k for _, k in ranked[:RANK_OK]]
+    place = None
+    if ch in MARKS and boxes.get(ch) and boxes.get(CHARS[0]):
+        place = (boxes[ch][1] - boxes[CHARS[0]][3], boxes[ch][3] - boxes[CHARS[0]][3])
+
+    def score(k, rg):
+        s_ = similarity(glyphs[ch], rg)
+        if place is not None and (rp := ref_place(font_file, size, k)):
+            s_ -= 0.6 * (abs(place[0] - rp[0]) + abs(place[1] - rp[1])) / size
+        return s_
+
+    ranked = sorted(((score(k, rg), k) for k in CANDIDATES if (rg := ref_glyph(font_file, size, k))), reverse=True)
+    top = [k for _, k in ranked[:1 if place is not None else RANK_OK]]
     result["chars"][ch]["best_matches"] = "".join(top)
     right = bool(set(top) & LOOKALIKES.get(ch, {ch}))
     rival = RIVALS.get(ch)

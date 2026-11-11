@@ -64,6 +64,7 @@ jobs:
           app-binary: components/target/release/examples/form
           click-in-window: "220,177"
           layout: us
+          inject-layout: de  # the injector types for de while the keyboard is us: the characters come out wrong
           runs: "1"
           install: "false"
           name: fields-form-us
@@ -73,7 +74,7 @@ jobs:
           CODE: ${{ steps.wrong.outputs.exit-code }}
         run: |
           case "$CODE" in
-            1) echo "layout us turned the test red (exit 1), as wanted" ;;
+            1) echo "layout us with the keys of de turned the test red (exit 1), as wanted" ;;
             0) echo "the typing test passed with layout us: it does not check the characters" >&2; exit 1 ;;
             *) echo "the typing test did not run with layout us (exit '$CODE'): nothing was checked" >&2; exit 1 ;;
           esac

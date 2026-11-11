@@ -21,7 +21,7 @@ jobs:
       - name: shellcheck
         run: shellcheck -x -S warning scripts/*.sh scripts/typing-test/*.sh tests/packaging/*.sh tests/typing-test/*.sh actions/*/*.sh
       - name: python
-        run: python3 -I -m py_compile actions/plan/plan.py actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py scripts/typing-test/analyze.py scripts/typing-test/fieldcheck.py scripts/typing-test/stau.py scripts/typing-test/summary.py tests/typing-test/caret.py tests/typing-test/glyphs.py
+        run: python3 -I -m py_compile actions/plan/plan.py actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py scripts/typing-test/analyze.py scripts/typing-test/fieldcheck.py scripts/typing-test/stau.py scripts/typing-test/summary.py scripts/typing-test/keymap.py tests/typing-test/caret.py tests/typing-test/glyphs.py tests/typing-test/keymap.py
   packaging-tests:
     runs-on: ubuntu-24.04
     steps:
@@ -33,8 +33,9 @@ jobs:
       - name: typing test, caret and field detection on synthetic pictures
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends python3-pil
+          sudo apt-get install -y --no-install-recommends python3-pil x11-xkb-utils xkb-data
           tests/typing-test/caret.sh
           tests/typing-test/glyphs.sh
+          tests/typing-test/keymap.sh
           tests/typing-test/runs.sh
           tests/typing-test/vsession.sh

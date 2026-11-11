@@ -15,9 +15,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ANALYZE = os.path.join(HERE, "..", "..", "scripts", "typing-test", "analyze.py")
 sys.path.insert(0, os.path.dirname(ANALYZE))
 import fieldcheck as fc  # noqa: E402
-CHARS = ["a", "Ä", "ä", "ö", "ü", "ß", "@", "€", "{", "}", "[", "]", "\\", "|", "~", "µ"]
-PARTS = ["aÄäöüß@€", "{}[]\\|~µ"]
-WRONG = dict(zip(CHARS, "zXsoqpwEcdfgnhkj"))  # what a wrong layout could have typed
+with open(os.path.join(HERE, "..", "..", "scripts", "typing-test", "chars-de.txt"), encoding="utf-8") as f:
+    CHARS = f.read().splitlines()  # what the test types on the German layout, "a" first
+PARTS = ["".join(CHARS[i:i + 8]) for i in range(0, len(CHARS), 8)]
+WRONG = {c: CHARS[(i + 7) % len(CHARS)] for i, c in enumerate(CHARS)}  # what a wrong layout could have typed
 FIELD = (588, 313, 1076, 349)
 FONTS = ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf"]
 
@@ -67,7 +68,7 @@ def run(font_file, typed, lost_first):
     font = ImageFont.truetype(font_file, 13)
     with tempfile.TemporaryDirectory() as out:
         make(out, font, typed, lost_first)
-        subprocess.run([sys.executable, "-I", ANALYZE, out], env={**os.environ, "TT_REF_FONT": font_file, "TT_SOFTWARE": "1"},
+        subprocess.run([sys.executable, "-I", ANALYZE, out], env={**os.environ, "TT_REF_FONT": font_file, "TT_SOFTWARE": "1", "TT_LAYOUT": "de"},
                        capture_output=True, text=True)
         return {c["name"]: c["passed"] for c in json.load(open(f"{out}/result.json"))["cases"]}
 
@@ -93,10 +94,12 @@ check("first character not drawn: reported as not arrived", cases["char 'a' arri
 check("first character not drawn: the others are still judged right (size not spoiled)",
       all(cases[f"char {c!r} is right"] for c in CHARS[1:]))
 cases = run(font_file, WRONG, False)
-check("wrong layout: characters turn red", sum(not v for k, v in cases.items() if k.endswith("is right")) >= 12)
+check("wrong layout: characters turn red", sum(not v for k, v in cases.items() if k.endswith("is right")) >= len(CHARS) - 6)
 # Near twins: the app draws the twin instead of the typed character (dead key, AltGr missing): that character turns red,
-# the other fifteen stay green.
-for typed_char, twin in {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "[": "(", "{": "(", "]": ")", "}": ")"}.items():
+# the others stay green.
+TWINS = {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "Ö": "O", "Ü": "U", "[": "(", "{": "(", "]": ")", "}": ")", ")": "]",
+         "+": "=", "/": "?", ";": ":", "'": '"', "~": "`", "@": "2", ".": ",", ",": ".", "-": "_", "_": "-", "^": "~"}
+for typed_char, twin in TWINS.items():
     cases = run(font_file, {**right, typed_char: twin}, False)
     check(f"{typed_char} drawn as {twin}: red", cases[f"char {typed_char!r} is right"] is False)
     check(f"{typed_char} drawn as {twin}: the others stay green",
