@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside the virtual KWin (started by ../typing-test.sh): drives the app and takes the pictures.
 # Phase A waits for the window, finds the field around the click, types one character at a time and takes a picture of
-# each, then two parts of a text (the caret is looked for inside the field only); phase B types a text with the app's Wayland trace switched on, for the
+# each, then the same characters in parts of eight (the caret is looked for inside the field only); phase B types a text with the app's Wayland trace switched on, for the
 # key-to-picture time. A scenario file may use c, shot, WX0/WY0 (the window's corner) and set TT_NEAR="x,y"
 # (a point in the field, for finding the caret).
 set -uo pipefail
@@ -119,7 +119,7 @@ if [ "${TT_PHASE:-all}" != latency ]; then
     c "key 14" 0.3
     nudge
   done
-  # Two parts of eight characters, so the text stays inside the field; the caret is found in a second picture.
+  # Parts of eight characters, so the text stays inside the field; the caret is found in a second picture.
   n=0
   for text in "${PARTS[@]}"; do
     n=$((n + 1))

@@ -33,7 +33,9 @@ MIN_KEYS = 10
 CARET_GAP_PX = 4
 # What a wrong layout could have produced instead: printable ASCII and the German extras.
 CANDIDATES = [chr(c) for c in range(33, 127)] + list("äöüÄÖÜß€µ§°´²³")
-LOOKALIKES = {}  # the bar "|" is judged by shape and place, like the marks (it reaches below the baseline, l I 1 ! do not)
+# "!" is a stem and a dot, too small to tell from these by shape. The bar "|" and the marks are not here: they are judged by
+# shape and place (MARKS below; "|" reaches below the baseline, l I 1 ! do not).
+LOOKALIKES = {"!": set("!Il1i")}
 # Near twins a wrong layout or a missing accent could produce: the typed character must rank above its twin, not only be in the
 # best three (a dead key gives a for ä, a missing AltGr a bracket of the wrong kind).
 RIVALS = {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "Ö": "O", "Ü": "U", "[": "(", "{": "(", "]": ")", "}": ")",

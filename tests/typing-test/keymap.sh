@@ -4,7 +4,9 @@
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -z "${TT_INJECT:-}" ]; then
-  cache="${XDG_CACHE_HOME:-$HOME/.cache}/fs-typing-inject"
+  src="$here/../../scripts/typing-test/inject"
+  key="$(cat "$src/Cargo.toml" "$src/Cargo.lock" "$src/src/"*.rs | sha256sum | cut -c1-16)"  # as scripts/typing-test.sh
+  cache="${XDG_CACHE_HOME:-$HOME/.cache}/fs-typing-inject/$key"
   CARGO_TARGET_DIR="$cache" cargo build --release --locked --quiet --manifest-path "$here/../../scripts/typing-test/inject/Cargo.toml"
   TT_INJECT="$cache/release/fs-typing-inject"
 fi

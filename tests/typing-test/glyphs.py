@@ -70,7 +70,11 @@ def run(font_file, typed, lost_first):
         make(out, font, typed, lost_first)
         subprocess.run([sys.executable, "-I", ANALYZE, out], env={**os.environ, "TT_REF_FONT": font_file, "TT_SOFTWARE": "1", "TT_LAYOUT": "de"},
                        capture_output=True, text=True)
-        return {c["name"]: c["passed"] for c in json.load(open(f"{out}/result.json"))["cases"]}
+        cases = json.load(open(f"{out}/result.json"))["cases"]
+        for c in cases:
+            if not c["passed"] and os.environ.get("GLYPHS_DEBUG"):
+                print("      ", c["name"], c["message"])
+        return {c["name"]: c["passed"] for c in cases}
 
 
 font_file = find_font()
@@ -89,6 +93,9 @@ def check(name, ok):
 right = {c: c for c in CHARS}
 cases = run(font_file, right, False)
 check("all right layout: every character passes", all(v for k, v in cases.items() if k.startswith(("char", "part", "screen"))))
+for k, v in cases.items():
+    if not v and k.startswith(("char", "part", "screen")):
+        print("     red:", k)
 cases = run(font_file, right, True)
 check("first character not drawn: reported as not arrived", cases["char 'a' arrives"] is False)
 check("first character not drawn: the others are still judged right (size not spoiled)",

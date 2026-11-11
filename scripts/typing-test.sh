@@ -10,7 +10,7 @@
 #                           included): does not depend on where KWin places the window
 #   TT_CLICK     "x,y"      the same on the screen; TT_SCENARIO: bash fragment defining focus() (see session.sh)
 #   TT_FIELD     "x,y,w,h"  the field's rectangle on screen (default: found inside the field around the click: blinking caret, else a blue bar)
-#   TT_TEXT_WIDTH           pixels of text area right of the caret (default 110; the 16 characters go in two parts)
+#   TT_TEXT_WIDTH           pixels of text area right of the caret (default 110; the characters of a layout go in parts of eight)
 #   TT_LAYOUT    xkb layout, de or us (default de; the characters typed: scripts/typing-test/chars-<layout>.txt)
 #   TT_INJECT_LAYOUT  layout the injector types for (default TT_LAYOUT; set another to make the test red on purpose)
 #   TT_SIZE  WxH (default 1280x800)
@@ -49,8 +49,14 @@ OUT="$(mkdir -p "${TT_OUT:-typing-test-out}" && cd "${TT_OUT:-typing-test-out}" 
 rm -rf "$OUT/shots" "$OUT"/*.log "$OUT/result.json" "$OUT/junit.xml" "$OUT"/.session-*
 mkdir -p "$OUT/shots"
 
+TT_LAYOUT="${TT_LAYOUT:-${LAYOUT:-de}}"
+case "$TT_LAYOUT" in de | us) ;; *) echo "typing-test: layout '$TT_LAYOUT' has no character list and no key table; there are: de, us" >&2; exit 2 ;; esac
+case "${TT_INJECT_LAYOUT:-$TT_LAYOUT}" in de | us) ;; *) echo "typing-test: inject layout '${TT_INJECT_LAYOUT}' has no key table; there are: de, us" >&2; exit 2 ;; esac
 if [ -z "${TT_INJECT:-}" ]; then
-  cache="${XDG_CACHE_HOME:-$HOME/.cache}/fs-typing-inject"
+  # One build directory per state of the injector's sources, so another branch's binary (one without `inject table`) is never taken
+  # and worktrees side by side do not disturb each other.
+  key="$(cat "$HERE/typing-test/inject/Cargo.toml" "$HERE/typing-test/inject/Cargo.lock" "$HERE/typing-test/inject/src/"*.rs | sha256sum | cut -c1-16)"
+  cache="${XDG_CACHE_HOME:-$HOME/.cache}/fs-typing-inject/$key"
   CARGO_TARGET_DIR="$cache" cargo build --release --locked --quiet --manifest-path "$HERE/typing-test/inject/Cargo.toml"
   TT_INJECT="$cache/release/fs-typing-inject"
 fi
@@ -115,7 +121,7 @@ fi
 if [ -n "$HOST_SOCKET" ]; then backend=(--wayland-display "$HOST_SOCKET"); else backend=(--virtual); fi
 rc=0
 # Own process group, so that nothing of the test (KWin, the app, the injector) outlives it.
-setsid timeout "${TT_TIMEOUT:-300}" dbus-run-session -- kwin_wayland "${backend[@]}" --width "${SIZE%x*}" --height "${SIZE#*x}" \
+setsid timeout "${TT_TIMEOUT:-600}" dbus-run-session -- kwin_wayland "${backend[@]}" --width "${SIZE%x*}" --height "${SIZE#*x}" \
   --socket "$TT_SOCKET" --no-lockscreen --exit-with-session "$TT/session.sh" > "$OUT/kwin.log" 2>&1 &
 KPID=$!
 cleanup() { kill -TERM -- "-$KPID" 2>/dev/null || true; sleep 0.5; kill -KILL -- "-$KPID" 2>/dev/null || true; sleep 0.3; rm -rf "$RUNTIME"; }

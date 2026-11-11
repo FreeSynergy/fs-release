@@ -140,7 +140,7 @@ fn main() {
             if words.is_empty() { continue; }
             if words[0] == "quit" { return; }
             if words[0] == "text" {
-                // Everything after `text ` is typed with the German layout, one stroke at a time.
+                // Everything after `text ` is typed with the layout of INJECT_LAYOUT (de, us), one stroke at a time.
                 let rest = line.trim_start().strip_prefix("text").unwrap().strip_prefix(' ').unwrap_or("");
                 text_typed(rest, &fake, &mut queue, &mut s);
                 continue;
@@ -205,7 +205,7 @@ fn now_us() -> u64 {
 }
 
 /// Type `text` on the layout of INJECT_LAYOUT (default de). Prints `KEY <char> <monotonic µs>` as each key goes down.
-/// A dead key (the ^ of the German layout) is followed by a Space, which makes it type itself.
+/// A dead key (the ^ of the de layout) is followed by a Space, which makes it type itself.
 fn text_typed(text: &str, fake: &OrgKdeKwinFakeInput, queue: &mut wayland_client::EventQueue<S>, s: &mut S) {
     let pause: u64 = std::env::var("INJECT_PAUSE_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(120);
     let layout = layout();
