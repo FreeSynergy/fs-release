@@ -1,0 +1,4 @@
+# The ONE source of truth for which fs-blinc tag programs may have in Cargo.lock: `<tag> <full 40-hex commit sha>`.
+# Read by scripts/check_blinc_lock.py (the gate). Changed only by scripts/approve-blinc.sh, after the owner (Opus) approved the tag.
+# The sha is the commit the tag peels to (git rev-parse <tag>^{}); a moved tag therefore turns the gate red.
+fs-blinc-3 8a0251b2105a070626ad8390cd14d7ef7483c0f5

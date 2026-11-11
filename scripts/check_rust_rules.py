@@ -15,11 +15,20 @@ Checks (exit 1 on any violation):
     LIMIT: these are file checks. Whoever deletes `.fs-rules.toml` (or fakes the identity of the exempt repo in a
     repo whose origin is elsewhere AND whose Cargo.toml says so) turns the rule off; only review catches that.
     Programs take Blinc through `fs_components::blinc`.
+  * Cargo.lock (every repo, no switch): Blinc packages (blinc*, any fork such as blinc-app-fix) only from
+    github.com/FreeSynergy/Blinc at the ONE approved fs-blinc tag + full sha of scripts/blinc-approved.txt
+    (scripts/check_blinc_lock.py; crates.io, path, other tags/shas, two Blinc sources are errors).
 
     python3 scripts/check_rust_rules.py /srv/FreeSynergy/fs-store [/srv/FreeSynergy/fs-hub …]
 """
-import re, subprocess, sys, tomllib
+import importlib.util, re, subprocess, sys, tomllib
 from pathlib import Path
+
+def _blinc_lock_errors(repo: Path):
+    """Cargo.lock of every repo: Blinc only from the approved fs-blinc tag (scripts/check_blinc_lock.py, scripts/blinc-approved.txt)."""
+    spec = importlib.util.spec_from_file_location("check_blinc_lock", Path(__file__).resolve().parent / "check_blinc_lock.py")
+    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    return mod.check_repo_lock(repo)
 
 HARD, SOFT = 300, 200
 
@@ -151,7 +160,7 @@ def check_blinc(repo: Path):
     return errors
 
 def check(repo: Path):
-    errors, warns = check_blinc(repo), []
+    errors, warns = check_blinc(repo) + _blinc_lock_errors(repo), []
     for f in _walk(repo, "*.rs"):
         p = f.as_posix()
         if "/generated/" in p or f.name.endswith("_capnp.rs"):

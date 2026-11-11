@@ -4,6 +4,7 @@
 # WHAT IT DOES NOT DO: it does not convert programs. It removes no blinc* line, no [patch], rewrites no `use`.
 # The first move of a repo onto "Blinc only through fs-components" is manual work per repo (then add
 # `.fs-rules.toml` with `blinc = "components-only"`, see DESIGN.md); this script only moves the tag afterwards.
+# The approved fs-blinc tag (the gate checks every Cargo.lock against it) is set by scripts/approve-blinc.sh, not here.
 # Repos default to every /srv/FreeSynergy/fs-* with a Cargo.toml (any depth, not target/ or .wt-*) that names
 # fs-components, except fs-components itself. Before anything: the tag must exist in the fs-components repo
 # ($FS_COMPONENTS_URL, default https://github.com/FreeSynergy/fs-components; `git ls-remote --tags`).
