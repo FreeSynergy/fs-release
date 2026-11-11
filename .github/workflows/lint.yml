@@ -21,7 +21,7 @@ jobs:
       - name: shellcheck
         run: shellcheck -x -S warning scripts/*.sh scripts/typing-test/*.sh tests/packaging/*.sh tests/typing-test/*.sh actions/*/*.sh
       - name: python
-        run: python3 -I -m py_compile actions/plan/plan.py actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py scripts/typing-test/analyze.py scripts/typing-test/fieldcheck.py scripts/typing-test/stau.py tests/typing-test/caret.py
+        run: python3 -I -m py_compile actions/plan/plan.py actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py scripts/typing-test/analyze.py scripts/typing-test/fieldcheck.py scripts/typing-test/stau.py tests/typing-test/caret.py tests/typing-test/glyphs.py
   packaging-tests:
     runs-on: ubuntu-24.04
     steps:
@@ -35,3 +35,4 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3-pil
           tests/typing-test/caret.sh
+          tests/typing-test/glyphs.sh

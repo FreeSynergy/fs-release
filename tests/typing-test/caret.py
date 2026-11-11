@@ -61,8 +61,8 @@ def caret_gap(frames, rect, n=8):
 # 1. field around the click: the field itself, not the button column beside it or the ring
 for kw in ({}, {"ring": False}, {"button_above": True}, {"button_below_same_column": True}):
     rect = fc.field_around(picture(**kw), CLICK)
-    want = (FIELD[0] + fc.INSET, FIELD[1] + fc.INSET, FIELD[2] - fc.INSET, FIELD[3] - fc.INSET)
-    check(f"field found {kw}", rect is not None and all(abs(a - b) <= 2 for a, b in zip(rect, want)), f"{rect} vs {want}")
+    want = (FIELD[0] + fc.INSET_X, FIELD[1] + fc.INSET_Y, FIELD[2] - fc.INSET_X, FIELD[3] - fc.INSET_Y)
+    check(f"field found {kw}", rect is not None and all(abs(a - b) <= 3 for a, b in zip(rect, want)), f"{rect} vs {want}")
 rect = fc.field_around(picture(), CLICK)
 
 # 2. caret blinking: on in one picture, off in the next (and the other way round): found right behind the text

@@ -50,7 +50,7 @@ def reference_font():
 
 def glyph(img, rect):
     """The ink of one glyph as a grey bitmap (1 = ink) cut to its bounding box, or None."""
-    ink = fc.ink(img, rect, thr=90)
+    ink = fc.ink(img, rect, thr=40, faint_caret=True)
     if len(ink) < 3:
         return None
     x0, x1 = min(x for x, _ in ink), max(x for x, _ in ink)
@@ -90,10 +90,19 @@ def similarity(bitmap, ref):
     return (inter / union if union else 0.0) - 0.25 * shape
 
 
-def font_size_for(font_file, observed_a):
-    """Pixel size at which the reference 'a' is as tall as the one the app drew."""
-    best = min(range(8, 48), key=lambda s: abs((ref_glyph(font_file, s, "a") or Image.new("L", (1, 1))).size[1] - len(observed_a)))
-    return best
+def font_size_for(font_file, glyphs):
+    """Pixel size of the reference font at which the glyphs that arrived look most like the characters meant: the best
+    sum of similarities over all of them, so one glyph that did not arrive (it shows what was in the field before)
+    cannot spoil the size for the others."""
+    sizes = {}
+    for size in range(8, 48):
+        total = 0.0
+        for ch, bitmap in glyphs.items():
+            ref = ref_glyph(font_file, size, ch)
+            if bitmap is not None and ref is not None:
+                total += similarity(bitmap, ref)
+        sizes[size] = total
+    return max(sizes, key=sizes.get)
 
 
 def latency(path):
@@ -148,14 +157,22 @@ blank = shot("blank")
 # 1. every character arrives, and it is the right glyph (best matches of a reference rendering of all candidates)
 font_file = reference_font()
 glyphs = {ch: glyph(shot(f"g{i:02d}"), rect) for i, ch in enumerate(CHARS)}
-size = font_size_for(font_file, glyphs["a"]) if font_file and glyphs["a"] else None
+here = os.path.dirname(os.path.abspath(__file__))
+
+
+def arrived_in(i):
+    return subprocess.run([sys.executable, "-I", os.path.join(here, "fieldcheck.py"), "arrived", f"{out}/shots/g{i:02d}.png",
+                           f"{out}/shots/blank.png"], env={**os.environ, "TT_RECT": ",".join(map(str, rect))}).returncode == 0
+
+
+arrived_all = {ch: arrived_in(i) for i, ch in enumerate(CHARS)}
+size = font_size_for(font_file, {ch: g for ch, g in glyphs.items() if arrived_all[ch]}) if font_file and any(arrived_all.values()) else None
 single_ink = {}
 for i, ch in enumerate(CHARS):
     img = shot(f"g{i:02d}")
     n = len(fc.ink(img, rect))
     single_ink[ch] = n
-    arrived = subprocess.run([sys.executable, "-I", os.path.join(os.path.dirname(os.path.abspath(__file__)), "fieldcheck.py"), "arrived",
-                              f"{out}/shots/g{i:02d}.png", f"{out}/shots/blank.png"], env={**os.environ, "TT_RECT": ",".join(map(str, rect))}).returncode == 0
+    arrived = arrived_all[ch]
     result["chars"][ch] = {"ink_pixels": n}
     if not arrived:
         case(f"char {ch!r} arrives", False, f"the field shows no typed glyph ({n} ink pixels)")

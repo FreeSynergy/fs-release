@@ -28,8 +28,10 @@ def background(crop):
     return Counter(crop.getdata()).most_common(1)[0][0]
 
 
-def ink(img, rect, thr=150):
-    """Pixels far from the field's background colour, leaving out the bright blue of the caret."""
+def ink(img, rect, thr=150, faint_caret=False):
+    """Pixels far from the field's background colour, leaving out the bright blue of the caret (faint_caret: also the
+    pale blue edges of its anti-aliasing, for measuring a glyph's shape)."""
+    tint, bright = (25, 150) if faint_caret else (55, 180)
     crop = img.crop(rect)
     bg = background(crop)
     w, h = crop.size
@@ -39,7 +41,7 @@ def ink(img, rect, thr=150):
         for y in range(h):
             r, g, b = px[x, y]
             d = abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2])
-            if d > thr and not (b - r > 55 and b > 180):  # the caret is blue-ish and bright
+            if d > thr and not (b - r > tint and b > bright):  # the caret is blue-ish and bright
                 out[(x, y)] = min(1.0, d / 600)
     return out
 
@@ -73,7 +75,7 @@ def diff(a, b, rect=None, thr=60):
     return {(x, y) for x in range(w) for y in range(h) if sum(abs(pa[x, y][i] - pb[x, y][i]) for i in range(3)) > thr}
 
 
-INSET = 4  # the focus ring and the border are left out of the field's inside
+INSET_X, INSET_Y = 6, 4  # border, ring and rounded corners are left out of the field's inside
 
 
 def _far(px, x, y, bg, thr):
@@ -86,7 +88,7 @@ def field_around(img, point, thr=12, minline=40):
     field's own background. Top and bottom are rows with a long unbroken line across the click's column (glyphs and a
     caret never make one), left and right are columns that are 'far' over the middle of that height (a caret is too short).
     Buttons and other things beside or above the field are never looked at. Returns (x0, y0, x1, y1) of the inside
-    (ring and border cut off) or None."""
+    (border cut off) or None."""
     w, h = img.size
     px = img.load()
     cx, cy = point
@@ -119,7 +121,7 @@ def field_around(img, point, thr=12, minline=40):
     right = next((x for x in range(cx, w) if vline(x)), None)
     if left is None or right is None or right - left < 20:
         return None
-    return left + INSET, top + INSET, right - INSET, bottom - INSET
+    return left + INSET_X, top + INSET_Y, right - INSET_X, bottom - INSET_Y
 
 
 def _blue_mask(img, rect):
