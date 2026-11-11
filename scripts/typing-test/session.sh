@@ -75,7 +75,7 @@ wait_for() { awk -v n="${#1}" 'BEGIN { print n * 0.2 + 1.2 }'; }
 # Characters whose keys differ between layouts; "a" is the control. Shift: Ä. AltGr: the rest.
 CHARS=(a Ä ä ö ü ß @ € '{' '}' '[' ']' "\\" '|' '~' µ)
 PARTS=('aÄäöüß@€' '{}[]\|~µ')  # eight characters each
-LAT='Müller Wilhelm @ {x} [y] lilli ÄÖÜ äöüß 123'
+LAT="${TT_LAT:-Müller Wilhelm @ {x} [y] lilli ÄÖÜ äöüß 123}"
 
 if [ "${TT_PHASE:-all}" != latency ]; then
   TT_SETTLE_KEEP="${TT_SETTLE:-30}"
