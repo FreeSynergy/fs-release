@@ -86,6 +86,13 @@ for kw in ({"add_right": True}, {"button_below_same_column": True}):
     gap = caret_gap([picture(caret_at=cx, caret_color=FAINT, **kw)] * 3, fc.field_around(picture(**kw), CLICK))
     check(f"faint static caret {kw}", gap is not None and 0 <= gap <= 4, f"gap {gap}")
 
+# 3c. a light-blue fringe at the end of the text WITHOUT a caret stays red: one column wide, or a short piece
+for name, box in {"1 px wide edge, caret height": (text_end(8) + 1, 108, text_end(8) + 1, 128),
+                  "2 px wide but short (glyph-edge size)": (text_end(8) + 1, 112, text_end(8) + 2, 122)}.items():
+    im = picture()
+    ImageDraw.Draw(im).rectangle(box, fill=FAINT)
+    check(f"fringe without caret: {name}", fc.find_caret([im, im], rect, after=text_end(8)) is None)
+
 # 4. no caret anywhere in the field: nothing is found (the button's blue column is not a caret)
 check("no caret: none found", fc.find_caret([picture(), picture(), picture()], rect) is None)
 

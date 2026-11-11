@@ -46,8 +46,8 @@ def ink(img, rect, thr=150, faint_caret=False):
     return out
 
 
-def bars(mask, minh=10, maxh=40, maxw=3):
-    """Solid vertical bars of at most maxw columns in a set of (x, y): what a caret looks like."""
+def bars(mask, minh=10, maxh=40, maxw=3, minw=1):
+    """Solid vertical bars of minw to maxw columns in a set of (x, y): what a caret looks like."""
     cols = {}
     for x, y in mask:
         cols.setdefault(x, []).append(y)
@@ -64,7 +64,7 @@ def bars(mask, minh=10, maxh=40, maxw=3):
         run.append(x)
     if run:
         out.append(run)
-    return [(r[0], solid[r[0]][0], solid[r[0]][1]) for r in out if len(r) <= maxw]
+    return [(r[0], solid[r[0]][0], solid[r[0]][1]) for r in out if minw <= len(r) <= maxw]
 
 
 def diff(a, b, rect=None, thr=60):
@@ -131,6 +131,9 @@ def _blue_mask(img, rect):
             if px[x, y][2] - px[x, y][0] > 100 and px[x, y][0] < 130}
 
 
+FAINT_MINH = 12  # the caret of the apps is 15 px high at 13 px text; a glyph edge is shorter or one column
+
+
 def _faint_mask(img, rect):
     """Light-blue pixels (the caret caught at a low point of its fade, which stays so while nothing redraws)."""
     px = img.load()
@@ -142,7 +145,8 @@ def _faint_mask(img, rect):
 def find_caret(frames, rect, after=None):
     """The caret in the field `rect` (inside only, so a button or the focus ring in the same pixel column cannot be
     taken for it): a narrow bar that differs between some of the pictures (it blinks; the union over all pairs), else
-    a narrow saturated-blue bar present in some picture, else a narrow light-blue bar (a caret frozen at a faint point of its fade). With several candidates the one nearest to x `after` (the end
+    a narrow saturated-blue bar present in some picture, else a light-blue bar of 2-3 columns and at least FAINT_MINH
+    px (a caret frozen at a faint point of its fade). With several candidates the one nearest to x `after` (the end
     of the text). Returns (x, y0, y1) in picture coordinates or None."""
     x0, y0, x1, y1 = rect
     maxh = y1 - y0 + 1
@@ -160,7 +164,9 @@ def find_caret(frames, rect, after=None):
         faint = set()
         for f in frames:
             faint |= _faint_mask(f, rect)
-        found = bars(faint, maxh=maxh)
+        # measured on 162 real pictures: the caret is 2 columns wide and 15 px high, the app draws no light-blue fringes
+        # at glyph edges; so a 1-column edge or a short piece is no caret
+        found = bars(faint, minh=FAINT_MINH, maxh=maxh, minw=2)
     if not found:
         return None
     pick = min(found, key=lambda t: abs(t[0] - ((after if after is not None else 0) - x0)))
