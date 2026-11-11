@@ -37,3 +37,4 @@ jobs:
           tests/typing-test/caret.sh
           tests/typing-test/glyphs.sh
           tests/typing-test/runs.sh
+          tests/typing-test/vsession.sh

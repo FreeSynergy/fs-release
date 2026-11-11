@@ -16,6 +16,10 @@ No release tag yet. The workflows are used by the repos through a caller file.
 - A draft GitHub release, never published automatically.
 - First real run was green on FreeSynergy/fs-capnpc as a draft release: tar.gz for Linux and macOS, deb, rpm, Arch, msi and zip, SBOM and checksums.
 
+## Virtual sessions
+
+Tests and spikes that drive a desktop (typing test, KWin scripts, fake input) run in a virtual session with its own runtime directory and private D-Bus, never in the real one. Source `scripts/virtual-session.sh`, start with `scripts/typing-test.sh` or the pattern in DESIGN.md, and call tools only through `vs_run`/`vs_dbus`/`vs_qdbus`/`vs_gdbus`: they refuse to run against the real session.
+
 ## What is not there yet
 
 - Signing has not been shown in a real release run yet. AppImage, exe, dmg, Flatpak and containers have not been exercised either.

@@ -7,6 +7,9 @@
 set -uo pipefail
 D="$TT_OUT"
 export WAYLAND_DISPLAY="${TT_SOCKET:-tt-probe}"
+# shellcheck source=../virtual-session.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../virtual-session.sh"
+vs_guard || { echo "session refused: not a virtual session" > "$D/.session-failed"; exit 0; }
 WX0=0; WY0=0
 mapfile -d $'\x1f' -t APP_ARGS < <(printf '%s' "${TT_APP_ARGS:-}")
 

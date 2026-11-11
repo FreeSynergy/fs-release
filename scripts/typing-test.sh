@@ -27,6 +27,9 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TT="$HERE/typing-test"
+# shellcheck source=virtual-session.sh
+. "$HERE/virtual-session.sh"
+vs_capture_real   # the real session's values, before this script replaces the environment
 
 [ $# -ge 1 ] || { echo "usage: typing-test.sh <binary> [app args...]" >&2; exit 2; }
 BIN="$(readlink -f "$1")"; shift
@@ -83,8 +86,8 @@ export TT_APP_ARGS
 # toolkits told to use Wayland only, so nothing opens in the real session and no input reaches it.
 HOST_SOCKET=""
 if [ "${TT_BACKEND:-virtual}" = nested ]; then
-  HOST_SOCKET="${TT_HOST_DISPLAY:-${WAYLAND_DISPLAY:-wayland-0}}"
-  case "$HOST_SOCKET" in /*) ;; *) HOST_SOCKET="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$HOST_SOCKET" ;; esac
+  HOST_SOCKET="${TT_HOST_DISPLAY:-${VS_REAL_WAYLAND_DISPLAY:-wayland-0}}"
+  case "$HOST_SOCKET" in /*) ;; *) HOST_SOCKET="${VS_REAL_XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$HOST_SOCKET" ;; esac
 fi
 RUNTIME="$(mktemp -d "${TMPDIR:-/tmp}/tt-run.XXXXXX")"
 unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET XAUTHORITY DBUS_SESSION_BUS_ADDRESS
@@ -98,6 +101,7 @@ printf '[Layout]\nLayoutList=%s\nUse=true\nVariantList=\n' "$TT_LAYOUT" > "$RUNT
 # The app must not write into the real home either: HOME and the XDG directories live in the run directory.
 mkdir -p "$RUNTIME/home" "$RUNTIME/data" "$RUNTIME/cache"
 export HOME="$RUNTIME/home" XDG_DATA_HOME="$RUNTIME/data" XDG_CACHE_HOME="$RUNTIME/cache" XDG_CONFIG_HOME="$RUNTIME/config"
+vs_guard no-bus || exit 2   # the private bus does not exist yet: session.sh checks it too
 export KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1
 # Without a GPU (GitHub runner) KWin composes with OpenGL 2 in software (llvmpipe); its screenshot service needs OpenGL.
 if [ ! -e /dev/dri/renderD128 ]; then
