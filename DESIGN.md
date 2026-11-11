@@ -94,3 +94,54 @@ assets can never be changed or replaced, not even by an owner. Not switched on b
 - The script does NOT convert programs: it removes no `blinc*` line and no `[patch]` and rewrites no `use`. The first move of a repo to "Blinc only through fs-components" is manual work per repo; it ends by adding the switch below. Only then does the script keep the repo current.
 - Rule in `check_rust_rules.py` (`check_blinc`, the `Cargo.toml` part), switched per repo: the programs call `fs-release/.github/workflows/check.yml@main`, so a rule that is always on turns every program's CI red at once (they still carry `blinc_*` and `[patch]`). That is wanted for the lock rule below; this Cargo.toml rule stays per repo. The rule runs only when the repo root has `.fs-rules.toml` with `blinc = "components-only"` (default `off`; any other value is an error). Migrating a repo by hand includes adding that file. When on, a repo fails on: a `blinc*` dependency (also renamed through `package =`, by git url, in `target.*`, dev and build tables), a `[patch]` or `[replace]` entry naming blinc in any Cargo.toml or `.cargo/config.toml`, and two different fs-components tags/revs in one program (two Blinc). Exempt only the real fs-components repo: `crates/fs-components/Cargo.toml` must be a package named `fs-components` (and name that repository if it names one); an empty file there is no exemption. Cargo.toml in `target/`, `.git/` and nested `.wt-*` worktrees are not looked at. Cargo applies `[patch]` only at the top of a build, so such a line in a program is either redundant or a second, diverging pin.
 - Tests: `tests/packaging/rules.sh`, `tests/packaging/bump.sh` (a fake origin and a file:// fs-components repo with tags, stub gates, one run with the real `cargo update -p`).
+
+## Release chain (`crates/fs-release-chain`, stage 0 of the workflow standard)
+
+One command runs the release chain: `fs-release-chain run --version 0.0.9 --repo-dir <worktree> --catalog <fs-catalog checkout> --reach public`. It is a developer tool (ADR 0063: one Rust program, no shell as a switch); it calls `git`, `gh` and the existing `scripts/` (`gates.sh`, `check_blinc_lock.py`), it replaces none of them. The programs are not changed.
+
+**Output** is one line (plus `log: <path>`): `DONE ...` (exit 0), `HALT <step> <reason> needs: <what>` (exit 10, somebody else has to act: approval, reach, queue stall) or `RED <step> <first error line>` (exit 1, a check is red). Both stop the chain at once; nothing after the step runs. Run the same command again to go on.
+
+| Command | Risk | Reach | What it does (and when it is already done) |
+|---|---|---|---|
+| `gates` | start | local | Blinc lock check (`check_blinc_lock.py`, skipped without `Cargo.lock`), then `scripts/gates.sh` (optionally behind `--wrap`, e.g. `build-slot.sh`). Done: gates were green for this commit before |
+| `review` | view | local | `.opus-ok` must say JA for this repo and exactly this head sha, else HALT |
+| `push` | publish | shared | `git push origin HEAD:refs/heads/<branch>`, never forced. Done: remote head equals local |
+| `wait-ci` | view | shared | polls the runs of the pushed commit; green, red, or HALT. One retry of a red run only when its log shows a runner/network problem (DNS, apt) |
+| `merge-ff` | publish | public | needs a green `wait-ci` for this sha; pushes `sha:main` only when main is an ancestor (else RED "rebase needed"). Done: main is at sha |
+| `tag` | publish | public | annotated `v<version>` on main = sha, pushed. Done: tag on that commit; tag on another commit is RED, never moved |
+| `release` | publish | public | waits for the `release` run on the tag (one retry of a red run), then `gh release edit --draft=false --prerelease`. Done: release not a draft |
+| `bump` | publish | public | sets `tag` of the package with this `repo` in the catalog's `packages.toml`, commits, pushes. Needs a published release. Done: tag already there |
+| `sign` | publish | public | waits for the catalog `sign` run on the bump commit (starts it once by hand when the bump changed nothing). Done: signed for this commit before |
+| `check` | view | local | fresh clone of the catalog, `gpg --verify` against `release-signing-key.asc` in a temporary home, and the version is in `catalog.xml` |
+| `report` | view | local | at most ten lines to `<git-dir>/fs-release-chain/report-<version>.txt` |
+
+`fs-release-chain step <name> ...` runs one command, `list` prints the table, `verify` checks the chain file. The run log `chain-<version>.jsonl` (same directory) holds every result with the commit it ran for; it only speeds things up and carries facts between steps (catalog commit, "retried once"). Nothing is trusted from it for safety: every command looks at the real state first.
+
+**Approval (`.opus-ok`, not committed, git-ignored):**
+```yaml
+repo: FreeSynergy/fs-store
+sha: <full 40-hex head>
+date: 2026-11-12
+verdict: JA        # NEIN stops with review-no
+by: opus
+```
+Checked by `review` and again before every command of risk `publish` (a new commit during a run halts the next publish step). A new commit on the branch makes it worth nothing. The tool cannot tell who wrote the file: that the approval comes from Opus is a rule of the process, not something this file proves.
+
+**Reach limit.** Each command carries risk (view < open < start < install < system < publish) and reach (local, shared, public). A run may only touch up to `--reach` (default `local`); a step above it is `HALT <step> reach-limit`. So a chain started during a push pause stops before `push`.
+
+**GitHub rate limit.** One `gh run list` per 30 s at most (enforced in one place, shared by all waits; `--poll-secs` can only raise it), growing by half up to 120 s. A wait ends with HALT when no run shows up for 10 min (`ci-missing`), when all runs only queue for 20 min (`ci-queue`), or after 90 min in total (`ci-timeout`). Other calls (`release view`, `ls-remote`) are single.
+
+**FS profile precursor.** `chains/release.chain.yaml` lists exactly the commands above; `verify` and a test refuse any difference in name, order, risk or reach. It is not run by a generic runner (no `swf-core`); the program runs the list. Mapping to Serverless Workflow, for the later runner: `chain`/`version` -> `document.name`/`version`; `catalog: fs/0.1.0` -> the function catalog; each `steps[]` entry -> one task in `do` with `call: fs.<command>`; `risk`, `reach`, `actor` -> task `metadata`; HALT/RED -> an error type (`authorization`/`validation`/`runtime`) ending the run, resume = run again.
+
+**Patterns.** Strategy (`Step` trait, one type per command; `Runner` and `Clock` behind traits so tests use a fake clock), Registry (`registry.rs`: names and order), Template method (`runner.rs`: reach, approval, run, log around every command), Adapter (`gh.rs`), Facade (`git.rs`, `cli.rs`), Specification (`approval.rs`), State (`poll.rs`), Repository (`ledger.rs`). Output lines are developer text, English, not translated.
+
+**Tests** (`crates/fs-release-chain/tests/`): real `git` against local bare repositories as remotes, a fake `gh` and `gpg` (shell scripts first in `PATH`, answers from files, every call logged), a virtual clock. Covered: green chain to DONE (main, tag, catalog commit, release, report), red CI, red gates with log, Blinc lock red (real `check_blinc_lock.py`), new commit after approval, approval missing / NEIN, a commit in the middle of a run, reach limit, partial run then repeat, full repeat changing nothing, queue stall (HALT, at most one query per 30 s), run that never appears, one retry for a DNS failure and none for a code failure, tag on another commit, bad catalog signature.
+
+**Limits (honest).**
+- Nothing has been run against real GitHub: during the push pause no call went out, so the `gh` flags and JSON fields (`run list --json databaseId,workflowName,status,conclusion,headSha,headBranch`, `release view --json isDraft,isPrerelease`, `release edit --draft=false --prerelease`, `workflow run`) are from `gh` documentation, and the fake accepts what the code sends. The first real run must be watched, with `--reach shared` first.
+- `merge-ff` pushes to `main` directly. If branch protection demands a pull request, this step is RED and the chain needs a PR step.
+- CI is "all runs of the head commit on the branch"; there is no list of required jobs yet. A run of a workflow that is red but not required would stop the chain.
+- Not included: `typing-test` (only UI repos), the user-test halt (the DONE line says `next: user-test`), `fs-store check` (the signature and the entry are checked directly instead, so no installed state is touched), writing the approval file (a person or the coordinator does).
+- The GitHub token needs write access to the program repo (branch, tag, release) and to `fs-catalog` (push to main); the catalog push is a normal push, the bot commit "refresh and sign" is made by `sign.yml`.
+- `scripts/check_blinc_lock.py` crashes with a traceback when the repo has no `Cargo.lock` (its doc says "nothing to check"); the chain skips the call in that case. The script itself was not changed.
+- Two chains on the same release at once are not protected against (no lock file).

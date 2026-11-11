@@ -1,0 +1,22 @@
+[package]
+name = "fs-release-chain"
+version = "0.1.0"
+description = "The release chain (gates, push, CI, merge, tag, release, catalog bump, sign, check) as one command"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "fs-release-chain"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_norway = "0.9"
+
+[dev-dependencies]
+tempfile = "3"
+

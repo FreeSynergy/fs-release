@@ -1,0 +1,9 @@
+# Workspace of the developer tool that lives in this repo (ADR 0063). The packaging scripts and actions stay as they are.
+[workspace]
+resolver = "2"
+members = ["crates/fs-release-chain"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/FreeSynergy/fs-release"

@@ -1,0 +1,20 @@
+# The release chain (stage 0): a fixed list of the commands of fs-release-chain, in the "FS profile" precursor.
+# `fs-release-chain verify` and a test keep this file equal to the commands in the program (name, order, risk, reach).
+# Mapping to Serverless Workflow (DESIGN.md): chain -> document.name, version -> document.version,
+# steps[] -> do[] (one task each), call: fs.<command> -> a `call: function` task of the catalog "fs",
+# risk / reach / actor -> metadata of the task. No loops, no expressions, no shell.
+chain: release
+version: 0.1.0
+catalog: fs/0.1.0
+steps:
+  - { id: gates,    call: fs.gates,    risk: start,   reach: local,  actor: program }
+  - { id: review,   call: fs.review,   risk: view,    reach: local,  actor: llm }
+  - { id: push,     call: fs.push,     risk: publish, reach: shared, actor: program }
+  - { id: wait-ci,  call: fs.wait-ci,  risk: view,    reach: shared, actor: machine }
+  - { id: merge-ff, call: fs.merge-ff, risk: publish, reach: public, actor: program }
+  - { id: tag,      call: fs.tag,      risk: publish, reach: public, actor: program }
+  - { id: release,  call: fs.release,  risk: publish, reach: public, actor: machine }
+  - { id: bump,     call: fs.bump,     risk: publish, reach: public, actor: machine }
+  - { id: sign,     call: fs.sign,     risk: publish, reach: public, actor: machine }
+  - { id: check,    call: fs.check,    risk: view,    reach: local,  actor: program }
+  - { id: report,   call: fs.report,   risk: view,    reach: local,  actor: program }
