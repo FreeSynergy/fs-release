@@ -26,15 +26,9 @@ fn preflight(ctx: &Ctx) -> Result<(), Stop> {
             "fake gates mode cannot publish: use --reach local",
         ));
     }
-    Preapproved::load(ctx)
-        .and_then(|p| p.allows(&t.slug, ctx.reach))
-        .or_else(|stop| {
-            if ctx.reach == Reach::Local {
-                Ok(())
-            } else {
-                Err(stop)
-            }
-        })?;
+    if ctx.reach != Reach::Local {
+        Preapproved::load(ctx)?.allows(&t.slug, &t.catalog_slug, ctx.reach)?;
+    }
     let on = git::out(ctx, &t.repo_dir, &["symbolic-ref", "--short", "HEAD"])?;
     if on == t.branch {
         Ok(())
@@ -94,6 +88,11 @@ fn one(ctx: &Ctx, ledger: &Ledger, name: &str) -> Result<Finished, (String, Stop
     } else {
         None
     };
+    if let Some(a) = &approved {
+        // The intention is on record BEFORE the step runs; when the log cannot be written the step does not run.
+        audit::record(ctx, &audit::line(ctx, a, &head, &meta, "start"))
+            .map_err(|why| (head.clone(), why))?;
+    }
     let frame = Frame {
         ctx,
         ledger,

@@ -57,26 +57,128 @@ fn repos_outside_the_list_halt_and_public_stays_locked_until_the_entry_exists() 
 }
 
 #[test]
-fn the_list_is_read_from_the_commit_not_from_the_file_lying_around() {
+fn the_list_comes_from_origin_not_from_a_local_commit_or_file() {
     let (w, _) = approved_world();
-    fs::write(
-        w.root().join("rel/.fs/preapproved.toml"),
-        "repos = [\"Org/fs-demo\"]\npublic_ok = \"forged\"\n",
-    )
-    .unwrap();
     w.set_preapproved(&["Org/fs-demo"], "");
-    fs::write(
-        w.root().join("rel/.fs/preapproved.toml"),
-        "repos = [\"Org/fs-demo\"]\npublic_ok = \"forged\"\n",
-    )
-    .unwrap();
+    w.write_preapproved(&["Org/fs-demo"], &["Org/fs-catalog"], "forged", false);
     let o = w.run_names(Reach::Public, &names(&["review"]));
     assert_eq!(
         stopped_at(&o),
         "halt preflight public-locked",
+        "a local commit counts for nothing: {}",
+        o.line()
+    );
+    w.set_preapproved(&["Org/other"], "ok");
+    w.write_preapproved(
+        &["Org/fs-demo", "Org/other"],
+        &["Org/fs-catalog"],
+        "ok",
+        false,
+    );
+    let o = w.run_names(Reach::Shared, &names(&["review"]));
+    assert_eq!(
+        stopped_at(&o),
+        "halt preflight not-preapproved",
+        "a local list counts for nothing: {}",
+        o.line()
+    );
+}
+
+#[test]
+fn a_release_dir_that_is_not_fs_release_is_red() {
+    let (w, _) = approved_world();
+    let rel = w.root().join("rel");
+    git(
+        &rel,
+        &[
+            "config",
+            "remote.origin.url",
+            "https://github.com/Evil/fs-release.git",
+        ],
+    );
+    let o = w.run_names(Reach::Shared, &names(&["review"]));
+    assert!(
+        matches!(&o, Outcome::Red { line, .. } if line.contains("not FreeSynergy/fs-release")),
         "{}",
         o.line()
     );
+    git(
+        &rel,
+        &[
+            "config",
+            "remote.origin.url",
+            "https://github.com/FreeSynergy/fs-release.git",
+        ],
+    );
+    git(
+        &rel,
+        &[
+            "config",
+            "remote.origin.pushurl",
+            "https://github.com/Evil/fs-release.git",
+        ],
+    );
+    let o = w.run_names(Reach::Shared, &names(&["review"]));
+    assert!(
+        matches!(&o, Outcome::Red { line, .. } if line.contains("two repos")),
+        "{}",
+        o.line()
+    );
+}
+
+#[test]
+fn the_catalog_repo_must_be_a_listed_target_and_the_checkout_its_origin() {
+    let (w, _) = approved_world();
+    w.write_preapproved(&["Org/fs-demo"], &["Org/not-the-catalog"], "ok", true);
+    let o = w.run_names(Reach::Public, &names(&["review"]));
+    assert_eq!(
+        stopped_at(&o),
+        "halt preflight catalog-not-preapproved",
+        "{}",
+        o.line()
+    );
+    w.set_preapproved(&["Org/fs-demo"], "ok");
+    let cat = w.root().join("catalog");
+    git(
+        &cat,
+        &[
+            "config",
+            "remote.origin.pushurl",
+            "https://github.com/Evil/fs-catalog.git",
+        ],
+    );
+    let up = [
+        "gates", "review", "push", "wait-ci", "merge-ff", "tag", "release", "bump",
+    ];
+    let o = w.run_names(Reach::Public, &names(&up));
+    assert!(
+        matches!(&o, Outcome::Red { step, line } if step == "bump" && line.contains("two repos")),
+        "{}",
+        o.line()
+    );
+    assert_eq!(
+        git(&w.cat_origin(), &["log", "-1", "--format=%s"]),
+        "base",
+        "nothing pushed to the catalog"
+    );
+}
+
+#[test]
+fn an_audit_log_that_cannot_be_written_stops_before_the_step() {
+    let (w, _) = approved_world();
+    fs::write(w.root().join("audit"), "a file where the folder should be").unwrap();
+    let o = w.run_names(Reach::Public, &names(&["gates", "review", "push"]));
+    assert!(
+        matches!(&o, Outcome::Red { step, line } if step == "push" && line.contains("audit")),
+        "{}",
+        o.line()
+    );
+    assert_eq!(
+        git(&w.origin(), &["branch", "-l", "feat"]),
+        "",
+        "the step did not run"
+    );
+    assert_eq!(w.count("push"), 0);
 }
 
 #[test]
@@ -91,10 +193,15 @@ fn every_publication_leaves_an_audit_line_and_the_log_only_grows() {
     assert!(text.starts_with("older line\n"));
     let lines: Vec<&str> = text.lines().skip(1).collect();
     for step in ["push", "merge-ff", "tag", "release", "bump", "sign"] {
+        let start = lines
+            .iter()
+            .position(|l| l.contains(&format!("step={step} ")) && l.contains("result=start"))
+            .unwrap_or_else(|| panic!("no start line for {step}"));
         let l = lines
             .iter()
+            .skip(start + 1)
             .find(|l| l.contains(&format!("step={step} ")))
-            .unwrap_or_else(|| panic!("no audit line for {step}"));
+            .unwrap_or_else(|| panic!("no result line for {step}"));
         assert!(
             l.contains("by=opus")
                 && l.contains(&format!("sha={sha}"))
@@ -107,8 +214,8 @@ fn every_publication_leaves_an_audit_line_and_the_log_only_grows() {
     }
     assert_eq!(
         lines.len(),
-        6,
-        "one line per publishing command, none for the others"
+        12,
+        "a start and a result line per publishing command, none for the others"
     );
 }
 

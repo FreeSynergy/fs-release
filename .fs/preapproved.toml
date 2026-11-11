@@ -1,5 +1,6 @@
 # Repos the owner pre-approved for the release chain (versions Opus has checked green). Fixed list: a change is a commit.
-# The chain reads this file from the committed HEAD of this repo. Anything else halts with `not-preapproved`.
+# The chain reads this file from origin/<base> of the fs-release checkout (never from HEAD or a working tree), and only when
+# that checkout's origin is exactly FreeSynergy/fs-release. Anything else halts with `not-preapproved`.
 repos = [
   "FreeSynergy/fs-interfaces",
   "FreeSynergy/fs-components",
@@ -14,5 +15,8 @@ repos = [
   "FreeSynergy/fs-messenger",
   "FreeSynergy/fs-release",
 ]
+# Catalog repos that bump and sign may push to (public reach only).
+catalog_targets = ["FreeSynergy/fs-catalog"]
+
 # Public reach (`--reach public`) stays locked until the reference of the Opus JA that lifts the lock stands here.
 public_ok = ""

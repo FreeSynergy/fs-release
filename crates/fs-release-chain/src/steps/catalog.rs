@@ -7,6 +7,7 @@ use crate::ctx::Ctx;
 use crate::gh;
 use crate::git::{self, short};
 use crate::meta::{Meta, Reach, Risk};
+use crate::origin::configured_slug;
 use crate::outcome::{Note, StepResult, Stop};
 use crate::packages::set_tag;
 use crate::poll::Filter;
@@ -18,7 +19,21 @@ use crate::sys::Cmd;
 /// a catalog signed by any other key is red, whatever that file contains.
 pub const PROJECT_KEY_FPR: &str = "16A4A3EE563AEF51FCF0C55DED7B57C4A1904342";
 
+/// The catalog checkout, and proof that its origin is the catalog repo the run was told about (fetch and push URL).
 fn catalog_dir(ctx: &Ctx) -> Result<PathBuf, Stop> {
+    let dir = catalog_path(ctx)?;
+    let who = configured_slug(ctx.runner, &dir).map_err(Stop::red)?;
+    if !who.eq_ignore_ascii_case(&ctx.target.catalog_slug) {
+        return Err(Stop::red(format!(
+            "catalog checkout {} is {who}, not {}",
+            dir.display(),
+            ctx.target.catalog_slug
+        )));
+    }
+    Ok(dir)
+}
+
+fn catalog_path(ctx: &Ctx) -> Result<PathBuf, Stop> {
     ctx.target
         .catalog_dir
         .clone()

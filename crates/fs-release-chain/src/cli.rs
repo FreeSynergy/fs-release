@@ -12,7 +12,7 @@ use crate::ctx::{Ctx, Target, Timing, MIN_POLL};
 use crate::ledger::Ledger;
 use crate::meta::Reach;
 pub use crate::origin::check_slug;
-use crate::origin::{now_secs, slug_of, today_days};
+use crate::origin::{configured_slug, now_secs, today_days};
 use crate::outcome::Outcome;
 use crate::registry;
 use crate::runner;
@@ -175,15 +175,16 @@ fn build_target(c: &Common, runner: &dyn Runner) -> Result<Target, String> {
         Some(b) => b.clone(),
         None => git(&["symbolic-ref", "--short", "HEAD"])?,
     };
-    let origin = git(&["remote", "get-url", "origin"])?;
+    let origin = configured_slug(runner, &c.repo_dir)?;
     let slug = match &c.slug {
-        Some(s) => {
-            check_slug(s, &origin)?;
-            s.clone()
+        Some(given) => {
+            crate::slug::validate(given)?;
+            if !given.eq_ignore_ascii_case(&origin) {
+                return Err(format!("--slug {given} but origin is {origin}"));
+            }
+            origin
         }
-        None => {
-            slug_of(&origin).ok_or("cannot read owner/name from the origin URL: give --slug")?
-        }
+        None => origin,
     };
     crate::slug::validate(&slug)?;
     crate::slug::validate(&c.catalog_slug)?;

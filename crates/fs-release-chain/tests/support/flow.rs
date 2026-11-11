@@ -40,27 +40,63 @@ pub fn ci_rows(
 }
 
 impl World {
-    /// Commits `.fs/preapproved.toml` in the fs-release checkout (`rel`): the list of repos and the public lock.
+    /// Publishes `.fs/preapproved.toml` of fs-release: committed in the checkout `rel` AND pushed to its origin (a bare
+    /// repo that stands in for GitHub; the configured origin URL is the real GitHub one, mapped with `insteadOf`).
     pub fn set_preapproved(&self, repos: &[&str], public_ok: &str) {
+        self.write_preapproved(repos, &["Org/fs-catalog"], public_ok, true);
+    }
+
+    /// Writes and commits the list; pushes it to the origin only when `push` is set (a local-only commit must count for nothing).
+    pub fn write_preapproved(
+        &self,
+        repos: &[&str],
+        catalogs: &[&str],
+        public_ok: &str,
+        push: bool,
+    ) {
         let rel = self.root().join("rel");
         if !rel.join(".git").exists() {
+            let bare = self.root().join("rel-origin.git");
+            super::git(
+                &self.root(),
+                &[
+                    "init",
+                    "--quiet",
+                    "--bare",
+                    "-b",
+                    "main",
+                    &bare.display().to_string(),
+                ],
+            );
             super::git(&rel, &["init", "--quiet", "-b", "main"]);
+            let url = "https://github.com/FreeSynergy/fs-release.git";
+            super::git(&rel, &["remote", "add", "origin", url]);
+            super::git(
+                &rel,
+                &["config", &format!("url.{}.insteadOf", bare.display()), url],
+            );
         }
         fs::create_dir_all(rel.join(".fs")).unwrap();
-        let list: Vec<String> = repos.iter().map(|r| format!("\"{r}\"")).collect();
-        fs::write(
-            rel.join(".fs/preapproved.toml"),
-            format!(
-                "repos = [{}]\npublic_ok = \"{public_ok}\"\n",
-                list.join(", ")
-            ),
-        )
-        .unwrap();
+        let q = |l: &[&str]| {
+            l.iter()
+                .map(|r| format!("\"{r}\""))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let text = format!(
+            "repos = [{}]\ncatalog_targets = [{}]\npublic_ok = \"{public_ok}\"\n",
+            q(repos),
+            q(catalogs)
+        );
+        fs::write(rel.join(".fs/preapproved.toml"), text).unwrap();
         super::git(&rel, &["add", "."]);
         super::git(
             &rel,
             &["commit", "--quiet", "--allow-empty", "-m", "preapproved"],
         );
+        if push {
+            super::git(&rel, &["push", "--quiet", "origin", "main"]);
+        }
     }
 
     /// A sequence of answers: each poll takes the next one, the last stays.

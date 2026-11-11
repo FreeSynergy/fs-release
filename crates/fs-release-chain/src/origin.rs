@@ -1,15 +1,52 @@
 //! Pattern: none (pure functions of the `origin` URL and the wall clock: slug of the origin, slug check, today).
 
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// `Owner/name` of a GitHub URL (https or ssh form), if it is one.
+use crate::sys::{Cmd, Runner};
+
+/// `Owner/name` of a GitHub URL. Only two exact forms count: `https://github.com/<owner>/<name>[.git]` and
+/// `git@github.com:<owner>/<name>[.git]`. No substring match, no other host, no user part, no trailing junk; the slug must
+/// also pass [`crate::slug::validate`] (so no Unicode, `%`, NUL, `..`).
 #[must_use]
 pub fn slug_of(url: &str) -> Option<String> {
-    let rest = url.trim().trim_end_matches('/').trim_end_matches(".git");
-    let tail = rest
-        .rsplit_once("github.com")
-        .map(|(_, t)| t.trim_start_matches([':', '/']))?;
-    (tail.matches('/').count() == 1).then(|| tail.to_string())
+    let rest = ["https://github.com/", "git@github.com:"]
+        .iter()
+        .find_map(|p| url.strip_prefix(p))?;
+    let slug = rest.strip_suffix(".git").unwrap_or(rest);
+    crate::slug::validate(slug).ok().map(|()| slug.to_string())
+}
+
+/// The repo `origin` of `dir` is configured for: the raw `remote.origin.url` (not rewritten by `insteadOf`) and every
+/// `remote.origin.pushurl` must be GitHub URLs of one and the same repo.
+///
+/// # Errors
+/// A sentence when there is no origin, a URL is not an exact GitHub URL, or push and fetch URL differ.
+pub fn configured_slug(runner: &dyn Runner, dir: &Path) -> Result<String, String> {
+    let ask = |key: &str| -> Result<Vec<String>, String> {
+        let cmd = Cmd {
+            program: "git".into(),
+            args: vec!["config".into(), "--get-all".into(), key.into()],
+            cwd: Some(dir.to_path_buf()),
+            ..Cmd::default()
+        };
+        let o = runner.run(&cmd).map_err(|e| e.to_string())?;
+        Ok(o.stdout.lines().map(str::to_string).collect())
+    };
+    let fetch = ask("remote.origin.url")?;
+    let pushes = ask("remote.origin.pushurl")?;
+    let mut found: Option<String> = None;
+    for url in fetch.iter().chain(pushes.iter()) {
+        let slug = slug_of(url).ok_or_else(|| format!("origin URL {url:?} of {} is not https://github.com/<owner>/<name> or git@github.com:<owner>/<name>", dir.display()))?;
+        if found.as_ref().is_some_and(|f| *f != slug) {
+            return Err(format!(
+                "origin of {} points at two repos (fetch and push URL differ)",
+                dir.display()
+            ));
+        }
+        found = Some(slug);
+    }
+    found.ok_or_else(|| format!("{} has no origin", dir.display()))
 }
 
 /// `--slug` must be the repo `origin` points at; otherwise the checks would run for one repo and publish to another.

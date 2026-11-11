@@ -157,6 +157,19 @@ impl World {
                 ("catalog.xml.asc", "SIG-OK"),
             ],
         );
+        let (cat, url) = (
+            self.root().join("catalog"),
+            "https://github.com/Org/fs-catalog.git",
+        );
+        git(&cat, &["config", "remote.origin.url", url]);
+        git(
+            &cat,
+            &[
+                "config",
+                &format!("url.{}.insteadOf", self.cat_origin().display()),
+                url,
+            ],
+        );
     }
 
     fn release_dir(&self) {
@@ -273,10 +286,6 @@ impl World {
         let ledger = Ledger::new(&t.state_dir, &t.version);
         let ctx = Ctx::new(t, reach, Timing::standard(), &runner, &self.clock);
         runner::execute(&ctx, &ledger, names)
-    }
-
-    pub fn ledger(&self) -> Ledger {
-        Ledger::new(&self.root().join("state"), "0.0.9")
     }
 }
 

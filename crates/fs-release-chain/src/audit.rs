@@ -54,7 +54,8 @@ pub fn line(ctx: &Ctx, a: &Approval, head: &str, meta: &Meta, result: &str) -> S
 pub fn record(ctx: &Ctx, line: &str) -> Result<(), Stop> {
     let path = &ctx.target.audit_log;
     if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
+        fs::create_dir_all(dir)
+            .map_err(|e| Stop::red(format!("audit log folder {}: {e}", dir.display())))?;
     }
     let mut f = OpenOptions::new()
         .create(true)
