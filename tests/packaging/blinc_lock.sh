@@ -57,3 +57,42 @@ printf 'fs-blinc-3.1 %s\n' "$S3" > "$TB/approved2.txt"
 lock "blinc_app=$B?tag=fs-blinc-3.1#$S3" | python3 -I "$ROOT/scripts/check_blinc_lock.py" --approved "$TB/approved2.txt" - >/dev/null && pass "blinc-lock: tag fs-blinc-3.1 is a valid shape (same as approve-blinc.sh)" || fail "blinc-lock: fs-blinc-3.1 must load"
 printf '' > "$TB/s/blinc-approved.txt"; FS_BLINC_URL="$TB/bl" bash "$TB/s/approve-blinc.sh" fs-blinc-9 >/dev/null && pass "approve-blinc.sh: a file without comment lines does not abort" || fail "approve-blinc.sh: file without # lines must work"
 if FS_BLINC_URL="$TB/bl" bash "$TB/s/approve-blinc.sh" fs-blinc-8 >/dev/null 2>&1; then fail "approve-blinc.sh: missing tag must fail"; else pass "approve-blinc.sh: missing tag fails"; fi
+# Transition: two approved tags at once (fs-blinc-3 and fs-blinc-3.1); a lock still holds exactly ONE of them
+S31=3333333333333333333333333333333333333333
+printf '# transition\nfs-blinc-3 %s  # expires 2026-12-31 until all programs are lifted\nfs-blinc-3.1 %s\n' "$S3" "$S31" > "$TB/approved.txt"
+export BLINC_TODAY=2026-11-12
+lk_ok  "two approved tags: a lock with only fs-blinc-3 is green" "blinc_app=$B?tag=fs-blinc-3#$S3" "blinc_layout=$B?tag=fs-blinc-3#$S3"
+lk_ok  "two approved tags: a lock with only fs-blinc-3.1 is green" "blinc_app=$B?tag=fs-blinc-3.1#$S31" "blinc_layout=$B?tag=fs-blinc-3.1#$S31"
+lk_bad "two approved tags: a lock mixing 3 and 3.1 is red" "blinc_app=$B?tag=fs-blinc-3#$S3" "blinc_layout=$B?tag=fs-blinc-3.1#$S31"
+lk_bad "two approved tags: an unapproved tag is red" "blinc_app=$B?tag=fs-blinc-2#$S2"
+lk_bad "two approved tags: fs-blinc-3.1 at the sha of fs-blinc-3 is red" "blinc_app=$B?tag=fs-blinc-3.1#$S3"
+lock "blinc_app=$B?tag=fs-blinc-3#$S3" | LK && pass "blinc-lock: expiry date not reached stays green" || fail "blinc-lock: not yet expired must pass"
+export BLINC_TODAY=2026-12-31; lock "blinc_app=$B?tag=fs-blinc-3#$S3" | LK && pass "blinc-lock: the expiry day itself is still green" || fail "blinc-lock: expiry day must pass"
+export BLINC_TODAY=2027-01-01
+if lock "blinc_app=$B?tag=fs-blinc-3#$S3" | LK; then fail "blinc-lock: an expired entry must be red"; else pass "blinc-lock: an expired entry is red"; fi
+check_in "blinc-lock: the expired error names tag and date" "$(cat "$TB/out")" "approval of fs-blinc-3 expired on 2026-12-31"
+lock "blinc_app=$B?tag=fs-blinc-3.1#$S31" | LK && fail "blinc-lock: a lock is red while ANY approval is expired" || pass "blinc-lock: any expired entry makes the gate red (forces the cleanup)"
+lock | LK && fail "blinc-lock: a lock without Blinc is also red once an entry expired" || pass "blinc-lock: expiry is red for every repo, also without Blinc"
+unset BLINC_TODAY
+printf 'fs-blinc-3 %s\nfs-blinc-3 %s\n' "$S3" "$S31" > "$TB/approved2.txt"
+if python3 -I "$ROOT/scripts/check_blinc_lock.py" --approved "$TB/approved2.txt" - </dev/null >/dev/null 2>&1; then fail "blinc-lock: a tag listed twice must fail"; else pass "blinc-lock: a tag listed twice fails"; fi
+printf 'fs-blinc-3 %s # expires 2026-13-45\n' "$S3" > "$TB/approved2.txt"
+if python3 -I "$ROOT/scripts/check_blinc_lock.py" --approved "$TB/approved2.txt" - </dev/null >/dev/null 2>&1; then fail "blinc-lock: a bad expiry date must fail"; else pass "blinc-lock: a bad expiry date fails"; fi
+# approve-blinc.sh add / remove / list / replace
+git -C "$TB/bl" -c user.name=t -c user.email=t@example.org tag -a -m annotated fs-blinc-9.1
+A() { FS_BLINC_URL="$TB/bl" bash "$TB/s/approve-blinc.sh" "$@"; }
+SHA9=$(git -C "$TB/bl" rev-parse HEAD); printf '# header\nfs-blinc-3 %s\n' "$S3" > "$TB/s/blinc-approved.txt"
+A add fs-blinc-9.1 --expires 2026-12-24 >/dev/null; F=$(cat "$TB/s/blinc-approved.txt")
+check_has "approve-blinc.sh add keeps the old entry" "$F" "fs-blinc-3 $S3"
+check_has "approve-blinc.sh add writes the commit an annotated tag peels to, with expiry" "$F" "fs-blinc-9.1 $SHA9  # expires 2026-12-24"
+check_has "approve-blinc.sh add keeps the comment line" "$F" "# header"
+check_in "approve-blinc.sh list shows both" "$(A list)" "fs-blinc-9.1 $SHA9"
+A add fs-blinc-9.1 >/dev/null; check_lacks "approve-blinc.sh add again replaces the entry (no expiry now)" "$(cat "$TB/s/blinc-approved.txt")" "expires"
+A remove fs-blinc-3 >/dev/null; check_lacks "approve-blinc.sh remove takes the entry out" "$(cat "$TB/s/blinc-approved.txt")" "fs-blinc-3 "
+check_in "approve-blinc.sh remove leaves the other entry" "$(cat "$TB/s/blinc-approved.txt")" "fs-blinc-9.1 $SHA9"
+if A remove fs-blinc-3 >/dev/null 2>&1; then fail "approve-blinc.sh: removing an unapproved tag must fail"; else pass "approve-blinc.sh: removing an unapproved tag fails"; fi
+if A add fs-blinc-x >/dev/null 2>&1; then fail "approve-blinc.sh: a bad tag must fail"; else pass "approve-blinc.sh: a bad tag fails"; fi
+if A add fs-blinc-9 --expires 2026-02-31 >/dev/null 2>&1; then fail "approve-blinc.sh: an impossible date must fail"; else pass "approve-blinc.sh: an impossible date fails"; fi
+if A add fs-blinc-8 >/dev/null 2>&1; then fail "approve-blinc.sh: add of a missing tag must fail"; else pass "approve-blinc.sh: add of a missing tag fails"; fi
+A replace fs-blinc-9 >/dev/null; check_lacks "approve-blinc.sh replace leaves only that tag" "$(cat "$TB/s/blinc-approved.txt")" "fs-blinc-9.1"
+python3 -I "$ROOT/scripts/check_blinc_lock.py" --approved "$TB/s/blinc-approved.txt" - </dev/null >/dev/null && pass "approve-blinc.sh output is read by the loader" || fail "approve-blinc.sh output must load"

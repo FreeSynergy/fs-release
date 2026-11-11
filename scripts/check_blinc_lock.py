@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Central Blinc lock: Cargo.lock may carry Blinc ONLY from the approved fs-blinc tag (exit 1 otherwise).
+"""Central Blinc lock: Cargo.lock may carry Blinc ONLY from an approved fs-blinc tag (exit 1 otherwise).
 
     python3 -I scripts/check_blinc_lock.py [--approved FILE] <Cargo.lock | repo root | ->     (`-` reads the lock from stdin)
 
@@ -8,9 +8,14 @@ A package counts as Blinc when its name starts with `blinc` or its source mentio
 blinc-app-fix / blinc-layout-fix). Each one must have exactly
 `source = "git+https://github.com/FreeSynergy/Blinc?tag=<tag>#<sha>"` with `<tag> <sha>` a line of scripts/blinc-approved.txt
 (full sha, so a moved tag is caught). crates.io, path, rev/branch sources and forks are errors, and so is a lock that
-mixes two Blinc sources. A lock without Blinc packages passes. Missing Cargo.lock = nothing to check.
+mixes two Blinc sources, even when both are approved (during a transition two tags are approved, a lock still holds ONE).
+A lock without Blinc packages passes. Missing Cargo.lock = nothing to check.
+Approved file: one entry per line `<tag> <40-hex sha>`, optionally followed by a comment; a comment containing
+`expires YYYY-MM-DD` makes the entry expire: from the day AFTER that date it is an error (red for every repo) and no longer
+approves anything, so a transition cannot stay forever. Whole-line comments are ignored. `BLINC_TODAY=YYYY-MM-DD` replaces
+today's date (tests only).
 """
-import re, sys, tomllib
+import datetime, os, re, sys, tomllib
 from pathlib import Path
 
 APPROVED = Path(__file__).resolve().parent / "blinc-approved.txt"
@@ -19,15 +24,23 @@ FIX = ("programs take Blinc only through fs-components (tag as approved in scrip
        "scripts/bump-components.sh, then `cargo update`). scripts/approve-blinc.sh <tag> is for maintainers approving a NEW tag")
 TAG_RE = r"fs-blinc-[0-9]+(?:\.[0-9]+)?"          # the same shape approve-blinc.sh accepts
 
+def today() -> datetime.date:
+    return datetime.date.fromisoformat(os.environ["BLINC_TODAY"]) if os.environ.get("BLINC_TODAY") else datetime.date.today()
+
 def load_approved(f: Path):
-    """{tag: sha} from the approved file; ValueError on a malformed line."""
+    """{tag: (sha, expires date or None)} from the approved file; ValueError on a malformed line or a duplicate tag."""
     out = {}
     for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
-        line = line.split("#", 1)[0].strip()
-        if not line: continue
-        m = re.fullmatch(rf"({TAG_RE})\s+([0-9a-f]{{40}})", line)
-        if not m: raise ValueError(f"{f}:{n}: expected `<tag> <40-hex sha>`, got {line!r}")
-        out[m.group(1)] = m.group(2)
+        entry, _, comment = line.partition("#")
+        entry = entry.strip()
+        if not entry: continue
+        m = re.fullmatch(rf"({TAG_RE})\s+([0-9a-f]{{40}})", entry)
+        if not m: raise ValueError(f"{f}:{n}: expected `<tag> <40-hex sha> [# expires YYYY-MM-DD ...]`, got {entry!r}")
+        e = re.search(r"\bexpires\s+(\d{4}-\d{2}-\d{2})\b", comment)
+        try: exp = datetime.date.fromisoformat(e.group(1)) if e else None
+        except ValueError: raise ValueError(f"{f}:{n}: bad expiry date {e.group(1)!r}") from None
+        if m.group(1) in out: raise ValueError(f"{f}:{n}: tag {m.group(1)} listed twice")
+        out[m.group(1)] = (m.group(2), exp)
     return out
 
 def is_blinc(pkg: dict) -> bool:
@@ -40,8 +53,13 @@ def lock_has_blinc(text: str) -> bool:
 def lock_errors(text: str, approved: dict, label: str = "Cargo.lock"):
     try: doc = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e: return [f"{label}: not valid TOML ({e})"]
-    want = ", ".join(f"{t} ({s[:12]})" for t, s in sorted(approved.items())) or "none"
     errors, used, bad = [], set(), 0
+    now = today()
+    for t, (_, exp) in sorted(approved.items()):
+        if exp is not None and exp < now:
+            errors.append(f"{label}: approval of {t} expired on {exp}: finish the transition and run scripts/approve-blinc.sh remove {t} (or renew with add --expires)")
+    approved = {t: s for t, (s, exp) in approved.items() if exp is None or exp >= now}      # expired entries approve nothing
+    want = ", ".join(f"{t} ({s[:12]})" for t, s in sorted(approved.items())) or "none"
     for pkg in doc.get("package", []):
         if not is_blinc(pkg): continue
         name, src = pkg.get("name", "?"), pkg.get("source")
