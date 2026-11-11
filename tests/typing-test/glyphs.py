@@ -94,4 +94,11 @@ check("first character not drawn: the others are still judged right (size not sp
       all(cases[f"char {c!r} is right"] for c in CHARS[1:]))
 cases = run(font_file, WRONG, False)
 check("wrong layout: characters turn red", sum(not v for k, v in cases.items() if k.endswith("is right")) >= 12)
+# Near twins: the app draws the twin instead of the typed character (dead key, AltGr missing): that character turns red,
+# the other fifteen stay green.
+for typed_char, twin in {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "[": "(", "{": "(", "]": ")", "}": ")"}.items():
+    cases = run(font_file, {**right, typed_char: twin}, False)
+    check(f"{typed_char} drawn as {twin}: red", cases[f"char {typed_char!r} is right"] is False)
+    check(f"{typed_char} drawn as {twin}: the others stay green",
+          all(cases[f"char {c!r} is right"] for c in CHARS if c != typed_char))
 sys.exit(1 if fails else 0)

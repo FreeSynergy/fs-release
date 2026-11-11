@@ -29,7 +29,11 @@ CARET_GAP_PX = 4
 # What a wrong layout could have produced instead: printable ASCII and the German extras.
 CANDIDATES = [chr(c) for c in range(33, 127)] + list("äöüÄÖÜß€µ§°´²³")
 LOOKALIKES = {"|": set("|lIi!1")}  # a plain bar cannot be told from these by shape, so "|" is only checked that weakly
-RANK_OK = 3  # the typed character must be among the best three matches ("|" looks like "l" in many fonts)
+# Near twins a wrong layout or a missing accent could produce: the typed character must rank above its twin, not only be in the
+# best three (a dead key gives a for ä, a missing AltGr a bracket of the wrong kind).
+RIVALS = {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "[": "(", "{": "(", "]": ")", "}": ")"}
+ACCENTED = set("ÄäöÜü")
+RANK_OK = 3# the typed character must be among the best three matches ("|" looks like "l" in many fonts)
 
 
 def shot(name):
@@ -184,7 +188,15 @@ for i, ch in enumerate(CHARS):
     top = [k for _, k in ranked[:RANK_OK]]
     result["chars"][ch]["best_matches"] = "".join(top)
     right = bool(set(top) & LOOKALIKES.get(ch, {ch}))
-    case(f"char {ch!r} is right", right, f"drawn like {''.join(top)!r}" + ("" if right else f", expected {ch!r}"))
+    rival = RIVALS.get(ch)
+    if right and rival:  # the typed character must score above its near twin (Ä over A, [ over ( ...)
+        if ch in ACCENTED:  # the marks are thin and blur at small sizes, but they make the glyph taller: height decides
+            h = len(glyphs[ch])
+            right = abs(h - ref_glyph(font_file, size, ch).size[1]) < abs(h - ref_glyph(font_file, size, rival).size[1])
+        else:
+            score = {k: s for s, k in ranked}
+            right = score.get(ch, -9) > score.get(rival, -9)
+    case(f"char {ch!r} is right", right, f"drawn like {''.join(top)!r}" + ("" if right else f", expected {ch!r}" + (f" and not {rival!r}" if rival else "")))
 
 # Glyphs that showed only after waiting (the picture lagged behind the key): reported, not a failure.
 late = {}

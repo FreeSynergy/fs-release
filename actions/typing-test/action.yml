@@ -12,6 +12,7 @@ inputs:
   install: { description: "Install kwin, spectacle and the other packages with apt (ubuntu runner)", default: "true" }
   working-directory: { description: "Directory to run the app in", default: "." }
   click-in-window: { description: "x,y from the window's top left corner where to click to focus the text field (preferred over click; does not depend on where the compositor places the window)", default: "", required: false }
+  ref-font: { description: "Font file the typed glyphs are compared with; set it to the font the app draws with (empty: DejaVu Sans, what the apps use via sans-serif on the runner; set Inter once an app ships it)", default: "", required: false }
   text-width: { description: "Width in px of the text part compared with the reference rendering (empty: 110)", default: "", required: false }
   size: { description: "Virtual screen size WxH (empty: 1280x800)", default: "", required: false }
   settle: { description: "Seconds to wait for the app's window (empty: the script's own defaults)", default: "", required: false }
@@ -43,6 +44,7 @@ runs:
         TT_CLICK_REL: ${{ inputs.click-in-window }}
         TT_FIELD: ${{ inputs.field }}
         TT_TEXT_WIDTH: ${{ inputs.text-width }}
+        TT_REF_FONT: ${{ inputs.ref-font }}
         TT_SIZE: ${{ inputs.size }}
         TT_SETTLE: ${{ inputs.settle }}
         TT_ENFORCE_MS: ${{ inputs.enforce-ms }}
