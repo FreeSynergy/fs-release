@@ -12,6 +12,7 @@ pub mod gh;
 pub mod git;
 pub mod ledger;
 pub mod meta;
+pub mod origin;
 pub mod outcome;
 pub mod packages;
 pub mod poll;

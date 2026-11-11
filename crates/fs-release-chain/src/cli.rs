@@ -1,7 +1,7 @@
 //! Pattern: Facade (command line in, one run out: builds the context from the arguments and prints the one-line result).
 
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -11,6 +11,8 @@ use crate::chain::Chain;
 use crate::ctx::{Ctx, Target, Timing, MIN_POLL};
 use crate::ledger::Ledger;
 use crate::meta::Reach;
+pub use crate::origin::check_slug;
+use crate::origin::{now_secs, slug_of, today_days};
 use crate::outcome::Outcome;
 use crate::registry;
 use crate::runner;
@@ -140,43 +142,6 @@ fn verify(path: &Path) -> i32 {
             1
         }
     }
-}
-
-fn slug_of(url: &str) -> Option<String> {
-    let rest = url.trim().trim_end_matches('/').trim_end_matches(".git");
-    let tail = rest
-        .rsplit_once("github.com")
-        .map(|(_, t)| t.trim_start_matches([':', '/']))?;
-    (tail.matches('/').count() == 1).then(|| tail.to_string())
-}
-
-/// `--slug` must be the repo `origin` points at; otherwise the checks would run for one repo and publish to another.
-///
-/// # Errors
-/// A sentence when the origin URL names another repo (or none).
-pub fn check_slug(given: &str, origin_url: &str) -> Result<(), String> {
-    crate::slug::validate(given)?;
-    match slug_of(origin_url) {
-        Some(o) if o.eq_ignore_ascii_case(given) => Ok(()),
-        Some(o) => Err(format!("--slug {given} but origin is {o}")),
-        None => Err(format!(
-            "--slug {given} cannot be checked: origin {origin_url} is not a GitHub URL"
-        )),
-    }
-}
-
-fn now_secs() -> i64 {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
-    i64::try_from(secs).unwrap_or(0)
-}
-
-fn today_days() -> i64 {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
-    i64::try_from(secs / 86_400).unwrap_or(0)
 }
 
 /// Production: the shared build-slot script in front of the gates, nothing else. Test mode: the given fake.
