@@ -32,5 +32,5 @@ jobs:
         run: scripts/test-packaging.sh
       - name: typing test, caret and field detection on synthetic pictures
         run: |
-          python3 -m pip install --quiet pillow
+          sudo apt-get install -y --no-install-recommends python3-pil
           tests/typing-test/caret.sh
