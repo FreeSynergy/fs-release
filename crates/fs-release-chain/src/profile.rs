@@ -1,10 +1,9 @@
 //! Pattern: Value object (the release profile of a repo, `.fs/release.toml`: which runs must be green).
 
-use std::fs;
-use std::path::Path;
-
 use serde::Deserialize;
 
+use crate::ctx::Ctx;
+use crate::git;
 use crate::outcome::Stop;
 
 /// What a repo says about its own release: the workflow runs that must exist and be green for its head commit.
@@ -16,25 +15,30 @@ pub struct Profile {
 }
 
 impl Profile {
-    /// Reads `<repo>/.fs/release.toml`.
+    /// Reads `.fs/release.toml` as it is IN the commit `sha` (`git show`), not from the working tree: what is released is
+    /// what was checked, whatever lies around.
     ///
     /// # Errors
-    /// [`Stop::Halt`] `no-profile` when the file is missing or lists nothing (a chain without required runs would call
-    /// anything green); [`Stop::Red`] when it is damaged.
-    pub fn load(repo: &Path) -> Result<Profile, Stop> {
-        let path = repo.join(".fs/release.toml");
-        let Ok(text) = fs::read_to_string(&path) else {
+    /// [`Stop::Halt`] `no-profile` when the commit has no such file, `no-required` when it lists no run (a chain without
+    /// required runs would call anything green); [`Stop::Red`] when it is damaged.
+    pub fn load(ctx: &Ctx, sha: &str) -> Result<Profile, Stop> {
+        let spec = format!("{sha}:.fs/release.toml");
+        let o = git::raw(ctx, &ctx.target.repo_dir, &["show", &spec])?;
+        if !o.ok() {
             return Err(Stop::halt(
                 "no-profile",
-                format!("{} with required = [\"check\", \"lint\"]", path.display()),
+                format!(
+                    "{} in the commit with required = [\"check\", \"lint\"]",
+                    ".fs/release.toml"
+                ),
             ));
-        };
-        let p: Profile =
-            toml::from_str(&text).map_err(|e| Stop::red(format!("{}: {e}", path.display())))?;
+        }
+        let p: Profile = toml::from_str(&o.stdout)
+            .map_err(|e| Stop::red(format!(".fs/release.toml at {sha}: {e}")))?;
         if p.required.is_empty() {
             return Err(Stop::halt(
-                "no-profile",
-                format!("at least one required run in {}", path.display()),
+                "no-required",
+                "at least one required run in .fs/release.toml (empty list)",
             ));
         }
         Ok(p)

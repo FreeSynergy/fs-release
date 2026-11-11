@@ -95,7 +95,7 @@ impl Step for WaitCi {
 
     fn run(&self, f: &Frame) -> StepResult {
         let t = &f.ctx.target;
-        let profile = Profile::load(&t.repo_dir)?;
+        let profile = Profile::load(f.ctx, f.head)?;
         let filter = Filter {
             sha: f.head.to_string(),
             branch: Some(t.branch.clone()),
@@ -104,12 +104,47 @@ impl Step for WaitCi {
         };
         let runs = settle(f, "wait-ci", &t.slug, &filter, Retry::Infra)?;
         optional_red(&runs, &profile)?;
+        if pending_optional(&runs, &profile).is_some() {
+            // Not required, but still running: wait for them too (up to the limits), a red one halts.
+            let all = Filter {
+                required: Vec::new(),
+                ..filter
+            };
+            if let Verdict::Red(r) = poll::wait(f.ctx, &t.slug, &all)? {
+                let required = profile
+                    .required
+                    .iter()
+                    .any(|n| r.workflow.eq_ignore_ascii_case(n));
+                return Err(if required {
+                    Stop::red(format!("required run {} #{} turned red", r.workflow, r.id))
+                } else {
+                    Stop::halt(
+                        "ci-optional-red",
+                        format!(
+                            "a look at the not required run {} #{} ({})",
+                            r.workflow, r.id, r.conclusion
+                        ),
+                    )
+                });
+            }
+        }
         Ok(Note::text(format!(
             "CI green at {} (required: {})",
             short(f.head),
             profile.required.join(", ")
         )))
     }
+}
+
+/// A run that is not required and has not finished.
+fn pending_optional<'a>(runs: &'a [Run], profile: &Profile) -> Option<&'a Run> {
+    runs.iter().find(|r| {
+        r.status != "completed"
+            && !profile
+                .required
+                .iter()
+                .any(|n| r.workflow.eq_ignore_ascii_case(n))
+    })
 }
 
 /// A red run that is not required does not make the commit red, but somebody has to look at it.
@@ -137,7 +172,7 @@ fn optional_red(runs: &[Run], profile: &Profile) -> Result<(), Stop> {
 /// Asks GitHub now (one query) whether every required run of the head commit exists and is green. The run log is not asked.
 pub(super) fn verify_green(f: &Frame) -> Result<(), Stop> {
     let t = &f.ctx.target;
-    let profile = Profile::load(&t.repo_dir)?;
+    let profile = Profile::load(f.ctx, f.head)?;
     let filter = Filter {
         sha: f.head.to_string(),
         branch: Some(t.branch.clone()),
@@ -168,6 +203,15 @@ pub(super) fn verify_green(f: &Frame) -> Result<(), Stop> {
                 r.id, r.status, r.conclusion
             )));
         }
+    }
+    if let Some(r) = pending_optional(&runs, &profile) {
+        return Err(Stop::halt(
+            "ci-pending-optional",
+            format!(
+                "the not required run {} #{} to finish (or wait-ci again)",
+                r.workflow, r.id
+            ),
+        ));
     }
     optional_red(&runs, &profile)
 }

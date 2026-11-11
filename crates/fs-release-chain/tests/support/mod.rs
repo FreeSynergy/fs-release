@@ -72,6 +72,7 @@ impl World {
         w.program_repo();
         w.catalog_repo();
         w.release_dir();
+        w.set_preapproved(&["Org/fs-demo"], "test-ok");
         w.set_gates(true);
         w
     }
@@ -220,6 +221,9 @@ impl World {
             approval_dir: self.root().join("freigaben"),
             approval_days: 7,
             today_days: fs_release_chain::approval::parse_date("2026-11-12").unwrap(),
+            now_secs: fs_release_chain::approval::parse_date("2026-11-12").unwrap() * 86_400
+                + 3_600,
+            audit_log: self.root().join("audit/AUDIT.log"),
             fake: false,
             state_dir: self.root().join("state"),
             prerelease: true,

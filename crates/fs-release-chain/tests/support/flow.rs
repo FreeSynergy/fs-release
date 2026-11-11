@@ -40,6 +40,29 @@ pub fn ci_rows(
 }
 
 impl World {
+    /// Commits `.fs/preapproved.toml` in the fs-release checkout (`rel`): the list of repos and the public lock.
+    pub fn set_preapproved(&self, repos: &[&str], public_ok: &str) {
+        let rel = self.root().join("rel");
+        if !rel.join(".git").exists() {
+            super::git(&rel, &["init", "--quiet", "-b", "main"]);
+        }
+        fs::create_dir_all(rel.join(".fs")).unwrap();
+        let list: Vec<String> = repos.iter().map(|r| format!("\"{r}\"")).collect();
+        fs::write(
+            rel.join(".fs/preapproved.toml"),
+            format!(
+                "repos = [{}]\npublic_ok = \"{public_ok}\"\n",
+                list.join(", ")
+            ),
+        )
+        .unwrap();
+        super::git(&rel, &["add", "."]);
+        super::git(
+            &rel,
+            &["commit", "--quiet", "--allow-empty", "-m", "preapproved"],
+        );
+    }
+
     /// A sequence of answers: each poll takes the next one, the last stays.
     pub fn runs_seq(&self, repo: &str, answers: &[&str]) {
         let dir = self

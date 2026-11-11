@@ -6,6 +6,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use clap::{Args, Parser, Subcommand};
 
 use crate::approval::{APPROVAL_DAYS, APPROVAL_DIR};
+use crate::audit::AUDIT_LOG;
 use crate::chain::Chain;
 use crate::ctx::{Ctx, Target, Timing, MIN_POLL};
 use crate::ledger::Ledger;
@@ -154,6 +155,7 @@ fn slug_of(url: &str) -> Option<String> {
 /// # Errors
 /// A sentence when the origin URL names another repo (or none).
 pub fn check_slug(given: &str, origin_url: &str) -> Result<(), String> {
+    crate::slug::validate(given)?;
     match slug_of(origin_url) {
         Some(o) if o.eq_ignore_ascii_case(given) => Ok(()),
         Some(o) => Err(format!("--slug {given} but origin is {o}")),
@@ -161,6 +163,13 @@ pub fn check_slug(given: &str, origin_url: &str) -> Result<(), String> {
             "--slug {given} cannot be checked: origin {origin_url} is not a GitHub URL"
         )),
     }
+}
+
+fn now_secs() -> i64 {
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    i64::try_from(secs).unwrap_or(0)
 }
 
 fn today_days() -> i64 {
@@ -180,6 +189,9 @@ fn wrapper(c: &Common) -> Vec<String> {
 }
 
 fn build_target(c: &Common, runner: &dyn Runner) -> Result<Target, String> {
+    if let Some(s) = &c.slug {
+        crate::slug::validate(s)?;
+    }
     let git = |args: &[&str]| -> Result<String, String> {
         let cmd = Cmd {
             program: "git".into(),
@@ -198,11 +210,18 @@ fn build_target(c: &Common, runner: &dyn Runner) -> Result<Target, String> {
         Some(b) => b.clone(),
         None => git(&["symbolic-ref", "--short", "HEAD"])?,
     };
+    let origin = git(&["remote", "get-url", "origin"])?;
     let slug = match &c.slug {
-        Some(s) => s.clone(),
-        None => slug_of(&git(&["remote", "get-url", "origin"])?)
-            .ok_or("cannot read owner/name from the origin URL: give --slug")?,
+        Some(s) => {
+            check_slug(s, &origin)?;
+            s.clone()
+        }
+        None => {
+            slug_of(&origin).ok_or("cannot read owner/name from the origin URL: give --slug")?
+        }
     };
+    crate::slug::validate(&slug)?;
+    crate::slug::validate(&c.catalog_slug)?;
     let state_dir = match &c.state_dir {
         Some(d) => d.clone(),
         None => PathBuf::from(git(&["rev-parse", "--absolute-git-dir"])?).join("fs-release-chain"),
@@ -219,6 +238,8 @@ fn build_target(c: &Common, runner: &dyn Runner) -> Result<Target, String> {
         approval_dir: PathBuf::from(APPROVAL_DIR),
         approval_days: APPROVAL_DAYS,
         today_days: today_days(),
+        now_secs: now_secs(),
+        audit_log: PathBuf::from(AUDIT_LOG),
         fake: c.fake_wrap.is_some(),
         state_dir,
         prerelease: !c.full_release,
@@ -231,6 +252,9 @@ fn go(c: &Common, one: Option<String>) -> i32 {
     let clock = SystemClock::new();
     let outcome = start(c, one, &runner, &clock);
     println!("{}", outcome.0.line());
+    if let Some(line) = &outcome.2 {
+        println!("audit: {line}");
+    }
     if let Some(log) = outcome.1 {
         println!("log: {}", log.display());
     }
@@ -253,13 +277,14 @@ fn start(
     one: Option<String>,
     runner: &SystemRunner,
     clock: &SystemClock,
-) -> (Outcome, Option<PathBuf>) {
+) -> (Outcome, Option<PathBuf>, Option<String>) {
     let red = |line: String| {
         (
             Outcome::Red {
                 step: "setup".into(),
                 line,
             },
+            None,
             None,
         )
     };
@@ -279,5 +304,7 @@ fn start(
     let ledger = Ledger::new(&target.state_dir, &target.version);
     let path = ledger.path().to_path_buf();
     let ctx = Ctx::new(target, reach, timing, runner, clock);
-    (runner::execute(&ctx, &ledger, &names), Some(path))
+    let outcome = runner::execute(&ctx, &ledger, &names);
+    let audit = ctx.audit.borrow().last().cloned();
+    (outcome, Some(path), audit)
 }

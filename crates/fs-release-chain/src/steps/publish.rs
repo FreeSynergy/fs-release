@@ -22,18 +22,6 @@ impl Step for Push {
 
     fn run(&self, f: &Frame) -> StepResult {
         let t = &f.ctx.target;
-        if t.branch == t.base {
-            return Err(Stop::red(format!(
-                "push refused: {} is the base branch, only merge-ff may move it",
-                t.base
-            )));
-        }
-        if t.branch == t.base {
-            return Err(Stop::red(format!(
-                "push refused: {} is the base branch, only merge-ff may move it",
-                t.base
-            )));
-        }
         if git::remote_branch(f.ctx, &t.repo_dir, &t.branch)?.as_deref() == Some(f.head) {
             return Ok(Note::text(format!(
                 "{} is at {} on the remote already",
@@ -41,7 +29,7 @@ impl Step for Push {
                 short(f.head)
             )));
         }
-        let spec = format!("HEAD:refs/heads/{}", t.branch);
+        let spec = format!("{}:refs/heads/{}", f.head, t.branch);
         let o = git::raw(f.ctx, &t.repo_dir, &["push", "origin", &spec])?;
         if o.ok() {
             Ok(Note::text(format!(

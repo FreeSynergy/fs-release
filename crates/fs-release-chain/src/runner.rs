@@ -3,11 +3,13 @@
 use std::collections::BTreeMap;
 
 use crate::approval;
+use crate::audit;
 use crate::ctx::Ctx;
 use crate::git::{self, short};
 use crate::ledger::{Entry, Ledger};
 use crate::meta::{Reach, Risk};
 use crate::outcome::{Note, Outcome, Stop};
+use crate::preapproved::Preapproved;
 use crate::registry;
 use crate::steps::Frame;
 
@@ -24,6 +26,15 @@ fn preflight(ctx: &Ctx) -> Result<(), Stop> {
             "fake gates mode cannot publish: use --reach local",
         ));
     }
+    Preapproved::load(ctx)
+        .and_then(|p| p.allows(&t.slug, ctx.reach))
+        .or_else(|stop| {
+            if ctx.reach == Reach::Local {
+                Ok(())
+            } else {
+                Err(stop)
+            }
+        })?;
     let on = git::out(ctx, &t.repo_dir, &["symbolic-ref", "--short", "HEAD"])?;
     if on == t.branch {
         Ok(())
@@ -61,15 +72,45 @@ fn one(ctx: &Ctx, ledger: &Ledger, name: &str) -> Result<Finished, (String, Stop
         )));
     }
     let head = git::rev(ctx, &ctx.target.repo_dir, "HEAD").map_err(at)?;
-    if meta.risk == Risk::Publish {
-        approval::verify(ctx, &head).map_err(|why| (head.clone(), why))?;
+    if meta.reach >= Reach::Shared
+        && !git::out(
+            ctx,
+            &ctx.target.repo_dir,
+            &["status", "--porcelain", "--untracked-files=no"],
+        )
+        .map_err(at)?
+        .is_empty()
+    {
+        return Err((
+            head,
+            Stop::red(format!(
+                "worktree {} has uncommitted changes: what is released must be what was checked",
+                ctx.target.repo_dir.display()
+            )),
+        ));
     }
+    let approved = if meta.risk == Risk::Publish {
+        Some(approval::verify(ctx, &head).map_err(|why| (head.clone(), why))?)
+    } else {
+        None
+    };
     let frame = Frame {
         ctx,
         ledger,
         head: &head,
     };
-    match step.run(&frame) {
+    let result = step.run(&frame);
+    if let Some(a) = approved {
+        let word = match &result {
+            Ok(_) => "ok",
+            Err(Stop::Halt { .. }) => "halt",
+            Err(Stop::Red { .. }) => "red",
+        };
+        if let Err(why) = audit::record(ctx, &audit::line(ctx, &a, &head, &meta, word)) {
+            return Err((head, why));
+        }
+    }
+    match result {
         Ok(note) => Ok(Finished { note, head }),
         Err(why) => Err((head, why)),
     }

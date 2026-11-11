@@ -1,0 +1,18 @@
+# Repos the owner pre-approved for the release chain (versions Opus has checked green). Fixed list: a change is a commit.
+# The chain reads this file from the committed HEAD of this repo. Anything else halts with `not-preapproved`.
+repos = [
+  "FreeSynergy/fs-interfaces",
+  "FreeSynergy/fs-components",
+  "FreeSynergy/fs-store",
+  "FreeSynergy/fs-files",
+  "FreeSynergy/fs-people",
+  "FreeSynergy/fs-groups",
+  "FreeSynergy/fs-tasks",
+  "FreeSynergy/fs-wiki",
+  "FreeSynergy/fs-calendar",
+  "FreeSynergy/fs-maps",
+  "FreeSynergy/fs-messenger",
+  "FreeSynergy/fs-release",
+]
+# Public reach (`--reach public`) stays locked until the reference of the Opus JA that lifts the lock stands here.
+public_ok = ""

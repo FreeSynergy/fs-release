@@ -56,14 +56,26 @@ pub fn parse_date(text: &str) -> Option<i64> {
 }
 
 impl Approval {
-    /// Reads `<dir>/<repo name>/<head>.ok`.
+    /// Reads `<dir>/<repo name>/<head>.ok`. The slug and the sha are validated first (no path leaves the folder), and a
+    /// symbolic link for the repo folder or the file is refused.
     ///
     /// # Errors
     /// [`Stop::Halt`] `approval-stale` when approvals exist for other commits only, `review` when there is none at all;
-    /// [`Stop::Red`] when the file is damaged or lacks a required field.
-    pub fn load(dir: &Path, slug: &str, head: &str) -> Result<Approval, Stop> {
-        let repo_dir = dir.join(slug.rsplit('/').next().unwrap_or(slug));
+    /// [`Stop::Red`] when the slug or sha is not valid, a link is in the way, or the file is damaged.
+    pub fn load(dir: &Path, slug: &str, head: &str) -> Result<(Approval, PathBuf), Stop> {
+        crate::slug::validate(slug).map_err(Stop::red)?;
+        if head.len() != 40 || !head.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(Stop::red(format!("not a full commit sha: {head:?}")));
+        }
+        let repo_dir = dir.join(crate::slug::name(slug));
         let path = repo_dir.join(format!("{head}.ok"));
+        let is_link = |p: &Path| fs::symlink_metadata(p).is_ok_and(|m| m.file_type().is_symlink());
+        if is_link(&repo_dir) || is_link(&path) {
+            return Err(Stop::red(format!(
+                "{} is a symbolic link: approvals must be plain files",
+                path.display()
+            )));
+        }
         let Ok(text) = fs::read_to_string(&path) else {
             let others = fs::read_dir(&repo_dir).map_or(0, |d| {
                 d.filter_map(Result::ok)
@@ -79,7 +91,9 @@ impl Approval {
                 Stop::halt("review", format!("approval file {} (repo, sha, date, verdict: JA, by, findings, findings_sha256)", path.display()))
             });
         };
-        serde_norway::from_str(&text).map_err(|e| Stop::red(format!("{}: {e}", path.display())))
+        let a = serde_norway::from_str(&text)
+            .map_err(|e| Stop::red(format!("{}: {e}", path.display())))?;
+        Ok((a, path))
     }
 
     /// True when the approval is for `repo`, says yes, names `head` in full, has an author, a findings hash, and is not
@@ -125,30 +139,58 @@ impl Approval {
     }
 }
 
-/// Loads and checks the approval of `head`, including the hash of the findings file (computed with `sha256sum`).
+/// One way to tell that an approval is real. Today only the findings hash is checked ([`FindingsHash`]); a signature
+/// check (`ssh-keygen -Y verify` against a fixed `allowed_signers` file) is another implementation added to [`verifiers`],
+/// nothing else changes.
+pub trait ApprovalVerifier {
+    /// # Errors
+    /// [`Stop::Halt`] when the approval is not proven by this verifier.
+    fn check(&self, ctx: &Ctx, approval: &Approval, file: &Path) -> Result<(), Stop>;
+}
+
+/// Compares the findings file with the hash the approval names. Protects against mistakes (a changed or wrong findings
+/// file), not against somebody who writes both files: whoever can write the approval can write the hash.
+pub struct FindingsHash;
+
+impl ApprovalVerifier for FindingsHash {
+    fn check(&self, ctx: &Ctx, a: &Approval, _file: &Path) -> Result<(), Stop> {
+        let cmd = Cmd {
+            program: "sha256sum".into(),
+            args: vec![a.findings.display().to_string()],
+            ..Cmd::default()
+        };
+        let o = ctx.runner.run(&cmd)?;
+        let have = o.stdout.split_whitespace().next().unwrap_or("");
+        if o.ok() && have.eq_ignore_ascii_case(&a.findings_sha256) {
+            Ok(())
+        } else {
+            Err(Stop::halt(
+                "approval-findings",
+                format!(
+                    "the findings file {} as it was when approved",
+                    a.findings.display()
+                ),
+            ))
+        }
+    }
+}
+
+/// The verifiers every approval has to pass, in order.
+#[must_use]
+pub fn verifiers() -> Vec<Box<dyn ApprovalVerifier>> {
+    vec![Box::new(FindingsHash)]
+}
+
+/// Loads and checks the approval of `head`: the file, its content, and every verifier.
 ///
 /// # Errors
-/// [`Stop::Halt`] for everything [`Approval::load`] and [`Approval::covers`] say, and `approval-findings` when the
-/// findings file is gone or no longer has the hash the approval names.
+/// [`Stop::Halt`] for everything [`Approval::load`], [`Approval::covers`] and the verifiers say.
 pub fn verify(ctx: &Ctx, head: &str) -> Result<Approval, Stop> {
     let t = &ctx.target;
-    let a = Approval::load(&t.approval_dir, &t.slug, head)?;
+    let (a, file) = Approval::load(&t.approval_dir, &t.slug, head)?;
     a.covers(&t.slug, head, t.today_days, t.approval_days)?;
-    let cmd = Cmd {
-        program: "sha256sum".into(),
-        args: vec![a.findings.display().to_string()],
-        ..Cmd::default()
-    };
-    let o = ctx.runner.run(&cmd)?;
-    let have = o.stdout.split_whitespace().next().unwrap_or("");
-    if !o.ok() || !have.eq_ignore_ascii_case(&a.findings_sha256) {
-        return Err(Stop::halt(
-            "approval-findings",
-            format!(
-                "the findings file {} as it was when approved",
-                a.findings.display()
-            ),
-        ));
+    for v in verifiers() {
+        v.check(ctx, &a, &file)?;
     }
     Ok(a)
 }

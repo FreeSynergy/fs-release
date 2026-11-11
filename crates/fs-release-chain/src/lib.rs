@@ -4,6 +4,7 @@
 //! Output of a run is one line: `DONE`, `HALT` (somebody else has to act) or `RED` (a check failed); exit 0, 10, 1.
 
 pub mod approval;
+pub mod audit;
 pub mod chain;
 pub mod cli;
 pub mod ctx;
@@ -14,9 +15,11 @@ pub mod meta;
 pub mod outcome;
 pub mod packages;
 pub mod poll;
+pub mod preapproved;
 pub mod profile;
 pub mod registry;
 pub mod runner;
+pub mod slug;
 pub mod steps;
 pub mod sys;
 

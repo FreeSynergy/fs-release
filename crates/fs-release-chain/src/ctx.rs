@@ -1,6 +1,6 @@
 //! Pattern: Value object (everything one run knows: where, which version, how far it may reach, which clock and runner).
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -59,8 +59,11 @@ pub struct Target {
     pub approval_dir: PathBuf,
     /// Days an approval stays valid.
     pub approval_days: i64,
-    /// Today as days since 1970-01-01.
+    /// Today as days since 1970-01-01, and now as unix seconds.
     pub today_days: i64,
+    pub now_secs: i64,
+    /// Append-only audit log of publications.
+    pub audit_log: PathBuf,
     /// Test mode of the gates (a fake wrapper stands in for them): nothing may be published and nothing is remembered as green.
     pub fake: bool,
     /// Where the run log and the report go.
@@ -89,6 +92,8 @@ pub struct Ctx<'a> {
     pub clock: &'a dyn Clock,
     /// When the last GitHub run query went out (for the rate limit).
     pub last_query: Cell<Option<Duration>>,
+    /// Audit lines written during this run (for the output).
+    pub audit: RefCell<Vec<String>>,
 }
 
 impl<'a> Ctx<'a> {
@@ -107,6 +112,7 @@ impl<'a> Ctx<'a> {
             runner,
             clock,
             last_query: Cell::new(None),
+            audit: RefCell::new(Vec::new()),
         }
     }
 }
