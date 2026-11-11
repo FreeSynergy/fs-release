@@ -18,7 +18,7 @@ FIELD = (40, 100, 440, 140)  # outer box of the field (ring included)
 CLICK = (200, 120)
 
 
-def picture(text_chars=8, caret_at=None, ring=True, add_right=True, button_above=False, button_below_same_column=False):
+def picture(text_chars=8, caret_at=None, caret_color=BLUE, ring=True, add_right=True, button_above=False, button_below_same_column=False):
     im = Image.new("RGB", (600, 300), PAGE)
     d = ImageDraw.Draw(im)
     d.rectangle(FIELD, fill=WHITE, outline=RING if ring else (180, 180, 180), width=2 if ring else 1)
@@ -34,7 +34,7 @@ def picture(text_chars=8, caret_at=None, ring=True, add_right=True, button_above
         d.rectangle((FIELD[0], 150, FIELD[0] + 1, 200), fill=BLUE)
         d.rectangle((FIELD[2] - 1, 150, FIELD[2], 200), fill=BLUE)
     if caret_at is not None:
-        d.rectangle((caret_at, 108, caret_at + 1, 128), fill=BLUE)
+        d.rectangle((caret_at, 108, caret_at + 1, 128), fill=caret_color)
     return im
 
 
@@ -79,6 +79,12 @@ for name, frames in {
 for kw in ({"add_right": True}, {"add_right": False, "button_above": True}, {"button_below_same_column": True}):
     gap = caret_gap([picture(caret_at=cx, **kw), picture(caret_at=cx, **kw)], fc.field_around(picture(**kw), CLICK))
     check(f"static caret, buttons around {kw}", gap is not None and 0 <= gap <= 4, f"gap {gap}")
+
+# 3b. a caret frozen at a faint point of its fade (light blue in every picture, as seen on a laptop with the app idle)
+FAINT = (192, 216, 247)
+for kw in ({"add_right": True}, {"button_below_same_column": True}):
+    gap = caret_gap([picture(caret_at=cx, caret_color=FAINT, **kw)] * 3, fc.field_around(picture(**kw), CLICK))
+    check(f"faint static caret {kw}", gap is not None and 0 <= gap <= 4, f"gap {gap}")
 
 # 4. no caret anywhere in the field: nothing is found (the button's blue column is not a caret)
 check("no caret: none found", fc.find_caret([picture(), picture(), picture()], rect) is None)

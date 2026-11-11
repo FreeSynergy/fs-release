@@ -131,10 +131,18 @@ def _blue_mask(img, rect):
             if px[x, y][2] - px[x, y][0] > 100 and px[x, y][0] < 130}
 
 
+def _faint_mask(img, rect):
+    """Light-blue pixels (the caret caught at a low point of its fade, which stays so while nothing redraws)."""
+    px = img.load()
+    x0, y0, x1, y1 = rect
+    return {(x - x0, y - y0) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)
+            if px[x, y][2] - px[x, y][0] > 40 and px[x, y][2] > 235}
+
+
 def find_caret(frames, rect, after=None):
     """The caret in the field `rect` (inside only, so a button or the focus ring in the same pixel column cannot be
     taken for it): a narrow bar that differs between some of the pictures (it blinks; the union over all pairs), else
-    a narrow saturated-blue bar present in some picture. With several candidates the one nearest to x `after` (the end
+    a narrow saturated-blue bar present in some picture, else a narrow light-blue bar (a caret frozen at a faint point of its fade). With several candidates the one nearest to x `after` (the end
     of the text). Returns (x, y0, y1) in picture coordinates or None."""
     x0, y0, x1, y1 = rect
     maxh = y1 - y0 + 1
@@ -148,6 +156,11 @@ def find_caret(frames, rect, after=None):
         for f in frames:
             blue |= _blue_mask(f, rect)
         found = bars(blue, maxh=maxh)
+    if not found:  # a caret frozen at a faint point of its fade in all pictures: still inside the field only
+        faint = set()
+        for f in frames:
+            faint |= _faint_mask(f, rect)
+        found = bars(faint, maxh=maxh)
     if not found:
         return None
     pick = min(found, key=lambda t: abs(t[0] - ((after if after is not None else 0) - x0)))
