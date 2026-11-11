@@ -117,4 +117,4 @@ wait "$KPID" || rc=$?
 [ -s "$OUT/.session-failed" ] && { echo "typing-test: $(cat "$OUT/.session-failed")" >&2; exit 2; }
 [ -s "$OUT/.session-done" ] || { echo "typing-test: session did not finish (kwin exit $rc), see $OUT/kwin.log" >&2; tail -20 "$OUT/kwin.log" >&2; exit 2; }
 
-if [ "${TT_PHASE:-all}" = latency ]; then python3 -I "$TT/stau.py" "$OUT"; else python3 -I "$TT/analyze.py" "$OUT"; fi
+if [ "${TT_PHASE:-all}" = idle ]; then python3 -I "$TT/idle.py" "$OUT"; elif [ "${TT_PHASE:-all}" = latency ]; then python3 -I "$TT/stau.py" "$OUT"; else python3 -I "$TT/analyze.py" "$OUT"; fi

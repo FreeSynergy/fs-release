@@ -123,10 +123,19 @@ fi
 WAYLAND_DEBUG=1 start_app B 0
 if ! wait_window blank0b; then echo "no window after ${TT_SETTLE:-30} s" > "$D/.session-failed"; stop_app; kill "$INJ" 2>/dev/null; exit 0; fi
 focus
+# TT_PHASE=idle: no typing, only the app idling for TT_IDLE seconds; its CPU time goes to idle.txt.
+if [ "${TT_PHASE:-all}" = idle ]; then
+  cpu() { awk '{print $14 + $15}' "/proc/$APP/stat"; }
+  c0="$(cpu)"; sleep "${TT_IDLE:-20}"; c1="$(cpu)"
+  echo "$c0 $c1 $(getconf CLK_TCK) ${TT_IDLE:-20}" > "$D/idle.txt"
+  stop_app; c quit 0.3; kill "$INJ" 2>/dev/null; echo ok > "$D/.session-done"; exit 0
+fi
 # TT_SAMPLE=1: what the app's main thread waits in, every 50 ms, to see what it does while keys pile up.
 if [ -n "${TT_SAMPLE:-}" ]; then
-  ( while kill -0 "$APP" 2>/dev/null; do
-      echo "$(date +%s.%N) $(cat "/proc/$APP/wchan" 2>/dev/null) $(awk '{print $3}' "/proc/$APP/stat" 2>/dev/null)"
+  # TT_SAMPLE_COMM names the process when the app is started through a wrapper script.
+  ( SP="$APP"; [ -n "${TT_SAMPLE_COMM:-}" ] && SP="$(pgrep -n -x "$TT_SAMPLE_COMM")"
+    while kill -0 "$APP" 2>/dev/null; do
+      echo "$(date +%s.%N) $(cat "/proc/$SP/wchan" 2>/dev/null) $(awk '{print $3}' "/proc/$SP/stat" 2>/dev/null)"
       sleep 0.05
     done ) > "$D/wchan.log" 2>&1 &
   SAMPLER=$!
