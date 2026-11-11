@@ -76,3 +76,4 @@ jobs:
           name: dist-container
           path: dist/*
           if-no-files-found: error
+          retention-days: 3
