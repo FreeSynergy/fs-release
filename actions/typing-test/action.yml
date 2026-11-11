@@ -8,6 +8,7 @@ inputs:
   scenario: { description: "App-specific bash fragment defining focus() (uses c '<inject command>' [secs] and shot NAME); replaces click", default: "" }
   layout: { description: "xkb keyboard layout", default: de }
   max-ms: { description: "Limit for the median key-to-picture time in ms", default: "8" }
+  runs: { description: "How many times the test runs, each with a fresh app window; the result is green only if ALL runs are green (rare faults are the point). 3 in the mandatory gate, 10 locally before a tag", default: "3", required: false }
   name: { description: "Name of the app in the report and the artefact", default: "" }
   install: { description: "Install kwin, spectacle and the other packages with apt (ubuntu runner)", default: "true" }
   working-directory: { description: "Directory to run the app in", default: "." }
@@ -53,11 +54,12 @@ runs:
         TT_LAYOUT: ${{ inputs.layout }}
         TT_MAX_MS: ${{ inputs.max-ms }}
         TT_NAME: ${{ inputs.name }}
+        TT_RUNS: ${{ inputs.runs }}
         TT_OUT: ${{ runner.temp }}/typing-test-out
       run: |
         read -r -a args <<<"$APP_ARGS"
         rc=0
-        "$GITHUB_ACTION_PATH/../../scripts/typing-test.sh" "$APP" "${args[@]}" || rc=$?
+        "$GITHUB_ACTION_PATH/../../scripts/typing-test-runs.sh" "$APP" "${args[@]}" || rc=$?
         echo "exit-code=$rc" >> "$GITHUB_OUTPUT"
         exit "$rc"
     - name: Result (junit.xml, result.json, pictures)
@@ -66,9 +68,12 @@ runs:
       with:
         name: typing-test-${{ inputs.name != '' && inputs.name || 'app' }}
         path: |
-          ${{ runner.temp }}/typing-test-out/result.json
-          ${{ runner.temp }}/typing-test-out/junit.xml
-          ${{ runner.temp }}/typing-test-out/shots
-          ${{ runner.temp }}/typing-test-out/*.log
-          ${{ runner.temp }}/typing-test-out/rect.txt
+          ${{ runner.temp }}/typing-test-out/summary.json
+          ${{ runner.temp }}/typing-test-out/summary.txt
+          ${{ runner.temp }}/typing-test-out/run-*.log
+          ${{ runner.temp }}/typing-test-out/run-*/result.json
+          ${{ runner.temp }}/typing-test-out/run-*/junit.xml
+          ${{ runner.temp }}/typing-test-out/run-*/shots
+          ${{ runner.temp }}/typing-test-out/run-*/*.log
+          ${{ runner.temp }}/typing-test-out/run-*/rect.txt
         if-no-files-found: warn

@@ -64,6 +64,7 @@ jobs:
           app-binary: components/target/release/examples/form
           click-in-window: "220,177"
           layout: us
+          runs: "1"
           install: "false"
           name: fields-form-us
       - name: The wrong layout was caught (exit 1), not just "the test did not run" (exit 2)
