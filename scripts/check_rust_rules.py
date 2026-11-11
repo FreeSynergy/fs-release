@@ -17,7 +17,8 @@ Checks (exit 1 on any violation):
     Programs take Blinc through `fs_components::blinc`.
   * Cargo.lock (every repo, no switch): Blinc packages (blinc*, any fork such as blinc-app-fix) only from
     github.com/FreeSynergy/Blinc at the ONE approved fs-blinc tag + full sha of scripts/blinc-approved.txt
-    (scripts/check_blinc_lock.py; crates.io, path, other tags/shas, two Blinc sources are errors).
+    (scripts/check_blinc_lock.py; crates.io, path, other tags/shas, two Blinc sources are errors). With Blinc in the lock,
+    `.cargo/config(.toml)` may have no `paths` and no `[source.*] replace-with` (always on). Only the root lock is read.
 
     python3 scripts/check_rust_rules.py /srv/FreeSynergy/fs-store [/srv/FreeSynergy/fs-hub …]
 """
@@ -25,10 +26,27 @@ import importlib.util, re, subprocess, sys, tomllib
 from pathlib import Path
 
 def _blinc_lock_errors(repo: Path):
-    """Cargo.lock of every repo: Blinc only from the approved fs-blinc tag (scripts/check_blinc_lock.py, scripts/blinc-approved.txt)."""
+    """Cargo.lock of every repo: Blinc only from the approved fs-blinc tag (scripts/check_blinc_lock.py, scripts/blinc-approved.txt).
+    Only the root lock is read (known limit: nested locks, e.g. scripts/typing-test/inject/, are not). A repo with Blinc in its
+    lock also may not hide a replacement in `.cargo/config(.toml)` (`paths`, `[source.*] replace-with`): always on, no switch."""
     spec = importlib.util.spec_from_file_location("check_blinc_lock", Path(__file__).resolve().parent / "check_blinc_lock.py")
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-    return mod.check_repo_lock(repo)
+    errors = mod.check_repo_lock(repo)
+    lock = repo / "Cargo.lock"
+    if lock.is_file() and mod.lock_has_blinc(lock.read_text(encoding="utf-8")):
+        for name in ("config.toml", "config"):
+            for f in _walk(repo, f".cargo/{name}"):
+                for rel, doc, err in _config_docs(f, repo, set()):
+                    errors.extend([err] if err else _bypass_errors(rel, doc))
+    return errors
+
+def _bypass_errors(rel, doc):
+    """A cargo config that swaps sources under an unchanged Cargo.lock (vendored fork): `paths`, `[source.*] replace-with`."""
+    if doc.get("paths"):
+        yield f"{rel}: `paths` override in a repo with Blinc in Cargo.lock: it can replace Blinc unseen by the lock check"
+    for name, spec in (doc.get("source") or {}).items():
+        if isinstance(spec, dict) and "replace-with" in spec:
+            yield f"{rel}: [source.{name}] replace-with in a repo with Blinc in Cargo.lock: a vendored fork would pass the lock check"
 
 HARD, SOFT = 300, 200
 

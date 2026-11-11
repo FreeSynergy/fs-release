@@ -22,7 +22,9 @@ lk_bad "a fork under a non-blinc name with a blinc source is red" "other=git+htt
 lk_ok  "a lock without Blinc is green"
 if printf '' | LK; then pass "blinc-lock: an empty lock is green"; else fail "blinc-lock: empty lock must pass"; fi
 lock "blinc_app=git+https://github.com/FreeSynergy/blinc-app-fix#$SX" | LK || true; check_in "blinc-lock: the error names package, source and approved tag" "$(cat "$TB/out")" "package \`blinc_app\`"
-check_in "blinc-lock: the error names the bump script" "$(cat "$TB/out")" "approve-blinc.sh"
+check_in "blinc-lock: the error names fs-components and the approve script for maintainers" "$(cat "$TB/out")" "only through fs-components"
+check_in "blinc-lock: the error counts the packages" "$(cat "$TB/out")" "1 Blinc package(s)"
+check_in "blinc-lock: the error names approve-blinc.sh" "$(cat "$TB/out")" "approve-blinc.sh"
 check_in "blinc-lock: the error names the approved tag" "$(cat "$TB/out")" "fs-blinc-3"
 # the real approved file is one full-sha line for the current tag
 if python3 -I "$ROOT/scripts/check_blinc_lock.py" - </dev/null >/dev/null; then pass "blinc-lock: real blinc-approved.txt parses"; else fail "blinc-lock: real blinc-approved.txt broken"; fi
@@ -35,6 +37,13 @@ lock "blinc_app=$B?tag=$tag#$sha" > "$TB/repo/Cargo.lock"; RRL && pass "rules: l
 lock "blinc_app=git+https://github.com/FreeSynergy/blinc-app-fix#$SX" > "$TB/repo/Cargo.lock"; RRL && fail "rules: blinc-app-fix in Cargo.lock must fail the gate" || pass "rules: blinc-app-fix in Cargo.lock fails the gate"
 lock "blinc_app=$B?tag=fs-blinc-2#$S2" > "$TB/repo/Cargo.lock"; RRL && fail "rules: unapproved tag must fail the gate" || pass "rules: unapproved tag fails the gate"
 lock > "$TB/repo/Cargo.lock"; RRL && pass "rules: lock without Blinc passes the gate" || fail "rules: lock without Blinc must pass"
+# bypass: a replacement hidden in .cargo/config, only when the lock has Blinc (always on, no .fs-rules.toml)
+lock "blinc_app=$B?tag=$tag#$sha" > "$TB/repo/Cargo.lock"; mkdir -p "$TB/repo/.cargo"
+printf 'paths = ["../blinc-fork"]\n' > "$TB/repo/.cargo/config.toml"; RRL && fail "rules: paths override with Blinc in the lock must fail" || pass "rules: paths override with Blinc in the lock fails"
+printf '[source.crates-io]\nreplace-with = "vendored"\n[source.vendored]\ndirectory = "vendor"\n' > "$TB/repo/.cargo/config.toml"; RRL && fail "rules: [source] replace-with with Blinc in the lock must fail" || pass "rules: [source] replace-with with Blinc in the lock fails"
+printf '[net]\nretry = 3\n' > "$TB/repo/.cargo/config.toml"; RRL && pass "rules: a harmless .cargo/config passes" || fail "rules: harmless .cargo/config must pass"
+lock > "$TB/repo/Cargo.lock"; printf 'paths = ["../x"]\n' > "$TB/repo/.cargo/config.toml"; RRL && pass "rules: paths in a repo without Blinc in the lock is not this rule's business" || fail "rules: no Blinc in lock: paths must not fail here"
+rm -rf "$TB/repo/.cargo"
 rm -f "$TB/repo/Cargo.lock"; RRL && pass "rules: no Cargo.lock passes" || fail "rules: no Cargo.lock must pass"
 # approve-blinc.sh against a local Blinc repo
 git init -q "$TB/bl"; git -C "$TB/bl" -c user.name=t -c user.email=t@example.org commit -q --allow-empty -m x; git -C "$TB/bl" tag fs-blinc-9
@@ -42,4 +51,9 @@ mkdir -p "$TB/s"; cp "$ROOT/scripts/approve-blinc.sh" "$TB/s/"; cp "$ROOT/script
 FS_BLINC_URL="$TB/bl" bash "$TB/s/approve-blinc.sh" fs-blinc-9 >/dev/null; want="fs-blinc-9 $(git -C "$TB/bl" rev-parse HEAD)"
 check_has "approve-blinc.sh writes tag and full sha" "$(cat "$TB/s/blinc-approved.txt")" "$want"
 check_lacks "approve-blinc.sh replaces the old tag" "$(cat "$TB/s/blinc-approved.txt")" "fs-blinc-3"
+printf 'fs-blinc-3.1 %s\nbad line\n' "$S3" > "$TB/approved2.txt"
+if python3 -I "$ROOT/scripts/check_blinc_lock.py" --approved "$TB/approved2.txt" - </dev/null >/dev/null 2>&1; then fail "blinc-lock: malformed approved file must fail"; else pass "blinc-lock: malformed approved file fails"; fi
+printf 'fs-blinc-3.1 %s\n' "$S3" > "$TB/approved2.txt"
+lock "blinc_app=$B?tag=fs-blinc-3.1#$S3" | python3 -I "$ROOT/scripts/check_blinc_lock.py" --approved "$TB/approved2.txt" - >/dev/null && pass "blinc-lock: tag fs-blinc-3.1 is a valid shape (same as approve-blinc.sh)" || fail "blinc-lock: fs-blinc-3.1 must load"
+printf '' > "$TB/s/blinc-approved.txt"; FS_BLINC_URL="$TB/bl" bash "$TB/s/approve-blinc.sh" fs-blinc-9 >/dev/null && pass "approve-blinc.sh: a file without comment lines does not abort" || fail "approve-blinc.sh: file without # lines must work"
 if FS_BLINC_URL="$TB/bl" bash "$TB/s/approve-blinc.sh" fs-blinc-8 >/dev/null 2>&1; then fail "approve-blinc.sh: missing tag must fail"; else pass "approve-blinc.sh: missing tag fails"; fi

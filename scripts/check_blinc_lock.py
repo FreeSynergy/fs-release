@@ -15,7 +15,9 @@ from pathlib import Path
 
 APPROVED = Path(__file__).resolve().parent / "blinc-approved.txt"
 URL = "https://github.com/FreeSynergy/Blinc"
-FIX = "scripts/approve-blinc.sh <tag> (after the owner approved it), then `cargo update -p blinc_app -p blinc_layout …` in the program"
+FIX = ("programs take Blinc only through fs-components (tag as approved in scripts/blinc-approved.txt; bump with "
+       "scripts/bump-components.sh, then `cargo update`). scripts/approve-blinc.sh <tag> is for maintainers approving a NEW tag")
+TAG_RE = r"fs-blinc-[0-9]+(?:\.[0-9]+)?"          # the same shape approve-blinc.sh accepts
 
 def load_approved(f: Path):
     """{tag: sha} from the approved file; ValueError on a malformed line."""
@@ -23,7 +25,7 @@ def load_approved(f: Path):
     for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
         line = line.split("#", 1)[0].strip()
         if not line: continue
-        m = re.fullmatch(r"(fs-blinc-[\w.-]+)\s+([0-9a-f]{40})", line)
+        m = re.fullmatch(rf"({TAG_RE})\s+([0-9a-f]{{40}})", line)
         if not m: raise ValueError(f"{f}:{n}: expected `<tag> <40-hex sha>`, got {line!r}")
         out[m.group(1)] = m.group(2)
     return out
@@ -31,11 +33,15 @@ def load_approved(f: Path):
 def is_blinc(pkg: dict) -> bool:
     return pkg.get("name", "").lower().startswith("blinc") or "blinc" in str(pkg.get("source", "")).lower()
 
+def lock_has_blinc(text: str) -> bool:
+    try: return any(is_blinc(p) for p in tomllib.loads(text).get("package", []))
+    except tomllib.TOMLDecodeError: return False
+
 def lock_errors(text: str, approved: dict, label: str = "Cargo.lock"):
     try: doc = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e: return [f"{label}: not valid TOML ({e})"]
     want = ", ".join(f"{t} ({s[:12]})" for t, s in sorted(approved.items())) or "none"
-    errors, used = [], set()
+    errors, used, bad = [], set(), 0
     for pkg in doc.get("package", []):
         if not is_blinc(pkg): continue
         name, src = pkg.get("name", "?"), pkg.get("source")
@@ -44,8 +50,11 @@ def lock_errors(text: str, approved: dict, label: str = "Cargo.lock"):
         why = ("no source (a path dependency)" if src is None else
                f"tag {m.group(1)} is at {m.group(2)[:12]}, approved is {approved.get(m.group(1), 'not approved')}" if m else
                f"source {src}")
-        errors.append(f"{label}: package `{name}` {pkg.get('version', '')}: {why}; Blinc is allowed only as "
-                      f"git+{URL}?tag=<approved>#<sha>, approved: {want}. Fix: {FIX}")
+        errors.append(f"{label}: package `{name}` {pkg.get('version', '')}: {why}")
+        bad += 1
+    if bad:
+        errors.append(f"{label}: {bad} Blinc package(s) not from the approved source; allowed only as git+{URL}?tag=<approved>#<sha>, "
+                      f"approved: {want}. Fix: {FIX}")
     if len(used) > 1:
         errors.append(f"{label}: two Blinc sources in one lock: {', '.join(sorted(used))}")
     return errors
