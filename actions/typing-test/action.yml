@@ -1,5 +1,5 @@
 name: typing-test
-description: Start a built app under a virtual KWin with a keyboard layout (de and us), type every special sign of the layout (. , - _ + @ / : ; ' " ( ) [ ] { } ~ ^ \ | and on de € ä ö ü ß Ä Ö Ü µ; Shift, AltGr, the dead key) into a text field, check the text arrives and is visible, and measure key-to-picture time. Same script as scripts/typing-test.sh on a laptop.
+description: 'Start a built app under a virtual KWin with a keyboard layout (de and us), type every special sign of the layout (. , - _ + @ / : ; '' " ( ) [ ] { } ~ ^ \ | and on de € ä ö ü ß Ä Ö Ü µ; Shift, AltGr, the dead key) into a text field, check the text arrives and is visible, and measure key-to-picture time. Same script as scripts/typing-test.sh on a laptop.'
 inputs:
   app-binary: { description: "Path to the built (release) binary", required: true }
   app-args: { description: "Arguments for the app, one line, split on spaces", default: "" }
