@@ -98,7 +98,8 @@ def main(argv):
         if p.is_dir():
             p = p / "Cargo.lock"
             if not p.is_file(): print(f"blinc lock ok (no Cargo.lock in {a}: nothing to check)"); return 0
-        text, label = p.read_text(encoding="utf-8"), str(p)
+        try: text, label = p.read_text(encoding="utf-8"), str(p)
+        except OSError as e: print(f"ERROR cannot read {p}: {e.strerror or e}", file=sys.stderr); return 1
     errors = lock_errors(text, approved, label)
     for e in errors: print("ERROR", e)
     if not errors: print(f"blinc lock ok ({label})")
