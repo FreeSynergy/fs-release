@@ -36,28 +36,28 @@ const DE: &[Key] = &[
     ('#', 43, false, false, false), ('$', 5, true, false, false), ('%', 6, true, false, false),
     ('&', 7, true, false, false), ('*', 27, true, false, false), ('<', 86, false, false, false),
     ('=', 11, true, false, false), ('>', 86, true, false, false), ('?', 12, true, false, false),
-    ('µ', 50, false, true, false), ('a', 30, false, false, false), ('b', 48, false, false, false),
-    ('c', 46, false, false, false), ('d', 32, false, false, false), ('e', 18, false, false, false),
-    ('f', 33, false, false, false), ('g', 34, false, false, false), ('h', 35, false, false, false),
-    ('i', 23, false, false, false), ('j', 36, false, false, false), ('k', 37, false, false, false),
-    ('l', 38, false, false, false), ('m', 50, false, false, false), ('n', 49, false, false, false),
-    ('o', 24, false, false, false), ('p', 25, false, false, false), ('q', 16, false, false, false),
-    ('r', 19, false, false, false), ('s', 31, false, false, false), ('t', 20, false, false, false),
-    ('u', 22, false, false, false), ('v', 47, false, false, false), ('w', 17, false, false, false),
-    ('x', 45, false, false, false), ('y', 44, false, false, false), ('z', 21, false, false, false),
-    ('0', 11, false, false, false), ('1', 2, false, false, false), ('2', 3, false, false, false),
-    ('3', 4, false, false, false), ('4', 5, false, false, false), ('5', 6, false, false, false),
-    ('6', 7, false, false, false), ('7', 8, false, false, false), ('8', 9, false, false, false),
-    ('9', 10, false, false, false), ('A', 30, true, false, false), ('B', 48, true, false, false),
-    ('C', 46, true, false, false), ('D', 32, true, false, false), ('E', 18, true, false, false),
-    ('F', 33, true, false, false), ('G', 34, true, false, false), ('H', 35, true, false, false),
-    ('I', 23, true, false, false), ('J', 36, true, false, false), ('K', 37, true, false, false),
-    ('L', 38, true, false, false), ('M', 50, true, false, false), ('N', 49, true, false, false),
-    ('O', 24, true, false, false), ('P', 25, true, false, false), ('Q', 16, true, false, false),
-    ('R', 19, true, false, false), ('S', 31, true, false, false), ('T', 20, true, false, false),
-    ('U', 22, true, false, false), ('V', 47, true, false, false), ('W', 17, true, false, false),
-    ('X', 45, true, false, false), ('Y', 44, true, false, false), ('Z', 21, true, false, false),
-    (' ', 57, false, false, false),
+    ('µ', 50, false, true, false), ('§', 4, true, false, false), ('°', 41, true, false, false),
+    ('a', 30, false, false, false), ('b', 48, false, false, false), ('c', 46, false, false, false),
+    ('d', 32, false, false, false), ('e', 18, false, false, false), ('f', 33, false, false, false),
+    ('g', 34, false, false, false), ('h', 35, false, false, false), ('i', 23, false, false, false),
+    ('j', 36, false, false, false), ('k', 37, false, false, false), ('l', 38, false, false, false),
+    ('m', 50, false, false, false), ('n', 49, false, false, false), ('o', 24, false, false, false),
+    ('p', 25, false, false, false), ('q', 16, false, false, false), ('r', 19, false, false, false),
+    ('s', 31, false, false, false), ('t', 20, false, false, false), ('u', 22, false, false, false),
+    ('v', 47, false, false, false), ('w', 17, false, false, false), ('x', 45, false, false, false),
+    ('y', 44, false, false, false), ('z', 21, false, false, false), ('0', 11, false, false, false),
+    ('1', 2, false, false, false), ('2', 3, false, false, false), ('3', 4, false, false, false),
+    ('4', 5, false, false, false), ('5', 6, false, false, false), ('6', 7, false, false, false),
+    ('7', 8, false, false, false), ('8', 9, false, false, false), ('9', 10, false, false, false),
+    ('A', 30, true, false, false), ('B', 48, true, false, false), ('C', 46, true, false, false),
+    ('D', 32, true, false, false), ('E', 18, true, false, false), ('F', 33, true, false, false),
+    ('G', 34, true, false, false), ('H', 35, true, false, false), ('I', 23, true, false, false),
+    ('J', 36, true, false, false), ('K', 37, true, false, false), ('L', 38, true, false, false),
+    ('M', 50, true, false, false), ('N', 49, true, false, false), ('O', 24, true, false, false),
+    ('P', 25, true, false, false), ('Q', 16, true, false, false), ('R', 19, true, false, false),
+    ('S', 31, true, false, false), ('T', 20, true, false, false), ('U', 22, true, false, false),
+    ('V', 47, true, false, false), ('W', 17, true, false, false), ('X', 45, true, false, false),
+    ('Y', 44, true, false, false), ('Z', 21, true, false, false), (' ', 57, false, false, false),
 ];
 
 const US: &[Key] = &[
@@ -95,11 +95,15 @@ const US: &[Key] = &[
     ('Z', 44, true, false, false), (' ', 57, false, false, false),
 ];
 
+/// The table of `layout`; a layout without one is reported at once and ends the program (exit 2: the test did not run).
 fn table(layout: &str) -> &'static [Key] {
     match layout {
         "de" => DE,
         "us" => US,
-        other => panic!("no table for layout {other}: de or us"),
+        other => {
+            eprintln!("fs-typing-inject: no key table for layout '{other}' (there are: de, us)");
+            std::process::exit(2);
+        }
     }
 }
 

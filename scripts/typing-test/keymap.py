@@ -13,7 +13,7 @@ import tempfile
 
 # The characters the test types (besides letters and digits, which every layout has on the letter keys, a to z, 0 to 9).
 SPECIAL = list(".,-_+@/:;'\"()[]{}~^\\|") + ["€", "ä", "ö", "ü", "ß", "Ä", "Ö", "Ü"]
-EXTRA = list("!#$%&*<=>?`") + ["µ"]  # more of what other texts of the test type
+EXTRA = list("!#$%&*<=>?`") + ["µ", "§", "°"]  # more of what other texts of the test type
 WANTED = SPECIAL + EXTRA + list("abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 KEYSYMS = {
@@ -22,7 +22,7 @@ KEYSYMS = {
     "bracketright": "]", "braceleft": "{", "braceright": "}", "asciitilde": "~", "asciicircum": "^", "backslash": "\\",
     "bar": "|", "EuroSign": "€", "adiaeresis": "ä", "odiaeresis": "ö", "udiaeresis": "ü", "ssharp": "ß",
     "Adiaeresis": "Ä", "exclam": "!", "numbersign": "#", "dollar": "$", "percent": "%", "ampersand": "&",
-    "asterisk": "*", "less": "<", "equal": "=", "greater": ">", "question": "?", "grave": "`", "mu": "µ", "Odiaeresis": "Ö", "Udiaeresis": "Ü", "space": " ",
+    "asterisk": "*", "less": "<", "equal": "=", "greater": ">", "question": "?", "grave": "`", "mu": "µ", "section": "§", "degree": "°", "Odiaeresis": "Ö", "Udiaeresis": "Ü", "space": " ",
     "dead_circumflex": "^",  # a dead key: typed with a Space after it
 }
 for d in "0123456789":

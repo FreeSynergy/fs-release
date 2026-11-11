@@ -33,7 +33,7 @@ MIN_KEYS = 10
 CARET_GAP_PX = 4
 # What a wrong layout could have produced instead: printable ASCII and the German extras.
 CANDIDATES = [chr(c) for c in range(33, 127)] + list("äöüÄÖÜß€µ§°´²³")
-LOOKALIKES = {"|": set("|lIi!1")}  # a plain bar cannot be told from these by shape, so "|" is only checked that weakly
+LOOKALIKES = {}  # the bar "|" is judged by shape and place, like the marks (it reaches below the baseline, l I 1 ! do not)
 # Near twins a wrong layout or a missing accent could produce: the typed character must rank above its twin, not only be in the
 # best three (a dead key gives a for ä, a missing AltGr a bracket of the wrong kind).
 RIVALS = {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "Ö": "O", "Ü": "U", "[": "(", "{": "(", "]": ")", "}": ")",
@@ -41,7 +41,7 @@ RIVALS = {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "Ö": "O", "Ü": "U", "[":
 ACCENTED = set("ÄäöüÖÜ")
 # Signs that are small marks: their shape says little, WHERE they sit (against the baseline of the control "a") says
 # what they are. The typed one must be the best of all candidates, shape and place together.
-MARKS = set(".,-_'\":;^~`")
+MARKS = set(".,-_'\":;^~`|")
 RANK_OK = 3  # the typed character must be among the best three matches ("|" looks like "l" in many fonts)
 
 

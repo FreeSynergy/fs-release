@@ -98,8 +98,9 @@ check("wrong layout: characters turn red", sum(not v for k, v in cases.items() i
 # Near twins: the app draws the twin instead of the typed character (dead key, AltGr missing): that character turns red,
 # the others stay green.
 TWINS = {"Ä": "A", "ä": "a", "ö": "o", "ü": "u", "Ö": "O", "Ü": "U", "[": "(", "{": "(", "]": ")", "}": ")", ")": "]",
-         "+": "=", "/": "?", ";": ":", "'": '"', "~": "`", "@": "2", ".": ",", ",": ".", "-": "_", "_": "-", "^": "~"}
-for typed_char, twin in TWINS.items():
+         "+": "=", "/": "?", ";": ":", "'": '"', "~": "`", "@": "2", ".": ",", ",": ".", "-": "_", "_": "-", "^": "~", "|": "'"}
+TWINS_MORE = [("|", "l"), ("|", "I"), ("|", "1"), ("|", "!"), ("1", "l"), ("1", "I"), ("1", "|"), ("\\", "/"), ("\\", "|")]
+for typed_char, twin in [*TWINS.items(), *TWINS_MORE]:
     cases = run(font_file, {**right, typed_char: twin}, False)
     check(f"{typed_char} drawn as {twin}: red", cases[f"char {typed_char!r} is right"] is False)
     check(f"{typed_char} drawn as {twin}: the others stay green",
