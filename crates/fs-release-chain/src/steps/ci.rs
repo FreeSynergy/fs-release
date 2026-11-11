@@ -8,20 +8,31 @@ use crate::ledger::Entry;
 use crate::meta::{Meta, Reach, Risk};
 use crate::outcome::{Note, StepResult, Stop};
 use crate::poll::{self, Filter, Verdict};
+use crate::profile::Profile;
 use crate::steps::{Frame, Step};
 
-/// Log lines that mean the runner or its network failed, not the code: worth one second try.
-const INFRA: [&str; 5] = [
+/// Log lines that mean the runner's DNS or apt failed, not the code: worth one second try. Nothing broader.
+const INFRA: [&str; 4] = [
     "temporary failure in name resolution",
     "could not resolve host",
     "temporary failure resolving",
     "e: failed to fetch",
-    "connection timed out",
 ];
 
 fn is_infra(line: &str) -> bool {
     let low = line.to_lowercase();
     INFRA.iter().any(|p| low.contains(p))
+}
+
+/// When a red run is started again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Retry {
+    /// Never: red is red.
+    Never,
+    /// Once, only when the log shows a runner DNS or apt problem.
+    Infra,
+    /// Once, whatever the log says (artefact runs).
+    Once,
 }
 
 /// Waits for the matching runs. A red run is started again once (only when its log shows a runner or network problem if
@@ -31,7 +42,7 @@ pub(super) fn settle(
     step: &str,
     slug: &str,
     filter: &Filter,
-    infra_only: bool,
+    retry: Retry,
 ) -> Result<Vec<Run>, Stop> {
     loop {
         match poll::wait(f.ctx, slug, filter)? {
@@ -48,8 +59,9 @@ pub(super) fn settle(
             }
             Verdict::Red(run) => {
                 let line = gh::failed_line(f.ctx, slug, run.id)?;
-                let again =
-                    !f.ledger.has_marker(step, f.head, "rerun") && (!infra_only || is_infra(&line));
+                let again = retry != Retry::Never
+                    && !f.ledger.has_marker(step, f.head, "rerun")
+                    && (retry == Retry::Once || is_infra(&line));
                 if !again {
                     return Err(Stop::red(format!("{} #{}: {line}", run.workflow, run.id)));
                 }
@@ -83,18 +95,81 @@ impl Step for WaitCi {
 
     fn run(&self, f: &Frame) -> StepResult {
         let t = &f.ctx.target;
+        let profile = Profile::load(&t.repo_dir)?;
         let filter = Filter {
             sha: f.head.to_string(),
             branch: Some(t.branch.clone()),
+            required: profile.required.clone(),
             ..Filter::default()
         };
-        let runs = settle(f, "wait-ci", &t.slug, &filter, true)?;
+        let runs = settle(f, "wait-ci", &t.slug, &filter, Retry::Infra)?;
+        optional_red(&runs, &profile)?;
         Ok(Note::text(format!(
-            "CI green at {} ({} runs)",
+            "CI green at {} (required: {})",
             short(f.head),
-            runs.len()
+            profile.required.join(", ")
         )))
     }
+}
+
+/// A red run that is not required does not make the commit red, but somebody has to look at it.
+fn optional_red(runs: &[Run], profile: &Profile) -> Result<(), Stop> {
+    let bad = runs.iter().find(|r| {
+        r.status == "completed"
+            && !matches!(r.conclusion.as_str(), "success" | "skipped" | "neutral")
+            && !profile
+                .required
+                .iter()
+                .any(|n| r.workflow.eq_ignore_ascii_case(n))
+    });
+    match bad {
+        Some(r) => Err(Stop::halt(
+            "ci-optional-red",
+            format!(
+                "a look at the not required run {} #{} ({})",
+                r.workflow, r.id, r.conclusion
+            ),
+        )),
+        None => Ok(()),
+    }
+}
+
+/// Asks GitHub now (one query) whether every required run of the head commit exists and is green. The run log is not asked.
+pub(super) fn verify_green(f: &Frame) -> Result<(), Stop> {
+    let t = &f.ctx.target;
+    let profile = Profile::load(&t.repo_dir)?;
+    let filter = Filter {
+        sha: f.head.to_string(),
+        branch: Some(t.branch.clone()),
+        required: profile.required.clone(),
+        ..Filter::default()
+    };
+    let runs: Vec<Run> = gh::list_runs(f.ctx, &t.slug)?
+        .into_iter()
+        .filter(|r| filter.matches(r))
+        .collect();
+    for name in &profile.required {
+        let mine: Vec<&Run> = runs
+            .iter()
+            .filter(|r| r.workflow.eq_ignore_ascii_case(name))
+            .collect();
+        if mine.is_empty() {
+            return Err(Stop::red(format!(
+                "required run {name} not found for {} on GitHub",
+                short(f.head)
+            )));
+        }
+        if let Some(r) = mine.iter().find(|r| {
+            r.status != "completed"
+                || !matches!(r.conclusion.as_str(), "success" | "skipped" | "neutral")
+        }) {
+            return Err(Stop::red(format!(
+                "required run {name} #{} is {} {} on GitHub",
+                r.id, r.status, r.conclusion
+            )));
+        }
+    }
+    optional_red(&runs, &profile)
 }
 
 /// Waits for the release run on the tag, then turns the draft into a (pre-)release.
@@ -124,7 +199,7 @@ impl Step for Release {
             workflow: Some("release".into()),
             ..Filter::default()
         };
-        settle(f, "release", &t.slug, &filter, false)?;
+        settle(f, "release", &t.slug, &filter, Retry::Once)?;
         match gh::release_state(f.ctx, &t.slug, &tag)? {
             None => {
                 return Err(Stop::red(format!(

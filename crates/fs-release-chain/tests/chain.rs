@@ -6,7 +6,7 @@ use std::fs;
 
 use fs_release_chain::meta::Reach;
 use fs_release_chain::Outcome;
-use support::flow::{all_green, stopped_at};
+use support::flow::{all_green, ci_rows};
 use support::{git, run_json, World, SLUG};
 
 #[test]
@@ -51,10 +51,7 @@ fn red_ci_halts_before_anything_public() {
     let sha = w.head();
     w.approve(&sha, "JA");
     all_green(&w, &sha);
-    w.runs(
-        SLUG,
-        &run_json(&sha, &[(1, "check", "feat", "completed", "failure")]),
-    );
+    w.runs(SLUG, &run_json(&sha, &ci_rows("failure", "success")));
     fs::write(
         w.fake().join("log-1.txt"),
         "step\terror: test parser::tests::it failed\n",
@@ -83,8 +80,12 @@ fn repeat_after_a_partial_run_goes_on_and_a_full_repeat_changes_nothing() {
     let sha = w.head();
     w.approve(&sha, "JA");
     all_green(&w, &sha);
-    let o = w.run(Reach::Shared);
-    assert_eq!(stopped_at(&o), "halt merge-ff reach-limit", "{}", o.line());
+    let names: Vec<String> = ["gates", "review", "push", "wait-ci"]
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    let o = w.run_names(Reach::Public, &names);
+    assert!(matches!(o, Outcome::Done { .. }), "{}", o.line());
     assert_eq!(git(&w.origin(), &["rev-parse", "feat"]), sha);
     let polls = w.count("run list");
     let o = w.run(Reach::Public);
@@ -123,16 +124,14 @@ fn runner_dns_failure_is_retried_once_and_then_green() {
     let sha = w.head();
     w.approve(&sha, "JA");
     all_green(&w, &sha);
-    w.runs(
-        SLUG,
-        &run_json(&sha, &[(1, "check", "feat", "completed", "failure")]),
-    );
+    w.runs(SLUG, &run_json(&sha, &ci_rows("failure", "success")));
     fs::write(
         w.fake().join("runs-Org_fs-demo.json.rerun"),
         run_json(
             &sha,
             &[
                 (1, "check", "feat", "completed", "success"),
+                (4, "lint", "feat", "completed", "success"),
                 (2, "release", "v0.0.9", "completed", "success"),
             ],
         ),

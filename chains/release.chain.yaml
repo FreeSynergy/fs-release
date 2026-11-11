@@ -9,7 +9,7 @@ catalog: fs/0.1.0
 steps:
   - { id: gates,    call: fs.gates,    risk: start,   reach: local,  actor: program }
   - { id: review,   call: fs.review,   risk: view,    reach: local,  actor: llm }
-  - { id: push,     call: fs.push,     risk: publish, reach: shared, actor: program }
+  - { id: push,     call: fs.push,     risk: publish, reach: public, actor: program }
   - { id: wait-ci,  call: fs.wait-ci,  risk: view,    reach: shared, actor: machine }
   - { id: merge-ff, call: fs.merge-ff, risk: publish, reach: public, actor: program }
   - { id: tag,      call: fs.tag,      risk: publish, reach: public, actor: program }

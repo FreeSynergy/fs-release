@@ -102,7 +102,16 @@ fn queue_without_jobs_halts_after_the_limit_and_polls_slowly() {
     let w = World::new();
     let sha = w.head();
     w.approve(&sha, "JA");
-    w.runs(SLUG, &run_json(&sha, &[(1, "check", "feat", "queued", "")]));
+    w.runs(
+        SLUG,
+        &run_json(
+            &sha,
+            &[
+                (1, "check", "feat", "queued", ""),
+                (4, "lint", "feat", "queued", ""),
+            ],
+        ),
+    );
     let o = w.run(Reach::Public);
     assert_eq!(stopped_at(&o), "halt wait-ci ci-queue", "{}", o.line());
     let slept = w.clock.slept();

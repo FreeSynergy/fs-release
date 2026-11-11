@@ -14,6 +14,7 @@ pub mod meta;
 pub mod outcome;
 pub mod packages;
 pub mod poll;
+pub mod profile;
 pub mod registry;
 pub mod runner;
 pub mod steps;

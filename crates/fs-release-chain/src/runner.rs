@@ -2,17 +2,28 @@
 
 use std::collections::BTreeMap;
 
-use crate::approval::Approval;
+use crate::approval;
 use crate::ctx::Ctx;
 use crate::git::{self, short};
 use crate::ledger::{Entry, Ledger};
-use crate::meta::Risk;
+use crate::meta::{Reach, Risk};
 use crate::outcome::{Note, Outcome, Stop};
 use crate::registry;
 use crate::steps::Frame;
 
 fn preflight(ctx: &Ctx) -> Result<(), Stop> {
     let t = &ctx.target;
+    if t.branch == t.base {
+        return Err(Stop::red(format!(
+            "{} is the base branch: the chain releases a branch, main only moves by merge-ff",
+            t.base
+        )));
+    }
+    if t.fake && ctx.reach != Reach::Local {
+        return Err(Stop::red(
+            "fake gates mode cannot publish: use --reach local",
+        ));
+    }
     let on = git::out(ctx, &t.repo_dir, &["symbolic-ref", "--short", "HEAD"])?;
     if on == t.branch {
         Ok(())
@@ -51,9 +62,7 @@ fn one(ctx: &Ctx, ledger: &Ledger, name: &str) -> Result<Finished, (String, Stop
     }
     let head = git::rev(ctx, &ctx.target.repo_dir, "HEAD").map_err(at)?;
     if meta.risk == Risk::Publish {
-        Approval::load(&ctx.target.approval)
-            .and_then(|a| a.covers(&ctx.target.slug, &head))
-            .map_err(|s| (head.clone(), s))?;
+        approval::verify(ctx, &head).map_err(|why| (head.clone(), why))?;
     }
     let frame = Frame {
         ctx,

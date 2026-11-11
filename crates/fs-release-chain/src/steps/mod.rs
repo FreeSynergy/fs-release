@@ -10,7 +10,7 @@ mod ci;
 mod local;
 mod publish;
 
-pub use catalog::{Bump, Check, Sign};
+pub use catalog::{Bump, Check, Sign, PROJECT_KEY_FPR};
 pub use ci::{Release, WaitCi};
 pub use local::{Gates, Report, Review};
 pub use publish::{MergeFf, Push, Tag};

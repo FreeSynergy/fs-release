@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use crate::approval::Approval;
+use crate::approval;
 use crate::git::short;
 use crate::ledger::Ledger;
 use crate::meta::{Meta, Reach, Risk};
@@ -25,7 +25,9 @@ impl Step for Gates {
     }
 
     fn run(&self, f: &Frame) -> StepResult {
-        if f.ledger.last_ok("gates", f.head).is_some() {
+        if f.ledger.entries().iter().any(|e| {
+            e.step == "gates" && e.sha == f.head && e.result == "ok" && !e.data.contains_key("fake")
+        }) {
             return Ok(Note::text("gates were green for this commit already"));
         }
         let t = &f.ctx.target;
@@ -39,12 +41,9 @@ impl Step for Gates {
             ],
             ..Cmd::default()
         };
-        // The script crashes on a repo without Cargo.lock although its doc says "nothing to check": skip it there.
-        if t.repo_dir.join("Cargo.lock").is_file() {
-            let o = f.ctx.runner.run(&lock)?;
-            if !o.ok() {
-                return Err(Stop::red(format!("blinc-lock: {}", o.first_error())));
-            }
+        let o = f.ctx.runner.run(&lock)?;
+        if !o.ok() {
+            return Err(Stop::red(format!("blinc-lock: {}", o.first_error())));
         }
         let mut argv = t.wrapper.clone();
         argv.extend([
@@ -59,7 +58,16 @@ impl Step for Gates {
             ..Cmd::default()
         })?;
         if o.ok() {
-            return Ok(Note::text(format!("gates ok at {}", short(f.head))));
+            let note = Note::text(format!(
+                "gates ok at {}{}",
+                short(f.head),
+                if t.fake {
+                    " (FAKE wrapper, counts for nothing)"
+                } else {
+                    ""
+                }
+            ));
+            return Ok(if t.fake { note.with("fake", "1") } else { note });
         }
         let log = t.state_dir.join(format!("gates-{}.log", short(f.head)));
         fs::create_dir_all(&t.state_dir)?;
@@ -87,13 +95,11 @@ impl Step for Review {
     }
 
     fn run(&self, f: &Frame) -> StepResult {
-        let t = &f.ctx.target;
-        let a = Approval::load(&t.approval)?;
-        a.covers(&t.slug, f.head)?;
+        let a = approval::verify(f.ctx, f.head)?;
         Ok(Note::text(format!(
             "approved {} by {} on {}",
             short(f.head),
-            a.by.as_deref().unwrap_or("?"),
+            a.by,
             a.date
         )))
     }

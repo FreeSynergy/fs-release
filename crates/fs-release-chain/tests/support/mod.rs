@@ -67,7 +67,8 @@ impl World {
         fs::create_dir_all(&d).unwrap();
         fs::create_dir_all(r.join("bin")).unwrap();
         script(&r.join("bin/gh"), GH);
-        script(&r.join("bin/gpg"), "#!/usr/bin/env bash\necho \"gpg $*\" >> \"$FAKE_DIR/calls.log\"\n[[ \" $* \" == *\" --verify \"* ]] || exit 0\nfor a in \"$@\"; do case \"$a\" in *.asc) [ \"$(cat \"$a\" 2>/dev/null)\" = SIG-OK ] || { echo 'gpg: BAD signature' >&2; exit 1; };; esac; done\n");
+        script(&r.join("bin/gpg"), include_str!("fake-gpg.sh"));
+        script(&r.join("bin/fs-store"), "#!/usr/bin/env bash\necho \"fs-store $*\" >> \"$FAKE_DIR/calls.log\"\n[ -f \"$FAKE_DIR/store-red\" ] && { echo 'error: catalog not readable' >&2; exit 1; }\nexit 0\n");
         w.program_repo();
         w.catalog_repo();
         w.release_dir();
@@ -130,6 +131,12 @@ impl World {
         self.init_pair(&self.origin(), &self.work(), &[("README", "demo\n")]);
         git(&self.work(), &["checkout", "--quiet", "-b", "feat"]);
         fs::write(self.work().join("feature"), "x\n").unwrap();
+        fs::create_dir_all(self.work().join(".fs")).unwrap();
+        fs::write(
+            self.work().join(".fs/release.toml"),
+            "required = [\"check\", \"lint\"]\n",
+        )
+        .unwrap();
         git(&self.work(), &["add", "."]);
         git(&self.work(), &["commit", "--quiet", "-m", "feature"]);
     }
@@ -182,14 +189,6 @@ impl World {
         git(&self.work(), &["rev-parse", "HEAD"])
     }
 
-    pub fn approve(&self, sha: &str, verdict: &str) {
-        fs::write(
-            self.work().join(".opus-ok"),
-            format!("repo: {SLUG}\nsha: {sha}\ndate: 2026-11-12\nverdict: {verdict}\nby: opus\n"),
-        )
-        .unwrap();
-    }
-
     /// Replaces what `gh run list` answers for `repo` (JSON text; `@MAIN@` becomes the main sha of the catalog remote).
     pub fn runs(&self, repo: &str, json: &str) {
         fs::write(
@@ -200,31 +199,12 @@ impl World {
         .unwrap();
     }
 
-    /// A sequence of answers: each poll takes the next one, the last stays.
-    pub fn runs_seq(&self, repo: &str, answers: &[&str]) {
-        let dir = self
-            .fake()
-            .join(format!("runs-{}.json.seq", repo.replace('/', "_")));
-        fs::create_dir_all(&dir).unwrap();
-        for (i, a) in answers.iter().enumerate() {
-            fs::write(dir.join(format!("{i:03}")), a).unwrap();
-        }
-    }
-
     pub fn release_draft(&self) {
         fs::write(
             self.fake().join("release-Org_fs-demo-v0.0.9.json"),
             "{\"isDraft\":true,\"isPrerelease\":false}",
         )
         .unwrap();
-    }
-
-    pub fn calls(&self) -> String {
-        fs::read_to_string(self.fake().join("calls.log")).unwrap_or_default()
-    }
-
-    pub fn count(&self, needle: &str) -> usize {
-        self.calls().lines().filter(|l| l.contains(needle)).count()
     }
 
     pub fn target(&self) -> Target {
@@ -237,7 +217,10 @@ impl World {
             release_dir: self.root().join("rel"),
             catalog_dir: Some(self.root().join("catalog")),
             catalog_slug: CAT.into(),
-            approval: self.work().join(".opus-ok"),
+            approval_dir: self.root().join("freigaben"),
+            approval_days: 7,
+            today_days: fs_release_chain::approval::parse_date("2026-11-12").unwrap(),
+            fake: false,
             state_dir: self.root().join("state"),
             prerelease: true,
             wrapper: vec![],
@@ -277,8 +260,12 @@ impl World {
     }
 
     pub fn run_names(&self, reach: Reach, names: &[String]) -> Outcome {
+        self.run_target(self.target(), reach, names)
+    }
+
+    /// Like `run_names`, with a changed target.
+    pub fn run_target(&self, t: Target, reach: Reach, names: &[String]) -> Outcome {
         let runner = self.runner();
-        let t = self.target();
         let ledger = Ledger::new(&t.state_dir, &t.version);
         let ctx = Ctx::new(t, reach, Timing::standard(), &runner, &self.clock);
         runner::execute(&ctx, &ledger, names)

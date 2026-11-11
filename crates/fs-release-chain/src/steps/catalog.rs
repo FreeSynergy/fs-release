@@ -10,9 +10,13 @@ use crate::meta::{Meta, Reach, Risk};
 use crate::outcome::{Note, StepResult, Stop};
 use crate::packages::set_tag;
 use crate::poll::Filter;
-use crate::steps::ci::settle;
+use crate::steps::ci::{settle, Retry};
 use crate::steps::{Frame, Step};
 use crate::sys::Cmd;
+
+/// Primary fingerprint of the project signing key (fs-catalog README). The key file in the checkout is only imported;
+/// a catalog signed by any other key is red, whatever that file contains.
+pub const PROJECT_KEY_FPR: &str = "16A4A3EE563AEF51FCF0C55DED7B57C4A1904342";
 
 fn catalog_dir(ctx: &Ctx) -> Result<PathBuf, Stop> {
     ctx.target
@@ -57,22 +61,26 @@ impl Step for Bump {
             )));
         }
         git::out(f.ctx, &dir, &["fetch", "--quiet", "origin", &t.base])?;
-        git::out(
-            f.ctx,
-            &dir,
-            &[
-                "merge",
-                "--quiet",
-                "--ff-only",
-                &format!("origin/{}", t.base),
-            ],
-        )?;
+        let (local, remote) = (
+            git::rev(f.ctx, &dir, "HEAD")?,
+            git::rev(f.ctx, &dir, &format!("refs/remotes/origin/{}", t.base))?,
+        );
+        if local != remote || git::out(f.ctx, &dir, &["symbolic-ref", "--short", "HEAD"])? != t.base
+        {
+            return Err(Stop::red(format!(
+                "{} is not exactly origin/{} (HEAD {}, origin {}): local commits are never pushed by the chain, clean up first",
+                dir.display(),
+                t.base,
+                short(&local),
+                short(&remote)
+            )));
+        }
         let file = dir.join("packages.toml");
         let edit = set_tag(&fs::read_to_string(&file)?, &t.slug, &tag).map_err(Stop::red)?;
         if !edit.changed {
-            let sha = git::rev(f.ctx, &dir, "HEAD")?;
+            // HEAD is origin/<base>, so the entry is on the remote.
             return Ok(Note::text(format!("catalog has {} {tag} already", edit.id))
-                .with("catalog_sha", sha)
+                .with("catalog_sha", local)
                 .with("unchanged", "1"));
         }
         fs::write(&file, &edit.text)?;
@@ -90,8 +98,9 @@ impl Step for Bump {
         let spec = format!("HEAD:refs/heads/{}", t.base);
         let o = git::raw(f.ctx, &dir, &["push", "origin", &spec])?;
         if !o.ok() {
+            git::out(f.ctx, &dir, &["reset", "--hard", "--quiet", &local])?;
             return Err(Stop::red(format!(
-                "catalog push rejected: {}",
+                "catalog push rejected (own commit taken back): {}",
                 o.first_error()
             )));
         }
@@ -119,9 +128,6 @@ impl Step for Sign {
 
     fn run(&self, f: &Frame) -> StepResult {
         let t = &f.ctx.target;
-        if f.ledger.last_ok("sign", f.head).is_some() {
-            return Ok(Note::text("catalog was signed for this commit already"));
-        }
         // The entry of the run that pushed the commit wins over a later "already there" entry.
         let oks: Vec<_> = f
             .ledger
@@ -141,26 +147,21 @@ impl Step for Sign {
         };
         let sha = bump.data.get("catalog_sha").cloned().unwrap_or_default();
         let mut filter = Filter {
-            sha: sha.clone(),
+            sha,
             workflow: Some("sign".into()),
             ..Filter::default()
         };
-        let unchanged = bump.data.contains_key("unchanged");
-        if unchanged {
-            // Nothing was pushed, so no run was triggered: start one and take only a newer run.
-            filter.min_id = gh::list_runs(f.ctx, &t.catalog_slug)?
-                .iter()
-                .map(|r| r.id)
-                .max()
-                .unwrap_or(0);
+        let seen = gh::list_runs(f.ctx, &t.catalog_slug)?;
+        if bump.data.contains_key("unchanged") && !seen.iter().any(|r| filter.matches(r)) {
+            // Nothing was pushed by us and no run exists for the commit: start one and take only a newer run.
+            filter.min_id = seen.iter().map(|r| r.id).max().unwrap_or(0);
             gh::dispatch(f.ctx, &t.catalog_slug, "sign")?;
             filter.sha = String::new();
         }
-        let runs = settle(f, "sign", &t.catalog_slug, &filter, false)?;
+        let runs = settle(f, "sign", &t.catalog_slug, &filter, Retry::Never)?;
         Ok(Note::text(format!(
-            "catalog signed by run #{} ({} run)",
-            runs.first().map_or(0, |r| r.id),
-            runs.len()
+            "catalog signed by run #{}",
+            runs.first().map_or(0, |r| r.id)
         )))
     }
 }
@@ -224,6 +225,8 @@ impl Step for Check {
         let (asc, xml) = (clone.join("catalog.xml.asc"), clone.join("catalog.xml"));
         let verified = gpg(vec![
             "--batch".into(),
+            "--status-fd".into(),
+            "1".into(),
             "--verify".into(),
             asc.display().to_string(),
             xml.display().to_string(),
@@ -232,6 +235,18 @@ impl Step for Check {
             return Err(Stop::red(format!(
                 "catalog signature: {}",
                 verified.first_error()
+            )));
+        }
+        // VALIDSIG <fpr of the signing key> <date> <ts> <expire> <ver> <res> <pk-algo> <hash-algo> <class> <primary fpr>
+        let primary = verified
+            .stdout
+            .lines()
+            .find(|l| l.contains("VALIDSIG"))
+            .and_then(|l| l.split_whitespace().last())
+            .unwrap_or("");
+        if !primary.eq_ignore_ascii_case(PROJECT_KEY_FPR) {
+            return Err(Stop::red(format!(
+                "catalog is signed by {primary:?}, not by the project key {PROJECT_KEY_FPR}"
             )));
         }
         let version = format!("<release version=\"{}\"", t.version);
@@ -243,6 +258,21 @@ impl Step for Check {
             return Err(Stop::red(format!(
                 "catalog.xml has no release {} of {id} (signature is fine)",
                 t.version
+            )));
+        }
+        // Last: the store itself, in an empty store root (the real installed state is never touched).
+        let root = work.join("store-root");
+        fs::create_dir_all(&root)?;
+        let store = f.ctx.runner.run(&Cmd {
+            program: "fs-store".into(),
+            args: vec!["check".into()],
+            env: vec![("FS_STORE_ROOT".into(), root.display().to_string())],
+            ..Cmd::default()
+        })?;
+        if !store.ok() {
+            return Err(Stop::red(format!(
+                "fs-store check: {}",
+                store.first_error()
             )));
         }
         let _ = fs::remove_dir_all(&work);

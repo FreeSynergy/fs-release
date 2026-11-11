@@ -21,8 +21,8 @@ fn chain_file_equals_the_commands_in_the_program() {
 #[test]
 fn a_chain_file_that_differs_is_refused() {
     let text = std::fs::read_to_string(file()).unwrap().replace(
-        "risk: publish, reach: shared",
-        "risk: view,    reach: shared",
+        "call: fs.push,     risk: publish, reach: public",
+        "call: fs.push,     risk: publish, reach: shared",
     );
     let dir = tempfile::tempdir().unwrap();
     let p = dir.path().join("x.yaml");

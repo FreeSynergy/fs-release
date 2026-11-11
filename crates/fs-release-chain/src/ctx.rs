@@ -55,8 +55,14 @@ pub struct Target {
     /// Checkout of the catalog repo used for the bump, and its slug.
     pub catalog_dir: Option<PathBuf>,
     pub catalog_slug: String,
-    /// Freigabe file; default `<repo_dir>/.opus-ok`.
-    pub approval: PathBuf,
+    /// Folder of the approvals (`<dir>/<repo name>/<sha>.ok`); outside every worktree.
+    pub approval_dir: PathBuf,
+    /// Days an approval stays valid.
+    pub approval_days: i64,
+    /// Today as days since 1970-01-01.
+    pub today_days: i64,
+    /// Test mode of the gates (a fake wrapper stands in for them): nothing may be published and nothing is remembered as green.
+    pub fake: bool,
     /// Where the run log and the report go.
     pub state_dir: PathBuf,
     /// Published as pre-release (versions 0.0.N are).

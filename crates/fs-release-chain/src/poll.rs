@@ -17,10 +17,12 @@ pub struct Filter {
     pub workflow: Option<String>,
     /// Only runs newer than this id (a run started by hand after a dispatch).
     pub min_id: u64,
+    /// Workflow names that must all be present and green; other runs do not decide (empty: every matching run decides).
+    pub required: Vec<String>,
 }
 
 impl Filter {
-    fn matches(&self, r: &Run) -> bool {
+    pub(crate) fn matches(&self, r: &Run) -> bool {
         (self.sha.is_empty() || r.head_sha == self.sha)
             && r.id > self.min_id
             && self.branch.as_ref().is_none_or(|b| &r.head_branch == b)
@@ -49,8 +51,25 @@ enum Seen {
     Missing,
 }
 
-fn classify(runs: &[Run]) -> Seen {
-    if runs.is_empty() {
+fn classify(all: &[Run], required: &[String]) -> Seen {
+    let named = |r: &&Run, n: &String| r.workflow.eq_ignore_ascii_case(n);
+    let runs: Vec<Run> = if required.is_empty() {
+        all.to_vec()
+    } else {
+        all.iter()
+            .filter(|r| required.iter().any(|n| named(r, n)))
+            .cloned()
+            .collect()
+    };
+    let runs = runs.as_slice();
+    let absent = required.iter().any(|n| !runs.iter().any(|r| named(&r, n)));
+    if runs.is_empty()
+        || (absent
+            && !runs.iter().any(|r| {
+                r.status == "completed"
+                    && !matches!(r.conclusion.as_str(), "success" | "skipped" | "neutral")
+            }))
+    {
         return Seen::Missing;
     }
     if let Some(bad) = runs.iter().find(|r| {
@@ -95,7 +114,7 @@ pub fn wait(ctx: &Ctx, slug: &str, filter: &Filter) -> Result<Verdict, Stop> {
             .filter(|r| filter.matches(r))
             .collect();
         let now = ctx.clock.now();
-        match classify(&runs) {
+        match classify(&runs, &filter.required) {
             Seen::Green => return Ok(Verdict::Green(runs)),
             Seen::Red(r) => return Ok(Verdict::Red(r)),
             Seen::Missing => {

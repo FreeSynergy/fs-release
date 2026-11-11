@@ -3,6 +3,7 @@
 use crate::git::{self, short};
 use crate::meta::{Meta, Reach, Risk};
 use crate::outcome::{Note, StepResult, Stop};
+use crate::steps::ci::verify_green;
 use crate::steps::{Frame, Step};
 
 /// Pushes the branch (never forced: a rejected push is red).
@@ -13,7 +14,7 @@ impl Step for Push {
         Meta {
             name: "push",
             risk: Risk::Publish,
-            reach: Reach::Shared,
+            reach: Reach::Public,
             preview: "{{branch}} is pushed to {{remote}}.",
             undo: "none",
         }
@@ -21,6 +22,18 @@ impl Step for Push {
 
     fn run(&self, f: &Frame) -> StepResult {
         let t = &f.ctx.target;
+        if t.branch == t.base {
+            return Err(Stop::red(format!(
+                "push refused: {} is the base branch, only merge-ff may move it",
+                t.base
+            )));
+        }
+        if t.branch == t.base {
+            return Err(Stop::red(format!(
+                "push refused: {} is the base branch, only merge-ff may move it",
+                t.base
+            )));
+        }
         if git::remote_branch(f.ctx, &t.repo_dir, &t.branch)?.as_deref() == Some(f.head) {
             return Ok(Note::text(format!(
                 "{} is at {} on the remote already",
@@ -42,7 +55,8 @@ impl Step for Push {
     }
 }
 
-/// Moves the base branch forward to exactly the checked commit, without a merge commit.
+/// Moves the base branch forward to exactly the checked commit, without a merge commit. Asks GitHub for the CI result
+/// itself; the run log is not believed.
 pub struct MergeFf;
 
 impl Step for MergeFf {
@@ -58,12 +72,7 @@ impl Step for MergeFf {
 
     fn run(&self, f: &Frame) -> StepResult {
         let t = &f.ctx.target;
-        if f.ledger.last_ok("wait-ci", f.head).is_none() {
-            return Err(Stop::red(format!(
-                "no green CI recorded for {}: run wait-ci first",
-                short(f.head)
-            )));
-        }
+        verify_green(f)?;
         let Some(base) = git::remote_branch(f.ctx, &t.repo_dir, &t.base)? else {
             return Err(Stop::red(format!(
                 "{} does not exist on the remote",
