@@ -108,19 +108,19 @@ impl LiftEnv<'_> {
     /// # Errors
     /// [`Stop::Red`] when cargo cannot be started.
     pub fn cargo(&self, args: &[&str]) -> Result<Out, Stop> {
-        let mut argv = self.opts.wrapper.clone();
+        let mut words = self.opts.wrapper.clone();
         // The slot script adds `-j<N>` to a cargo call; only the compiling subcommands accept it. For the others (update,
         // generate-lockfile, fmt) `env` in front keeps the slot (and its memory limit) but hides the call from that rule.
         if !matches!(
             args.first().copied(),
             Some("build" | "check" | "clippy" | "test")
-        ) && !argv.is_empty()
+        ) && !words.is_empty()
         {
-            argv.push("env".into());
+            words.push("env".into());
         }
-        argv.push("cargo".into());
-        argv.extend(args.iter().map(|a| (*a).to_string()));
-        let program = argv.remove(0);
+        words.push("cargo".into());
+        words.extend(args.iter().map(|a| (*a).to_string()));
+        let program = words.remove(0);
         let mut env = Vec::new();
         if let Ok(v) = std::fs::read_to_string(self.opts.release_dir.join("RUST_VERSION")) {
             env.push(("RUSTUP_TOOLCHAIN".to_string(), v.trim().to_string()));
@@ -132,7 +132,7 @@ impl LiftEnv<'_> {
             ));
             env.push(("CARGO_NET_GIT_FETCH_WITH_CLI".into(), "true".into()));
         }
-        self.exec(&program, argv, env)
+        self.exec(&program, words, env)
     }
 
     /// Path of a script of the fs-release checkout.

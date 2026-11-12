@@ -137,34 +137,28 @@ impl Report {
     /// Human form (an agent reads this first).
     #[must_use]
     pub fn markdown(&self) -> String {
-        let mut m = format!(
-            "# Lift report: {} {}\n\n",
-            self.repo,
-            if self.ok { "GREEN" } else { "RED" }
-        );
-        m += &format!("- branch `{}`, head `{}`\n", self.branch, self.head);
-        m += &format!(
-            "- components {}, interfaces {}, {}\n",
-            self.components.as_deref().unwrap_or("-"),
-            self.interfaces.as_deref().unwrap_or("-"),
-            if self.online { "online" } else { "local tags" }
-        );
-        m += &format!("- duration {:.1} s\n", self.secs);
+        let mode = if self.online { "online" } else { "local tags" };
+        let mut m = vec![
+            format!("# Lift report: {} {}\n", self.repo, if self.ok { "GREEN" } else { "RED" }),
+            format!("- branch `{}`, head `{}`", self.branch, self.head),
+            format!(
+                "- components {}, interfaces {}, {mode}",
+                self.components.as_deref().unwrap_or("-"),
+                self.interfaces.as_deref().unwrap_or("-")
+            ),
+            format!("- duration {:.1} s", self.secs),
+        ];
         if !self.dirty.is_empty() {
-            m += &format!("- uncommitted: {}\n", self.dirty.join(", "));
+            m.push(format!("- uncommitted: {}", self.dirty.join(", ")));
         }
         for p in &self.pins {
-            m += &format!("- pin {} {} `{}`\n", p.repo, p.tag, p.sha);
+            m.push(format!("- pin {} {} `{}`", p.repo, p.tag, p.sha));
         }
-        m += "\n| step | result | s | first error / note |\n|---|---|---|---|\n";
+        m.push("\n| step | result | s | first error / note |\n|---|---|---|---|".into());
         for s in &self.steps {
-            let text = s
-                .first_error
-                .clone()
-                .unwrap_or_else(|| s.detail.clone())
-                .replace('|', "/");
-            m += &format!("| {} | {} | {:.1} | {} |\n", s.name, s.status, s.secs, text);
+            let text = s.first_error.clone().unwrap_or_else(|| s.detail.clone()).replace('|', "/");
+            m.push(format!("| {} | {} | {:.1} | {} |", s.name, s.status, s.secs, text));
         }
-        m
+        m.join("\n") + "\n"
     }
 }

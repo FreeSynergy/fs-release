@@ -58,7 +58,7 @@ struct LiftArgs {
     /// Commit the changed Cargo.toml files after green steps (the flow does).
     #[arg(long)]
     commit: bool,
-    /// The fs-release checkout (scripts, RUST_VERSION).
+    /// The fs-release checkout (scripts, `RUST_VERSION`).
     #[arg(long, default_value = ".")]
     release_dir: PathBuf,
     /// Throw-away git config for local tags.
