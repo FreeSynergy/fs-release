@@ -9,6 +9,8 @@ use std::process::Command;
 use fs_release::lift::LiftOpts;
 use tempfile::TempDir;
 
+pub mod flow;
+
 pub fn git(dir: &Path, args: &[&str]) -> String {
     let o = Command::new("git")
         .args(args)

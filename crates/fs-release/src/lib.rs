@@ -5,5 +5,6 @@
 //! Every unit of work is a [`task::Task`]; a later Serverless-Workflow file only has to name the same tasks.
 
 pub mod cli;
+pub mod flow;
 pub mod lift;
 pub mod task;

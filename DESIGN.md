@@ -157,3 +157,19 @@ The slug and sha are validated before they touch a path (letters, digits, `.`, `
 - `.fs/release.toml` of the repos does not exist yet anywhere (fs-release included): without it `wait-ci` and `merge-ff` halt with `no-profile`.
 - `fs-store check` in an empty root clones the real reference catalog from GitHub; it proves the catalog is readable and signed for a fresh store, not that this one version shows up as an update.
 - Two chains on the same release at once are not protected against (no lock file).
+
+## `fs-release lift` and the flow (`crates/fs-release`)
+`fs-release lift <repo> --components vX --interfaces vY` is one deterministic command, no LLM. Steps (each one a `Task`, the
+same trait the flow uses, so a later workflow file can call them by name): `deps` (tag on every crate, via
+`scripts/set_components_tag.py <tag> <root> [fs-repo]`), `lock` (`cargo update --workspace`; offline through the throw-away
+`gitconfig-local-tags`, `--online` for real tags; the lock is checked to hold the asked tags), `lock-gate`
+(`check_blinc_lock.py`), `fmt`, `clippy` (pedantic), `rules` (`check_rust_rules.py`), `tests`, and with `--commit` `commit`
+(only after all green; a local-tags `Cargo.lock` is never committed). Cargo goes through `build-slot.sh`, one call after the
+other. `lock`/`deps`/`lock-gate` stop the run; the four checks all run so one report shows every red. The report is
+`<worktree>/.fs-release/lift-report.{md,json}` (the folder ignores itself); exit code 0 green, 1 red; an agent is only called
+on red and reads only that report.
+`flow` = lift --commit, `review-request` (file for Opus: head, diff head, report path, where the approval goes), `tag`
+(local, needs the approval of exactly this head), `push` (branch at `--reach shared`, plus the tag at `--reach public`).
+Tag and push use the chain's `approval::verify` (all `ApprovalVerifier`s), the audit log (start line before, result line
+after), and for shared/public the pre-approved list; public stays locked until the strategy fills `public_ok`.
+Result of a flow run: `DONE`, `HALT` (10, e.g. waiting for the approval: run again) or `RED` (1).
