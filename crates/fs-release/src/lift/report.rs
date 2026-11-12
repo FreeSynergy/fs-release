@@ -139,7 +139,11 @@ impl Report {
     pub fn markdown(&self) -> String {
         let mode = if self.online { "online" } else { "local tags" };
         let mut m = vec![
-            format!("# Lift report: {} {}\n", self.repo, if self.ok { "GREEN" } else { "RED" }),
+            format!(
+                "# Lift report: {} {}\n",
+                self.repo,
+                if self.ok { "GREEN" } else { "RED" }
+            ),
             format!("- branch `{}`, head `{}`", self.branch, self.head),
             format!(
                 "- components {}, interfaces {}, {mode}",
@@ -156,8 +160,15 @@ impl Report {
         }
         m.push("\n| step | result | s | first error / note |\n|---|---|---|---|".into());
         for s in &self.steps {
-            let text = s.first_error.clone().unwrap_or_else(|| s.detail.clone()).replace('|', "/");
-            m.push(format!("| {} | {} | {:.1} | {} |", s.name, s.status, s.secs, text));
+            let text = s
+                .first_error
+                .clone()
+                .unwrap_or_else(|| s.detail.clone())
+                .replace('|', "/");
+            m.push(format!(
+                "| {} | {} | {:.1} | {} |",
+                s.name, s.status, s.secs, text
+            ));
         }
         m.join("\n") + "\n"
     }
