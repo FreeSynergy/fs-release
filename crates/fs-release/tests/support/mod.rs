@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -99,15 +100,14 @@ impl World {
                 ("v0.2.0", "fs-interfaces", ""),
             ],
         );
-        let cfg: String = ["fs-components", "fs-interfaces", "Blinc"]
-            .iter()
-            .map(|n| {
-                format!(
-                    "[url \"{}\"]\n\tinsteadOf = https://github.com/FreeSynergy/{n}\n",
-                    r.join("up").join(n).display()
-                )
-            })
-            .collect();
+        let mut cfg = String::new();
+        for n in ["fs-components", "fs-interfaces", "Blinc"] {
+            let _ = writeln!(
+                cfg,
+                "[url \"{}\"]\n\tinsteadOf = https://github.com/FreeSynergy/{n}",
+                r.join("up").join(n).display()
+            );
+        }
         fs::write(r.join("gitconfig"), cfg).unwrap();
         w.release_dir();
         w.program();
@@ -152,10 +152,10 @@ impl World {
 
     /// Writes the approved list: the given tags with their real commits.
     pub fn approve_blinc(&self, tags: &[&str]) {
-        let text: String = tags
-            .iter()
-            .map(|t| format!("{t} {}\n", self.sha("Blinc", t)))
-            .collect();
+        let mut text = String::new();
+        for t in tags {
+            let _ = writeln!(text, "{t} {}", self.sha("Blinc", t));
+        }
         fs::write(self.rel().join("scripts/blinc-approved.txt"), text).unwrap();
     }
 

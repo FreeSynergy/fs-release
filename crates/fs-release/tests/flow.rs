@@ -99,7 +99,7 @@ fn tag_halts_without_approval_and_works_with_it_and_audits() {
     w.flow_setup("");
     let head = lifted(&w);
     assert_eq!(halt_reason(one(&w, Reach::Local, 1)), "review");
-    assert!(git(&w.work(), &["tag", "-l", "v0.0.9"]).is_empty());
+    assert_eq!(git(&w.work(), &["tag", "-l", "v0.0.9"]), "");
     w.approve(&head, "NEIN");
     assert_eq!(halt_reason(one(&w, Reach::Local, 1)), "review-no");
     w.approve(&head, "JA");

@@ -97,6 +97,7 @@ impl World {
         }
     }
 
+    #[allow(clippy::unused_self)] // kept as a method: every test asks the world for its runner
     pub fn runner(&self) -> SystemRunner {
         let mut env: Vec<(String, String)> = super::ident()
             .into_iter()

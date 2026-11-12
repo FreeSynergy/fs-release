@@ -71,7 +71,7 @@ fn a_tag_that_does_not_exist_is_red_at_the_lock_and_the_rest_is_skipped() {
     assert_eq!(step(&r, "deps").status, "ok");
     let lock = step(&r, "lock");
     assert_eq!(lock.status, "red");
-    assert!(!lock.first_error.clone().unwrap().is_empty());
+    assert_ne!(lock.first_error.clone().unwrap(), "");
     assert_eq!(step(&r, "tests").status, "skipped");
     assert!(w.read(".fs-release/lift-report.md").contains("RED"));
 }
@@ -84,7 +84,7 @@ fn a_tag_that_is_not_vx_y_z_is_red_at_deps_and_nothing_is_edited() {
     let (r, code) = run(&w, &o);
     assert_eq!(code, 1);
     assert_eq!(step(&r, "deps").status, "red");
-    assert!(git(&w.work(), &["status", "--porcelain"]).is_empty());
+    assert_eq!(git(&w.work(), &["status", "--porcelain"]), "");
 }
 
 #[test]
@@ -151,7 +151,7 @@ fn red_checks_are_all_reported_with_their_first_error_line() {
     for name in ["fmt", "rules", "tests"] {
         let s = step(&r, name);
         assert_eq!(s.status, "red", "{name}: {}", r.markdown());
-        assert!(!s.first_error.clone().unwrap().is_empty());
+        assert_ne!(s.first_error.clone().unwrap(), "");
     }
     assert!(
         step(&r, "tests")
@@ -206,9 +206,11 @@ fn online_commit_includes_the_lock() {
     let (r, code) = run(&w, &o);
     assert_eq!(code, 0, "{}", r.markdown());
     assert!(git(&w.work(), &["show", "--name-only", "--format=", "HEAD"]).contains("Cargo.lock"));
-    assert!(git(
-        &w.work(),
-        &["status", "--porcelain", "--untracked-files=no"]
-    )
-    .is_empty());
+    assert_eq!(
+        git(
+            &w.work(),
+            &["status", "--porcelain", "--untracked-files=no"]
+        ),
+        ""
+    );
 }
