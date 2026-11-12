@@ -1,0 +1,21 @@
+[package]
+name = "fs-release"
+version = "0.1.0"
+description = "fs-release: lift a program onto new fs-components / fs-interfaces tags and walk it through review, tag and push as one deterministic command"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "fs-release"
+path = "src/main.rs"
+
+[dependencies]
+fs-release-chain = { path = "../fs-release-chain" }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"

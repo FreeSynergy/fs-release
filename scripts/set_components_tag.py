@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Point every dependency on the fs-components git repo at `tag = "<tag>"` (rev/branch are removed).
 
-    scripts/set_components_tag.py <tag> <repo root>      exit 0: changed or already on the tag; 3: no such dependency; 1: could not
+    scripts/set_components_tag.py <tag> <repo root> [fs-repo-name]      (name default fs-components, e.g. fs-interfaces) exit 0: changed or already on the tag; 3: no such dependency; 1: could not
 
 Pattern: none (helper of bump-components.sh).
 The files are edited line by line (comments and layout stay), the parser is the judge: after the edit every
@@ -14,6 +14,7 @@ Anything else fails the check and exits 1, nothing is written then.
 import re, sys, tomllib
 from pathlib import Path
 
+REPO = "fs-components"                                      # `set_components_tag.py <tag> <root> fs-interfaces` switches it
 REPO_URL = re.compile(r"/fs-components(\.git)?/?$", re.I)
 SKIP = {"target", ".git", "node_modules"}
 VERSION_KEYS = ("rev", "branch", "tag")
@@ -40,14 +41,14 @@ def components_deps(doc):
 
 def _inline(line: str, tag: str) -> str:
     """`name = { git = "…/fs-components", rev = "x" }` -> tag = "<tag>" right after git."""
-    if not re.search(r"git\s*=\s*[\"'][^\"']*/fs-components(\.git)?/?[\"']", line, re.I): return line
+    if not re.search(rf"git\s*=\s*[\"'][^\"']*/{REPO}(\.git)?/?[\"']", line, re.I): return line
     val = r"(\"[^\"]*\"|'[^']*')"
     line = re.sub(rf"\b(rev|branch|tag)\s*=\s*{val}\s*,\s*", "", line)       # `{ tag = "v1", git = .. }`: key followed by comma
     line = re.sub(rf",\s*\b(rev|branch|tag)\s*=\s*{val}", "", line)          # key at the end
     return re.sub(r"(\bgit\s*=\s*(\"[^\"]*\"|'[^']*'))", lambda m: f'{m.group(1)}, tag = "{tag}"', line, count=1)
 
 def _mentions(*parts) -> bool:
-    return "fs-components" in " ".join(str(p) for p in parts).lower()
+    return REPO in " ".join(str(p) for p in parts).lower()
 
 def patch_hits(doc):
     """[patch.<url>] / [replace] entries naming fs-components in url, key or value (path, git, anything): never edited, reported.
@@ -81,7 +82,7 @@ def edit(text: str, tag: str) -> str:
     out, section, skip = [], [], [False]                       # section: lines of the current [table] (header excluded)
     def flush():
         body = "".join(section)
-        if not skip[0] and re.search(r"^\s*git\s*=\s*[\"'][^\"']*/fs-components(\.git)?/?[\"']", body, re.M | re.I):
+        if not skip[0] and re.search(rf"^\s*git\s*=\s*[\"'][^\"']*/{REPO}(\.git)?/?[\"']", body, re.M | re.I):
             kept = [l for l in section if not re.match(r"\s*(rev|branch|tag)\s*=", l)]
             i = next(i for i, l in enumerate(kept) if re.match(r"\s*git\s*=", l))
             kept.insert(i + 1, f'tag = "{tag}"\n')
@@ -97,8 +98,12 @@ def edit(text: str, tag: str) -> str:
     return "".join(out)
 
 def main(argv):
-    if len(argv) != 3: print(__doc__, file=sys.stderr); return 2
+    global REPO, REPO_URL
+    if len(argv) not in (3, 4): print(__doc__, file=sys.stderr); return 2
     tag, root = argv[1], Path(argv[2])
+    if len(argv) == 4:
+        if not re.fullmatch(r"fs-[a-z][a-z0-9-]*", argv[3]): print(f"not a repo name: {argv[3]}", file=sys.stderr); return 2
+        REPO = argv[3]; REPO_URL = re.compile(rf"/{REPO}(\.git)?/?$", re.I)
     found, writes = 0, {}
     for f, doc in config_files(root):
         if doc is None: print(f"{f}: not valid TOML", file=sys.stderr); return 1
