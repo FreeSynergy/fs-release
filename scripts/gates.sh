@@ -17,5 +17,12 @@ fi
 cargo fmt --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
 cargo test --workspace --all-features
+# Counter-check of the compile_error! guard: a release build with `test-access` must NOT compile.
+if grep -Eq '^[[:space:]]*test-access[[:space:]]*=' Cargo.toml; then
+  if cargo build --release --features test-access >/dev/null 2>&1; then
+    echo "gates FAILED: 'cargo build --release --features test-access' succeeded in $root; the compile_error! guard is missing" >&2
+    exit 1
+  fi
+fi
 python3 -I "$rules" "$root"
 echo "gates ok: $root at $(git rev-parse --short HEAD)"
