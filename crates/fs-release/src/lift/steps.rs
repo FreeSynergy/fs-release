@@ -95,14 +95,17 @@ impl Task<LiftEnv<'_>> for Lock {
         if !env.opts.repo_dir.join("Cargo.lock").is_file() {
             let o = env.cargo(&["generate-lockfile"])?;
             if !o.ok() {
-                return Err(Stop::red(format!("generate-lockfile: {}", o.first_error())));
+                return Err(Stop::red(format!(
+                    "generate-lockfile: {}",
+                    super::checks::red_line(&o)
+                )));
             }
         }
         let o = env.cargo(&["update", "--workspace"])?;
         if !o.ok() {
             return Err(Stop::red(format!(
                 "cargo update --workspace: {}",
-                o.first_error()
+                super::checks::red_line(&o)
             )));
         }
         let lock = fs::read_to_string(env.opts.repo_dir.join("Cargo.lock")).unwrap_or_default();

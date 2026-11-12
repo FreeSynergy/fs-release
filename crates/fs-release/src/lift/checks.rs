@@ -7,7 +7,7 @@ use super::LiftEnv;
 use crate::task::Task;
 
 /// The line a person (or an agent) should see first: a compiler error, a failed test, a panic, a format diff.
-fn red_line(o: &Out) -> String {
+pub(super) fn red_line(o: &Out) -> String {
     let all = format!("{}\n{}", o.stderr, o.stdout);
     let lines = || all.lines().map(str::trim);
     // A failed test or a format diff says more than the closing `error: test failed`, so those come first.
