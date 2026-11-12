@@ -231,8 +231,11 @@ fn assert_is_empty_in_a_test_is_red_at_clippy_stable_with_the_first_error_line()
     fs::write(&p, t).unwrap();
     let (r, code) = run(&w, &w.opts());
     assert_eq!(code, 1, "{}", r.markdown());
-    let s = step(&r, "clippy-stable");
-    assert_eq!(s.status, "red", "{}", r.markdown());
-    assert!(s.first_error.clone().unwrap().starts_with("error"), "{s:?}");
+    let cs = step(&r, "clippy-stable");
+    assert_eq!(cs.status, "red", "{}", r.markdown());
+    assert!(
+        cs.first_error.clone().unwrap().starts_with("error"),
+        "{cs:?}"
+    );
     assert_eq!(step(&r, "tests").status, "ok");
 }
