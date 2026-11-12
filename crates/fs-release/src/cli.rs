@@ -140,7 +140,11 @@ fn lift_cmd(a: &LiftArgs) -> i32 {
     for r in red {
         println!("  {r}");
     }
-    for s in rep.steps.iter().filter(|s| s.status == "skipped" && s.secs > 0.0) {
+    for s in rep
+        .steps
+        .iter()
+        .filter(|s| s.status == "skipped" && s.secs > 0.0)
+    {
         println!("  WARNING {} skipped: {}", s.name, s.detail);
     }
     code

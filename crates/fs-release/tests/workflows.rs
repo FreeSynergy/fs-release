@@ -80,9 +80,17 @@ fn lift_yaml_has_exactly_the_steps_of_the_code_in_order() {
 fn release_flow_yaml_names_the_flow_steps_in_order_and_bumps_after_the_release() {
     let names = step_names(&read("release-flow"));
     let code: Vec<&str> = fs_release::flow::tasks().iter().map(|t| t.name()).collect();
-    let at = |n: &str| names.iter().position(|x| x == n).unwrap_or_else(|| panic!("no step {n}"));
+    let at = |n: &str| {
+        names
+            .iter()
+            .position(|x| x == n)
+            .unwrap_or_else(|| panic!("no step {n}"))
+    };
     let positions: Vec<usize> = code.iter().map(|n| at(n)).collect();
-    assert!(positions.windows(2).all(|p| p[0] < p[1]), "{names:?} vs {code:?}");
+    assert!(
+        positions.windows(2).all(|p| p[0] < p[1]),
+        "{names:?} vs {code:?}"
+    );
     assert_eq!(names.first().map(String::as_str), Some("lift"));
     assert!(at("push") < at("release") && at("release") < at("bump") && at("bump") < at("sign"));
     let text = read("release-flow");
@@ -93,7 +101,14 @@ fn release_flow_yaml_names_the_flow_steps_in_order_and_bumps_after_the_release()
 fn the_files_hold_no_secrets() {
     for f in FILES {
         let t = read(f).to_lowercase();
-        for bad in ["ghp_", "github_pat_", "-----begin", "password:", "token:", "secret:"] {
+        for bad in [
+            "ghp_",
+            "github_pat_",
+            "-----begin",
+            "password:",
+            "token:",
+            "secret:",
+        ] {
             assert!(!t.contains(bad), "{f}.yaml contains {bad:?}");
         }
     }
@@ -114,7 +129,11 @@ fn mutation_missing_actor_is_red() {
 #[test]
 fn mutation_unknown_actor_value_is_red() {
     assert_red("agent-run", "'robot'", |t| {
-        t.replacen("freesynergy.net:actor: human", "freesynergy.net:actor: robot", 1)
+        t.replacen(
+            "freesynergy.net:actor: human",
+            "freesynergy.net:actor: robot",
+            1,
+        )
     });
 }
 
@@ -148,7 +167,9 @@ fn mutation_missing_document_version_is_red() {
 
 #[test]
 fn mutation_wrong_dsl_and_empty_do_are_red() {
-    assert_red("lift", "document.dsl", |t| t.replacen("dsl: 1.0.3", "dsl: 0.8", 1));
+    assert_red("lift", "document.dsl", |t| {
+        t.replacen("dsl: 1.0.3", "dsl: 0.8", 1)
+    });
     assert_red("cleanup-targets", "`do`", |t| {
         let head = t.split("\ndo:").next().unwrap().to_string();
         format!("{head}\ndo: []\n")

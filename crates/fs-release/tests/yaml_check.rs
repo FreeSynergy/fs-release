@@ -53,7 +53,10 @@ fn script_without_the_yaml_module_is_skipped_with_a_warning_not_green() {
     let arg = Path::new("--simulate-missing-yaml");
     let (code, out) = python(&s, &[tmp.path(), arg]);
     assert_eq!(code, 2, "{out}");
-    assert!(out.starts_with("skipped:") && out.contains("NOT checked"), "{out}");
+    assert!(
+        out.starts_with("skipped:") && out.contains("NOT checked"),
+        "{out}"
+    );
 }
 
 #[test]
@@ -70,7 +73,11 @@ fn lift_is_red_at_yaml_check_for_the_broken_file_and_green_for_the_valid_one() {
     let (r, code) = lift::run(&w.opts(), &fs_release_chain::sys::SystemRunner::default());
     assert_eq!(code, 0, "{}", r.markdown());
     let s = step(&r, "yaml-check");
-    assert_eq!(s.status, if have_yaml() { "ok" } else { "skipped" }, "{s:?}");
+    assert_eq!(
+        s.status,
+        if have_yaml() { "ok" } else { "skipped" },
+        "{s:?}"
+    );
     assert_eq!(r.steps.len(), 9);
     if !have_yaml() {
         return;
@@ -83,7 +90,10 @@ fn lift_is_red_at_yaml_check_for_the_broken_file_and_green_for_the_valid_one() {
     let s = step(&r, "yaml-check");
     assert_eq!(s.status, "red");
     assert!(
-        s.first_error.clone().unwrap().starts_with(".github/workflows/ci.yml:7:"),
+        s.first_error
+            .clone()
+            .unwrap()
+            .starts_with(".github/workflows/ci.yml:7:"),
         "{s:?}"
     );
     assert_eq!(step(&r, "tests").status, "ok");
