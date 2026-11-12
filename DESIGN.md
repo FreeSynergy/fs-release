@@ -163,11 +163,11 @@ The slug and sha are validated before they touch a path (letters, digits, `.`, `
 same trait the flow uses, so a later workflow file can call them by name): `deps` (tag on every crate, via
 `scripts/set_components_tag.py <tag> <root> [fs-repo]`), `lock` (`cargo update --workspace`; offline through the throw-away
 `gitconfig-local-tags`, `--online` for real tags; the lock is checked to hold the asked tags), `lock-gate`
-(`check_blinc_lock.py`), `fmt`, `clippy` (pedantic), `rules` (`check_rust_rules.py`), `tests`, and with `--commit` `commit`
+(`check_blinc_lock.py`), `fmt`, `clippy` (pedantic, pinned toolchain), `clippy-stable` (explicit CI-strict run: stable toolchain, `--locked`), `rules` (`check_rust_rules.py`), `tests`, and with `--commit` `commit`
 (only after all green; a local-tags `Cargo.lock` is never committed). Cargo goes through `build-slot.sh`, one call after the
 other. `lock`/`deps`/`lock-gate` stop the run; the four checks all run so one report shows every red. The report is
 `<worktree>/.fs-release/lift-report.{md,json}` (the folder ignores itself); exit code 0 green, 1 red; an agent is only called
-on red and reads only that report.
+on red and reads only that report (it also names the rustc versions used).
 `flow` = lift --commit, `review-request` (file for Opus: head, diff head, report path, where the approval goes), `tag`
 (local, needs the approval of exactly this head), `push` (branch at `--reach shared`, plus the tag at `--reach public`).
 Tag and push use the chain's `approval::verify` (all `ApprovalVerifier`s), the audit log (start line before, result line

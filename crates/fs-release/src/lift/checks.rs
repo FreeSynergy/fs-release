@@ -112,3 +112,33 @@ impl Task<LiftEnv<'_>> for Tests {
         )
     }
 }
+
+/// The explicit CI-strict run: the current stable toolchain, the lock as it is (`--locked`), pedantic, all targets. The pinned
+/// toolchain of `gates.sh` does not know the newest lints (items_after_statements, assert!(is_empty) in tests, ...); GitHub CI does.
+pub struct ClippyStable;
+
+impl Task<LiftEnv<'_>> for ClippyStable {
+    fn name(&self) -> &'static str {
+        "clippy-stable"
+    }
+
+    fn continue_on_red(&self) -> bool {
+        true
+    }
+
+    fn run(&self, env: &LiftEnv) -> Result<String, Stop> {
+        let args = [
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--all-features",
+            "--locked",
+            "--",
+            "-D",
+            "warnings",
+            "-W",
+            "clippy::pedantic",
+        ];
+        verdict("clippy stable", &env.cargo_on(&args, Some("stable"))?)
+    }
+}

@@ -31,6 +31,9 @@ pub struct Report {
     pub interfaces: Option<String>,
     pub online: bool,
     pub ok: bool,
+    /// `rustc --version` of the pinned toolchain (`RUST_VERSION`) and of `stable` (used by `clippy-stable`).
+    pub toolchain: String,
+    pub toolchain_stable: String,
     pub secs: f64,
     /// fs-components / fs-interfaces / Blinc commits as the lock holds them.
     pub pins: Vec<Pin>,
@@ -50,6 +53,24 @@ fn git(runner: &dyn Runner, dir: &Path, args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
+/// `rustc --version` on one toolchain ("unknown" when it cannot be asked).
+fn rustc(opts: &LiftOpts, runner: &dyn Runner, toolchain: &str) -> String {
+    let mut env = opts.env.clone();
+    if !toolchain.is_empty() {
+        env.push(("RUSTUP_TOOLCHAIN".into(), toolchain.to_string()));
+    }
+    let cmd = Cmd {
+        program: "rustc".into(),
+        args: vec!["--version".into()],
+        cwd: Some(opts.repo_dir.clone()),
+        env,
+    };
+    match runner.run(&cmd) {
+        Ok(o) if o.ok() => o.stdout.trim().to_string(),
+        _ => "unknown".into(),
+    }
+}
+
 /// A report with the request filled in; steps and heads come later.
 pub fn start(opts: &LiftOpts, runner: &dyn Runner) -> Report {
     let dir = &opts.repo_dir;
@@ -66,6 +87,8 @@ pub fn start(opts: &LiftOpts, runner: &dyn Runner) -> Report {
         interfaces: opts.interfaces.clone(),
         online: opts.online,
         ok: false,
+        toolchain: String::new(),
+        toolchain_stable: String::new(),
         secs: 0.0,
         pins: vec![],
         steps: vec![],
@@ -106,6 +129,10 @@ impl Report {
     pub fn finish(&mut self, opts: &LiftOpts, runner: &dyn Runner, ok: bool, secs: f64) {
         let dir = &opts.repo_dir;
         self.head = git(runner, dir, &["rev-parse", "HEAD"]);
+        let pinned =
+            std::fs::read_to_string(opts.release_dir.join("RUST_VERSION")).unwrap_or_default();
+        self.toolchain = rustc(opts, runner, pinned.trim());
+        self.toolchain_stable = rustc(opts, runner, "stable");
         self.dirty = git(
             runner,
             dir,
@@ -149,6 +176,10 @@ impl Report {
                 "- components {}, interfaces {}, {mode}",
                 self.components.as_deref().unwrap_or("-"),
                 self.interfaces.as_deref().unwrap_or("-")
+            ),
+            format!(
+                "- toolchain pinned: {}; stable: {}",
+                self.toolchain, self.toolchain_stable
             ),
             format!("- duration {:.1} s", self.secs),
         ];

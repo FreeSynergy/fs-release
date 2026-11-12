@@ -99,6 +99,14 @@ impl LiftEnv<'_> {
     /// # Errors
     /// [`Stop::Red`] when cargo cannot be started.
     pub fn cargo(&self, args: &[&str]) -> Result<Out, Stop> {
+        self.cargo_on(args, None)
+    }
+
+    /// Like [`cargo`](Self::cargo), on the given toolchain instead of the pinned one (`stable`: what GitHub CI uses).
+    ///
+    /// # Errors
+    /// [`Stop::Red`] when cargo cannot be started.
+    pub fn cargo_on(&self, args: &[&str], toolchain: Option<&str>) -> Result<Out, Stop> {
         let mut words = self.opts.wrapper.clone();
         // The slot script adds `-j<N>` to a cargo call; only the compiling subcommands accept it. For the others (update,
         // generate-lockfile, fmt) `env` in front keeps the slot (and its memory limit) but hides the call from that rule.
@@ -113,7 +121,9 @@ impl LiftEnv<'_> {
         words.extend(args.iter().map(|a| (*a).to_string()));
         let program = words.remove(0);
         let mut env = Vec::new();
-        if let Ok(v) = std::fs::read_to_string(self.opts.release_dir.join("RUST_VERSION")) {
+        if let Some(t) = toolchain {
+            env.push(("RUSTUP_TOOLCHAIN".to_string(), t.to_string()));
+        } else if let Ok(v) = std::fs::read_to_string(self.opts.release_dir.join("RUST_VERSION")) {
             env.push(("RUSTUP_TOOLCHAIN".to_string(), v.trim().to_string()));
         }
         if !self.opts.online {

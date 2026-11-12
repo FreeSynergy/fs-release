@@ -25,7 +25,11 @@ fn green_lift_moves_every_crate_to_the_given_tags_and_writes_the_report() {
     let (r, code) = run(&w, &w.opts());
     assert_eq!(code, 0, "{}", r.markdown());
     assert!(r.steps.iter().all(|s| s.status == "ok"), "{}", r.markdown());
-    assert_eq!(r.steps.len(), 7);
+    assert_eq!(r.steps.len(), 8);
+    assert!(r.toolchain.starts_with("rustc ") && r.toolchain_stable.starts_with("rustc "));
+    assert!(w
+        .read(".fs-release/lift-report.md")
+        .contains("toolchain pinned: rustc"));
     for f in ["Cargo.toml", "crates/a/Cargo.toml", "crates/b/Cargo.toml"] {
         let t = w.read(f);
         assert!(!t.contains("v0.1.0"), "{f} still on the old tag:\n{t}");
@@ -213,4 +217,22 @@ fn online_commit_includes_the_lock() {
         ),
         ""
     );
+}
+
+#[test]
+fn assert_is_empty_in_a_test_is_red_at_clippy_stable_with_the_first_error_line() {
+    let w = World::new();
+    let p = w.work().join("crates/a/src/answer.rs");
+    let t = fs::read_to_string(&p).unwrap();
+    let t = t.replace(
+        "assert_eq!(super::answer(), 42);",
+        "let v: Vec<u32> = vec![];\n        assert!(v.is_empty());\n        assert_eq!(super::answer(), 42);",
+    );
+    fs::write(&p, t).unwrap();
+    let (r, code) = run(&w, &w.opts());
+    assert_eq!(code, 1, "{}", r.markdown());
+    let s = step(&r, "clippy-stable");
+    assert_eq!(s.status, "red", "{}", r.markdown());
+    assert!(s.first_error.clone().unwrap().starts_with("error"), "{s:?}");
+    assert_eq!(step(&r, "tests").status, "ok");
 }

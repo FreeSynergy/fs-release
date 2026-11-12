@@ -14,6 +14,7 @@ pub fn tasks<'a>(opts: &LiftOpts) -> Vec<Box<dyn Task<LiftEnv<'a>>>> {
         Box::new(steps::LockGate),
         Box::new(checks::Fmt),
         Box::new(checks::Clippy),
+        Box::new(checks::ClippyStable),
         Box::new(checks::Rules),
         Box::new(checks::Tests),
     ];
