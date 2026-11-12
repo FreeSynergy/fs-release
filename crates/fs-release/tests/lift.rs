@@ -25,7 +25,7 @@ fn green_lift_moves_every_crate_to_the_given_tags_and_writes_the_report() {
     let (r, code) = run(&w, &w.opts());
     assert_eq!(code, 0, "{}", r.markdown());
     assert!(r.steps.iter().all(|s| s.status == "ok"), "{}", r.markdown());
-    assert_eq!(r.steps.len(), 8);
+    assert_eq!(r.steps.len(), 9);
     assert!(r.toolchain.starts_with("rustc ") && r.toolchain_stable.starts_with("rustc "));
     assert!(w
         .read(".fs-release/lift-report.md")

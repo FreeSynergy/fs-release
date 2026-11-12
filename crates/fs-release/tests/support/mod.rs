@@ -11,6 +11,7 @@ use fs_release::lift::LiftOpts;
 use tempfile::TempDir;
 
 pub mod flow;
+pub mod gh;
 
 pub fn git(dir: &Path, args: &[&str]) -> String {
     let o = Command::new("git")
@@ -27,6 +28,28 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
         String::from_utf8_lossy(&o.stderr)
     );
     String::from_utf8_lossy(&o.stdout).trim().to_string()
+}
+
+/// Does `python3` have `PyYAML`? The YAML checks are `skipped` (exit 2) when it has not; the tests then expect exactly that.
+pub fn have_yaml() -> bool {
+    Command::new("python3")
+        .args(["-I", "-c", "import yaml"])
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
+/// Runs `python3 -I <script> <args>`; returns exit code and stdout.
+pub fn python(script: &Path, args: &[&Path]) -> (i32, String) {
+    let o = Command::new("python3")
+        .arg("-I")
+        .arg(script)
+        .args(args)
+        .output()
+        .expect("python3");
+    (
+        o.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&o.stdout).trim().to_string(),
+    )
 }
 
 pub fn ident() -> Vec<(&'static str, &'static str)> {
@@ -139,6 +162,7 @@ impl World {
             "check_blinc_lock.py",
             "check_rust_rules.py",
             "set_components_tag.py",
+            "check_yaml.py",
         ] {
             fs::copy(real.join(f), dir.join("scripts").join(f)).unwrap();
         }

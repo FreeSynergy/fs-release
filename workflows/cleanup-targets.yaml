@@ -1,0 +1,27 @@
+# Cleaning up the throw-away build folders (`target/`) of finished runs. The script is named in the project handbook of the
+# machine; its path is deliberately not written here. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: cleanup-targets
+  version: 0.1.0
+  title: Remove the throw-away build targets of finished runs
+do:
+  - dry-run:
+      call: cleanup-targets:0.1.0@fs
+      with:
+        mode: dry-run
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:summary: Lists what would be deleted, deletes nothing.
+  - apply:
+      call: cleanup-targets:0.1.0@fs
+      with:
+        mode: apply
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: coordinator
+        freesynergy.net:summary: Deletes the listed targets (APPLY); the coordinator looked at the dry run first.

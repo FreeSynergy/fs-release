@@ -173,3 +173,20 @@ on red and reads only that report (it also names the rustc versions used).
 Tag and push use the chain's `approval::verify` (all `ApprovalVerifier`s), the audit log (start line before, result line
 after), and for shared/public the pre-approved list; public stays locked until the strategy fills `public_ok`.
 Result of a flow run: `DONE`, `HALT` (10, e.g. waiting for the approval: run again) or `RED` (1).
+`yaml-check` (lift step after `tests`, also in `scripts/gates.sh`): every `.github/workflows/*.yml` must parse as YAML
+(`scripts/check_yaml.py`, PyYAML `safe_load`; `actionlint` on top when installed). Red names `file:line: reason`. Without PyYAML
+the step is `skipped` with a warning (record status `skipped`, `gates.sh` prints WARNING), never green. Origin: a step name
+`Build (debug, the test: x)` is invalid YAML and GitHub only said "workflow file issue" after the push.
+`bump` (flow step after `push`, `fs-release bump`): needs `--reach public`, the pre-approved list (repo, catalog, `public_ok`),
+the approval of this head (audited like tag and push) and a published (non-draft) Pre-release of the tag, else HALT `release`
+(run again after `release.yml`). It then runs `gh workflow run bump.yml --repo FreeSynergy/fs-catalog` (the same as `-R`); the
+catalog's `sign` and `test` runs follow there and are not polled by this step. Tests use a mock `gh`, no real call. A flow at
+`--reach shared` now ends with HALT `reach-limit` at `bump` after the push (before: DONE).
+`workflows/` holds the visible workflows (Serverless Workflow 1.0 YAML, FS profile, draft `ENTWURF-workflow-standard.md` v3):
+`release-flow`, `lift`, `catalog-bump`, `cleanup-targets`, `agent-run`; every step has `freesynergy.net:actor` (human / ai /
+machine) and `freesynergy.net:gate`. They are checked by `scripts/check_workflows.py` (in `gates.sh` and in
+`crates/fs-release/tests/workflows.rs`, which also compares the step names of `lift` and `flow` with the code). A second step
+will let `fs-release flow` read them.
+
+### Changes
+- 0.2.0: `yaml-check` in lift and gates; `bump` in the flow; `workflows/` with the schema check. (No CHANGELOG file exists in this repo.)

@@ -4,7 +4,7 @@ use fs_release_chain::outcome::Stop;
 use fs_release_chain::sys::Out;
 
 use super::LiftEnv;
-use crate::task::Task;
+use crate::task::{Task, SKIPPED};
 
 /// The line a person (or an agent) should see first: a compiler error, a failed test, a panic, a format diff.
 pub(super) fn red_line(o: &Out) -> String {
@@ -110,6 +110,34 @@ impl Task<LiftEnv<'_>> for Tests {
             "tests",
             &env.cargo(&["test", "--workspace", "--all-features"])?,
         )
+    }
+}
+
+/// `scripts/check_yaml.py`: every `.github/workflows/*.yml` parses (a step name with `: ` inside is not YAML; GitHub only
+/// says "workflow file issue" after the push). Exit 2 of the script = no `PyYAML`: the step is skipped with a warning.
+pub struct YamlCheck;
+
+impl Task<LiftEnv<'_>> for YamlCheck {
+    fn name(&self) -> &'static str {
+        "yaml-check"
+    }
+
+    fn continue_on_red(&self) -> bool {
+        true
+    }
+
+    fn run(&self, env: &LiftEnv) -> Result<String, Stop> {
+        let args = vec![
+            "-I".to_string(),
+            env.script("check_yaml.py"),
+            env.opts.repo_dir.display().to_string(),
+        ];
+        let o = env.exec("python3", args, vec![])?;
+        match o.code {
+            0 => Ok(o.stdout.trim().to_string()),
+            2 => Ok(format!("{SKIPPED}{}", o.stdout.trim())),
+            _ => Err(Stop::red(red_line(&o))),
+        }
     }
 }
 

@@ -11,17 +11,19 @@ use fs_release_chain::meta::{Meta, Reach, Risk};
 use fs_release_chain::outcome::{Outcome, Stop};
 use fs_release_chain::sys::Runner;
 
-use super::{PushStep, ReviewRequest, TagStep};
+use super::{BumpStep, PushStep, ReviewRequest, TagStep};
 use crate::lift::{self, LiftOpts};
 use crate::task::{run_all, Task};
 
-/// The flow steps after the lift, in order. Tag comes before push: what is pushed is already tagged and approved.
+/// The flow steps after the lift, in order. Tag comes before push: what is pushed is already tagged and approved. The bump
+/// comes last: it needs the Pre-release that the pushed tag makes `release.yml` publish.
 #[must_use]
 pub fn tasks<'a>() -> Vec<Box<dyn Task<Ctx<'a>>>> {
     vec![
         Box::new(ReviewRequest),
         Box::new(TagStep),
         Box::new(PushStep),
+        Box::new(BumpStep),
     ]
 }
 
@@ -140,7 +142,7 @@ pub fn run(opts: &LiftOpts, ctx: &Ctx, runner: &dyn Runner) -> Outcome {
     match first {
         None => Outcome::Done {
             summary: format!(
-                "{} v{} {} lift review-request tag push",
+                "{} v{} {} lift review-request tag push bump",
                 ctx.target.slug,
                 ctx.target.version,
                 git::short(&report.head)

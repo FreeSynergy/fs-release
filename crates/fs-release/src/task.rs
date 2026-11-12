@@ -5,6 +5,10 @@ use std::time::Instant;
 use fs_release_chain::outcome::Stop;
 use serde::Serialize;
 
+/// A step returns `Ok(format!("{SKIPPED}<why>"))` when it could not do its check (a missing tool): recorded as `skipped`
+/// with the reason, never as `ok`.
+pub const SKIPPED: &str = "skipped: ";
+
 /// One step of a run. The same trait serves the lift steps and the flow steps, so a workflow file can call either by name.
 pub trait Task<C> {
     /// Fixed name (`deps`, `lock`, `fmt`, `tag`, ...).
@@ -70,13 +74,20 @@ pub fn run_all<C>(tasks: &[Box<dyn Task<C>>], ctx: &C) -> (Vec<Record>, Option<(
         let result = t.run(ctx);
         let secs = start.elapsed().as_secs_f64();
         match result {
-            Ok(detail) => records.push(Record {
-                name,
-                status: "ok".into(),
-                detail,
-                first_error: None,
-                secs,
-            }),
+            Ok(detail) => {
+                // A step that could not check anything says so; the run is not red, but the record is never `ok`.
+                let (status, detail) = match detail.strip_prefix(SKIPPED) {
+                    Some(why) => ("skipped", why.to_string()),
+                    None => ("ok", detail),
+                };
+                records.push(Record {
+                    name,
+                    status: status.into(),
+                    detail,
+                    first_error: None,
+                    secs,
+                });
+            }
             Err(stop) => {
                 let (status, line) = match &stop {
                     Stop::Red { line } => ("red", line.clone()),

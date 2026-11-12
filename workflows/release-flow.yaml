@@ -1,0 +1,94 @@
+# The release flow (`fs-release flow`, crates/fs-release/src/flow): lift, gates, review, tag, push, release, bump, sign.
+# A step marked with a gate halts until somebody else has acted; run again to go on. Nothing is published without the
+# approval of exactly this head. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: release-flow
+  version: 0.2.0
+  title: Release a branch of a program as a pre-release and bring it into the catalog
+do:
+  - lift:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: lift
+          version: 0.1.0
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:summary: Sub-workflow lift.yaml with --commit; red here stops the flow before any review.
+  - gates:
+      call: gates:0.1.0@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:summary: scripts/gates.sh on a fresh clone, the one definition of the checks.
+  - review-request:
+      call: review-request:0.1.0@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:summary: Writes the file Opus reads, only for a green lift report of exactly this head.
+  - review:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.approval
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:summary: Opus reviews the head and writes the approval file; a new head makes a JA invalid.
+  - tag:
+      call: tag:0.1.0@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:summary: Annotated tag v<version> on the approved head, locally.
+  - push:
+      call: push:0.1.0@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: preapproved-list
+        freesynergy.net:summary: Branch (reach shared) and tag (reach public), never forced; the repo must be on the pre-approved list.
+  - release:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.release.published
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:summary: release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release).
+  - bump:
+      call: bump:0.1.0@fs
+      with:
+        workflow: bump.yml
+        repo: FreeSynergy/fs-catalog
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:summary: After the Pre-release is published - gh workflow run bump.yml -R FreeSynergy/fs-catalog, behind the approval, public reach only.
+  - sign:
+      listen:
+        to:
+          all:
+            - with:
+                type: net.freesynergy.catalog.signed
+            - with:
+                type: net.freesynergy.catalog.tested
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:summary: Waits for the sign and test runs of the catalog (see catalog-bump.yaml); the flow only describes this wait, it does not poll yet.

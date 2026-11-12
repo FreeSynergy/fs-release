@@ -1,0 +1,35 @@
+# What happens in fs-catalog after a program was released (the workflows of the catalog repo). FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: catalog-bump
+  version: 0.1.0
+  title: Raise a program in the catalog, sign the catalog, test it
+do:
+  - bump:
+      call: bump:0.1.0@fs
+      with:
+        workflow: bump.yml
+        repo: FreeSynergy/fs-catalog
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:summary: bump.yml (dispatch, or its 15-minute schedule) finds the new published Pre-release and raises the tag in packages.toml.
+  - sign:
+      call: sign:0.1.0@fs
+      with:
+        workflow: sign.yml
+        repo: FreeSynergy/fs-catalog
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:summary: Signs catalog.xml with the project key (the key is a repository secret, never in a file).
+  - test:
+      call: check:0.1.0@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:summary: Looks at the catalog like a user - fresh clone, signature against the project key, the version is in it.

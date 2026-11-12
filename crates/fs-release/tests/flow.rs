@@ -8,10 +8,11 @@ use fs_release::task::run_all;
 use fs_release_chain::ctx::{Ctx, Timing};
 use fs_release_chain::meta::Reach;
 use fs_release_chain::outcome::Outcome;
-use fs_release_chain::sys::{FakeClock, SystemRunner};
+use fs_release_chain::sys::{FakeClock, Runner};
+use support::gh::MockGh;
 use support::{git, World};
 
-fn ctx<'a>(w: &World, runner: &'a SystemRunner, clock: &'a FakeClock, reach: Reach) -> Ctx<'a> {
+fn ctx<'a>(w: &World, runner: &'a dyn Runner, clock: &'a FakeClock, reach: Reach) -> Ctx<'a> {
     Ctx::new(w.target(), reach, Timing::standard(), runner, clock)
 }
 
@@ -24,12 +25,14 @@ fn lifted(w: &World) -> String {
     git(&w.work(), &["rev-parse", "HEAD"])
 }
 
-fn run_flow(w: &World, reach: Reach) -> Outcome {
-    let (runner, clock) = (w.runner(), FakeClock::default());
-    let c = ctx(w, &runner, &clock, reach);
+/// The whole flow; `gh` is the mock (the Pre-release is published), so no call leaves the machine. Returns the `gh` workflow starts.
+fn run_flow(w: &World, reach: Reach) -> (Outcome, Vec<String>) {
+    let (mock, clock) = (MockGh::new(w.runner(), Some(false)), FakeClock::default());
+    let c = ctx(w, &mock, &clock, reach);
     let mut o = w.online_opts();
     o.commit = true;
-    flow::run(&o, &c, &runner)
+    let out = flow::run(&o, &c, &mock);
+    (out, mock.dispatched())
 }
 
 fn one(w: &World, reach: Reach, which: usize) -> Result<String, fs_release_chain::outcome::Stop> {
@@ -170,7 +173,8 @@ fn whole_flow_halts_for_the_approval_then_pushes_branch_and_tag_when_public_is_l
     let w = World::new();
     w.flow_setup("opus-ja-1");
     // First run: lift and review-request happen, tag halts: no approval yet.
-    let first = run_flow(&w, Reach::Public);
+    let (first, started) = run_flow(&w, Reach::Public);
+    assert_eq!(started, Vec::<String>::new());
     assert!(
         matches!(&first, Outcome::Halt { step, reason, .. } if step == "tag" && reason == "review"),
         "{}",
@@ -179,8 +183,12 @@ fn whole_flow_halts_for_the_approval_then_pushes_branch_and_tag_when_public_is_l
     assert!(w.work().join(".fs-release/review-request.md").is_file());
     let head = git(&w.work(), &["rev-parse", "HEAD"]);
     w.approve(&head, "JA");
-    let second = run_flow(&w, Reach::Public);
+    let (second, started) = run_flow(&w, Reach::Public);
     assert!(matches!(second, Outcome::Done { .. }), "{}", second.line());
+    assert_eq!(
+        started,
+        ["workflow run bump.yml --repo FreeSynergy/fs-catalog"]
+    );
     assert!(w.remote_has("refs/heads/feat") && w.remote_has("refs/tags/v0.0.9"));
 }
 

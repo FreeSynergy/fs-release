@@ -33,7 +33,9 @@ enum Sub {
     Tag(StepArgs),
     /// Push branch (--reach shared) and tag (--reach public); needs the approval and the pre-approved list.
     Push(StepArgs),
-    /// lift --commit, review-request, tag, push in one run; halts until the approval exists, run again to go on.
+    /// After the Pre-release: start bump.yml of the catalog (--reach public); needs the approval and the pre-approved list.
+    Bump(StepArgs),
+    /// lift --commit, review-request, tag, push, bump in one run; halts until the approval and the Pre-release exist, run again to go on.
     Flow {
         #[command(flatten)]
         lift: LiftArgs,
@@ -104,6 +106,7 @@ pub fn main_with(args: Vec<String>) -> i32 {
         Sub::ReviewRequest(s) => one(&s, 0),
         Sub::Tag(s) => one(&s, 1),
         Sub::Push(s) => one(&s, 2),
+        Sub::Bump(s) => one(&s, 3),
         Sub::Flow { lift, flow } => full(&lift, &flow),
     }
 }
@@ -137,6 +140,9 @@ fn lift_cmd(a: &LiftArgs) -> i32 {
     for r in red {
         println!("  {r}");
     }
+    for s in rep.steps.iter().filter(|s| s.status == "skipped" && s.secs > 0.0) {
+        println!("  WARNING {} skipped: {}", s.name, s.detail);
+    }
     code
 }
 
@@ -169,7 +175,7 @@ fn with_ctx(
     line(body(&ctx))
 }
 
-/// `which`: 0 review-request, 1 tag, 2 push (the one step, with all that must hold before it).
+/// `which`: 0 review-request, 1 tag, 2 push, 3 bump (the one step, with all that must hold before it).
 fn one(s: &StepArgs, which: usize) -> i32 {
     with_ctx(&s.flow, &s.repo, &s.release_dir, |ctx| {
         let mut all = flow::tasks();
