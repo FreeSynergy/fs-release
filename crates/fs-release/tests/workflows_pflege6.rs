@@ -66,7 +66,8 @@ fn the_place_of_rules_md_is_named_where_the_orders_are_explained() {
         read("agent-run"),
         read("review"),
         std::fs::read_to_string(support::workflows::root().join("workflows/README.md")).unwrap(),
-        std::fs::read_to_string(support::workflows::root().join("docs/prompt-template.md")).unwrap(),
+        std::fs::read_to_string(support::workflows::root().join("docs/prompt-template.md"))
+            .unwrap(),
     ] {
         assert!(text.contains(RULES_MD));
         assert!(!text.replace(RULES_MD, "").contains(RULES_MD));
@@ -104,9 +105,14 @@ fn counter_asking_first_or_a_search_by_the_agent_is_caught() {
         "actor: ai\n        freesynergy.net:actor-type: Application",
         1
     )));
-    assert!(!decision_flow(&text.replace("if: ${ $context.verdict.open }", "")));
+    assert!(!decision_flow(
+        &text.replace("if: ${ $context.verdict.open }", "")
+    ));
     let decision = read("user-decision");
-    assert_ne!(step_names(&swapped(&decision, "adr-search", "question"))[0], "adr-search");
+    assert_ne!(
+        step_names(&swapped(&decision, "adr-search", "question"))[0],
+        "adr-search"
+    );
 }
 
 /// First the texts (ADR 0057, Words/MF2, de and en, gate `texts-check`), then the tokens; the check is a script.
@@ -133,7 +139,9 @@ fn counter_texts_after_tokens_or_without_the_gate_are_caught() {
     let text = read("frontend-umbau");
     assert!(!texts_before_tokens(&swapped(&text, "texte", "count")));
     assert!(!texts_before_tokens(&text.replace("MF2", "Fluent")));
-    assert!(!texts_before_tokens(&text.replace("call: texts-check:", "call: other:")));
+    assert!(!texts_before_tokens(
+        &text.replace("call: texts-check:", "call: other:")
+    ));
 }
 
 #[test]
@@ -146,14 +154,19 @@ fn the_jumps_back_that_were_only_in_the_summary_are_switch_with_then() {
         ("frontend-umbau", "texts-again", "then: texte"),
     ] {
         let body = step_body(&read(f), step);
-        assert!(body.contains("switch:") && body.contains(target), "{f} {step}");
+        assert!(
+            body.contains("switch:") && body.contains(target),
+            "{f} {step}"
+        );
         assert!(body.contains("actor: machine"), "{f} {step}");
     }
 }
 
 #[test]
 fn counter_a_jump_to_a_missing_step_is_red() {
-    assert_red("bugfix", "no step of this flow", |t| t.replacen("then: fix", "then: fx", 1));
+    assert_red("bugfix", "no step of this flow", |t| {
+        t.replacen("then: fix", "then: fx", 1)
+    });
     assert_red("frontend-round", "no step of this flow", |t| {
         t.replacen("then: gap-list", "then: gap-lst", 1)
     });

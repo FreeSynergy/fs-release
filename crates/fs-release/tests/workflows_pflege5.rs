@@ -75,9 +75,11 @@ fn counter_a_read_without_export_is_caught() {
         &text.replace("$context.count", ".count")
     ));
     // read before the export: the export of `assign` stays, but a read of it comes first
-    assert!(!data_flow_resolvable(
-        &text.replacen("do:\n", "do:\n  # ${ $context.assign }\n", 1)
-    ));
+    assert!(!data_flow_resolvable(&text.replacen(
+        "do:\n",
+        "do:\n  # ${ $context.assign }\n",
+        1
+    )));
 }
 
 #[test]

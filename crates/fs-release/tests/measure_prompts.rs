@@ -82,7 +82,9 @@ fn counter_aborted_run_and_foreign_prompt_do_not_count() {
 /// Twelve build runs on 2026-11-01..12 (USD = day, tokens = day * 100) and two review runs, around the day 2026-11-07.
 fn runs_by_day() -> (tempfile::TempDir, tempfile::TempDir) {
     let (prompts, costs) = sample();
-    let mut text = String::from("| Datum | Aufgabe | Modell | USD | Tokens | Ergebnis |\n|---|---|---|---|---|---|\n");
+    let mut text = String::from(
+        "| Datum | Aufgabe | Modell | USD | Tokens | Ergebnis |\n|---|---|---|---|---|---|\n",
+    );
     text.extend((1..=12).map(|day| {
         format!(
             "| 2026-11-{day:02} | store-{day} | sonnet | {day}.00 | {} | success |\n",
@@ -114,18 +116,30 @@ fn before_and_after_compare_five_runs_of_cost_and_tokens() {
     let (code, out) = run_since(prompts.path(), costs.path(), "2026-11-07");
     assert_eq!(code, 0, "{out}");
     // the last five before the 7th are the days 2..6, the first five from it on are the days 7..11 (the 12th is outside)
-    assert!(out.contains("| build | 5 | 4.0000 | 400 | 5 | 9.0000 | 900 |"), "{out}");
-    assert!(out.contains("| rev | 1 | 2.0000 | 1000 | 1 | 1.0000 | 400 |"), "{out}");
+    assert!(
+        out.contains("| build | 5 | 4.0000 | 400 | 5 | 9.0000 | 900 |"),
+        "{out}"
+    );
+    assert!(
+        out.contains("| rev | 1 | 2.0000 | 1000 | 1 | 1.0000 | 400 |"),
+        "{out}"
+    );
 }
 
 #[test]
 fn counter_a_window_without_enough_runs_is_shown_and_a_bad_date_is_red() {
     let (prompts, costs) = runs_by_day();
     let (_, out) = run_since(prompts.path(), costs.path(), "2026-11-11");
-    assert!(out.contains("| build | 5 | 8.0000 | 800 | 2 | 11.5000 | 1150 |"), "{out}");
+    assert!(
+        out.contains("| build | 5 | 8.0000 | 800 | 2 | 11.5000 | 1150 |"),
+        "{out}"
+    );
     assert!(out.contains("fewer than 5 runs"), "{out}");
     let (_, plain) = run(prompts.path(), costs.path());
-    assert!(!plain.contains("runs before"), "no comparison without --since: {plain}");
+    assert!(
+        !plain.contains("runs before"),
+        "no comparison without --since: {plain}"
+    );
     let (code, out) = run_since(prompts.path(), costs.path(), "yesterday");
     assert_eq!(code, 1, "{out}");
 }
