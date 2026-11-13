@@ -58,9 +58,10 @@ impl Step for Bump {
         let t = &f.ctx.target;
         let dir = catalog_dir(f.ctx)?;
         let tag = t.tag();
-        if gh::release_state(f.ctx, &t.slug, &tag)?.is_none_or(|r| r.draft) {
+        let state = gh::release_state(f.ctx, &t.slug, &tag)?;
+        if state.is_none_or(|r| r.draft || r.prerelease != t.prerelease) {
             return Err(Stop::red(format!(
-                "release {tag} is not published: the catalog generator would stop on it"
+                "release {tag} is not published as this run asked: the catalog generator would stop on it"
             )));
         }
         if !git::out(
@@ -75,11 +76,7 @@ impl Step for Bump {
                 dir.display()
             )));
         }
-        git::out(
-            f.ctx,
-            &dir,
-            &["fetch", "--quiet", "--end-of-options", "origin", &t.base],
-        )?;
+        git::fetch(f.ctx, &dir, &t.base)?;
         let (local, remote) = (
             git::rev(f.ctx, &dir, "HEAD")?,
             git::rev(f.ctx, &dir, &format!("refs/remotes/origin/{}", t.base))?,

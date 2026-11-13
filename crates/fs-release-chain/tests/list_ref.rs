@@ -4,6 +4,8 @@ mod support;
 
 use fs_release_chain::meta::Reach;
 use fs_release_chain::Outcome;
+use std::fs;
+
 use support::flow::{all_green, stopped_at};
 use support::{git, World};
 
@@ -62,4 +64,52 @@ fn a_base_that_looks_like_a_git_option_is_red_before_git_sees_it() {
         let o = run_with_base(&w, base);
         assert_eq!(stopped_at(&o), "red preflight", "{base:?}: {}", o.line());
     }
+}
+
+/// A forged local `refs/remotes/origin/main` (`public_ok` filled) and an origin that cannot be fetched.
+fn forged_local_ref_and_dead_origin(w: &World) {
+    let sha = w.head();
+    w.approve(&sha, "JA");
+    all_green(w, &sha);
+    w.set_preapproved(&["Org/fs-demo"], "");
+    w.write_preapproved(&["Org/fs-demo"], &["Org/fs-catalog"], "forged", false);
+    let rel = w.root().join("rel");
+    git(&rel, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    fs::remove_dir_all(w.root().join("rel-origin.git")).unwrap();
+}
+
+#[test]
+fn public_reach_never_falls_back_to_a_local_list_when_the_fetch_fails() {
+    let w = World::new();
+    forged_local_ref_and_dead_origin(&w);
+    let o = run_with_base(&w, "main");
+    assert_eq!(stopped_at(&o), "red preflight", "{}", o.line());
+    assert!(o.line().contains("no local ref is trusted"), "{}", o.line());
+}
+
+#[test]
+fn below_public_reach_the_existing_ref_is_still_used_when_the_fetch_fails() {
+    let w = World::new();
+    forged_local_ref_and_dead_origin(&w);
+    let mut t = w.target();
+    t.base = "main".into();
+    let o = w.run_target(t, Reach::Shared, &names(&["review"]));
+    assert_ne!(stopped_at(&o), "red preflight", "{}", o.line());
+}
+
+#[test]
+fn bump_wants_the_kind_of_release_the_run_asked_for() {
+    let w = World::new();
+    let sha = w.head();
+    w.approve(&sha, "JA");
+    all_green(&w, &sha);
+    w.set_preapproved(&["Org/fs-demo"], "ok");
+    // Published, but as a full release while the run asked for a pre-release.
+    fs::write(
+        w.fake().join("release-Org_fs-demo-v0.0.9.json"),
+        "{\"isDraft\":false,\"isPrerelease\":false}",
+    )
+    .unwrap();
+    let o = w.run_target(w.target(), Reach::Public, &names(&["bump"]));
+    assert_eq!(stopped_at(&o), "red bump", "{}", o.line());
 }

@@ -74,11 +74,7 @@ impl Step for MergeFf {
                 short(f.head)
             )));
         }
-        git::out(
-            f.ctx,
-            &t.repo_dir,
-            &["fetch", "--quiet", "--end-of-options", "origin", &t.base],
-        )?;
+        git::fetch(f.ctx, &t.repo_dir, &t.base)?;
         if !git::is_ancestor(f.ctx, &t.repo_dir, &base, f.head)? {
             return Err(Stop::red(format!(
                 "{} moved to {}: rebase needed (new CI, new approval)",

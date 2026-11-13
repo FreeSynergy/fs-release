@@ -37,6 +37,28 @@ pub fn out(ctx: &Ctx, dir: &Path, args: &[&str]) -> Result<String, Stop> {
     }
 }
 
+/// `git fetch origin <branch>` (the branch after `--end-of-options`: it never counts as an option), result as it is.
+///
+/// # Errors
+/// [`Stop::Red`] when git cannot be started.
+pub fn fetch_raw(ctx: &Ctx, dir: &Path, branch: &str) -> Result<Out, Stop> {
+    let args = ["fetch", "--quiet", "--end-of-options", "origin", branch];
+    raw(ctx, dir, &args)
+}
+
+/// As [`fetch_raw`], but a failed fetch is a stop.
+///
+/// # Errors
+/// [`Stop::Red`] with the first error line when the fetch fails.
+pub fn fetch(ctx: &Ctx, dir: &Path, branch: &str) -> Result<(), Stop> {
+    let o = fetch_raw(ctx, dir, branch)?;
+    if o.ok() {
+        Ok(())
+    } else {
+        Err(Stop::red(format!("git fetch: {}", o.first_error())))
+    }
+}
+
 /// Full sha of `rev` (`HEAD`, a branch, `v1^{commit}`).
 ///
 /// # Errors

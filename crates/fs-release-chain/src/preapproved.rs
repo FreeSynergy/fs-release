@@ -30,12 +30,12 @@ pub struct Preapproved {
 
 impl Preapproved {
     /// Reads the list from `origin/main` ([`LIST_BRANCH`]) of the fs-release checkout (`--release-dir`): the checkout's origin
-    /// must be exactly `FreeSynergy/fs-release`, the ref is fetched first (an existing one is used when the fetch fails), and
-    /// the working tree, `HEAD`, any local branch and the run's `--base` count for nothing. A release of fs-release itself,
-    /// or any other branch pushed to its origin, therefore cannot bring its own list.
+    /// must be exactly `FreeSynergy/fs-release`, the ref is fetched first (when that fails, an existing ref is used below
+    /// public reach, public reach is red), and the working tree, `HEAD`, any local branch and the run's `--base` count for
+    /// nothing. A release of fs-release itself, or any other branch pushed to its origin, cannot bring its own list.
     ///
     /// # Errors
-    /// [`Stop::Red`] when the checkout is not fs-release or the file is damaged; [`Stop::Halt`] `not-preapproved` when
+    /// [`Stop::Red`] when the checkout is not fs-release, the file is damaged or (public reach) the fetch failed; [`Stop::Halt`] `not-preapproved` when
     /// `origin/<base>` has no such file.
     pub fn load(ctx: &Ctx) -> Result<Preapproved, Stop> {
         let dir = &ctx.target.release_dir;
@@ -46,17 +46,20 @@ impl Preapproved {
                 dir.display()
             )));
         }
-        let _ = git::raw(
-            ctx,
-            dir,
-            &[
-                "fetch",
-                "--quiet",
-                "--end-of-options",
-                "origin",
-                LIST_BRANCH,
-            ],
-        )?;
+        let fetched = git::fetch_raw(ctx, dir, LIST_BRANCH)?;
+        if !fetched.ok() {
+            if ctx.reach == Reach::Public {
+                return Err(Stop::red(format!(
+                    "public reach needs the fresh list: git fetch origin {LIST_BRANCH} of {} failed ({}); no local ref is trusted",
+                    dir.display(),
+                    fetched.first_error()
+                )));
+            }
+            eprintln!(
+                "warning: git fetch origin {LIST_BRANCH} failed, the existing refs/remotes/origin/{LIST_BRANCH} is used: {}",
+                fetched.first_error()
+            );
+        }
         let spec = format!("refs/remotes/origin/{LIST_BRANCH}:.fs/preapproved.toml");
         let o = git::raw(ctx, dir, &["show", &spec])?;
         if !o.ok() {
