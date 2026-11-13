@@ -1,0 +1,231 @@
+# Set up a server, way A only - our layer ("Biotop") on top of an existing system with SSH access; the disks stay as they are (ADR 0079).
+# Not here (own workflows, only referred to): B kexec, C provider rescue, D disk rebuild (human gate, risk note).
+# Every step runs WITHOUT an AI: deterministic scripts, dry run, log. No agent gets SSH or root on a real server; the PERSON starts
+# fs-server-run LOCALLY on the target and hands back the one log file. Agents only write and test locally (VM, container).
+# Order: `Workflow server-einrichtung, step <id>, parameters host, hostname, fqdn, network, services, data_path, source_address`. FS profile: see README.md.
+# Scripts log through fs-server-run - command, output, exit code, duration; secrets are redacted before writing and never in a command.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: server-einrichtung
+  version: 0.0.6
+  title: Set up a server on an existing system (way A) - inventory, dry run, human approval, layer, hardening, services, check
+do:
+  - variables:
+      set:
+        server: ${ .input }
+      export:
+        as: '${ $context + { server: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The person writes the variable set of this server - host, hostname, FQDN or domain (optional), network, services, data path, package source address. Plain text, no secrets (credentials stay in the vault). Without a domain the first run is local or LAN only; with one, ACME DNS-01 can be used without open ports. No Tailscale-like service.
+  - inventory:
+      call: fs-server-bestand:0.0.6@fs
+      with:
+        mode: read-only
+        output: bestand.txt
+      export:
+        as: '${ $context + { inventory: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The person starts fs-server-run on the target; the script fs-server-bestand only reads - OS and version, boot, disks, RAID, file system, memory, network, ports, systemd, domain yes or no, container type (OpenVZ, LXC), package manager. Expected - one output file bestand.txt, exit code 0, nothing changed on the system. The duration and the output go into the log.
+  - fit-check:
+      switch:
+        - not-fit:
+            when: '${ $context.inventory.unfit }'
+            then: exit
+        - fit:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow by script, from the inventory only. A system without systemd, without apt (first throw) or without a supported file system (ext4, xfs; btrfs with subvolume) ends the flow with the reason in the log. A container VServer (OpenVZ, LXC) stays on way A with limits - no file system or kernel change, no snapshots - and the limits are reported. A wish for a disk change or a restart into another system is not this flow - the log names the separate workflows (B kexec, C provider rescue, D disk rebuild).
+  - plan:
+      call: fs-server-plan:0.0.6@fs
+      with:
+        mode: dry-run
+        variables: ${ .input }
+        output: plan.txt
+      export:
+        as: '${ $context + { plan: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Dry run. Resolves the variables against the inventory and prints every command that would run, in order, per phase (layer, hardening, services, check) - changes nothing. Expected - plan.txt with resolved values and exit code 0; an unresolved variable is red.
+  - back-to-variables:
+      switch:
+        - unresolved:
+            when: '${ $context.plan.red }'
+            then: variables
+        - resolved:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a red dry run (variable missing or not resolvable) goes back to variables, green goes on to the approval.
+  - plan-approval:
+      call: confirm-plan:0.0.6@fs
+      with:
+        file: plan.txt
+      export:
+        as: '${ $context + { approval: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The person reads plan.txt and confirms it or not. Nothing below runs without this YES; an agent never gives it (ADR 0056). The plan names every file, package and service that will be changed; a restart or a reinstall is not part of it and always needs a gate of its own.
+  - back-to-plan:
+      switch:
+        - rejected:
+            when: '${ $context.approval.no }'
+            then: variables
+        - approved:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a NO goes back to variables, a YES goes on to the layer.
+  - package-source:
+      call: fs-server-source:0.0.6@fs
+      with:
+        address: ${ .input.source_address }
+        format: apt-deb822
+        file: /etc/apt/sources.list.d/freesynergy.sources
+      export:
+        as: '${ $context + { source: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Enters the package source (ADR 0078) as deb822 freesynergy.sources with Signed-By; the first address is the github.io address of FreeSynergy/fs-packages, later packages.freesynergy.net by switching the variable. The key is checked against the fingerprint 16A4...4342 BEFORE it is trusted; a mismatch is red and the file is removed. Expected - the file, apt update without error, exit code 0. Idempotent.
+  - data-directory:
+      call: fs-server-layer:0.0.6@fs
+      with:
+        path: ${ .input.data_path }
+        default: /srv/freesynergy
+        owner: root
+        mode: "0755"
+      export:
+        as: '${ $context + { layer: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Creates /srv/freesynergy (or the data path variable) with the rights from the plan - no second location. Minimum base is ext4 or xfs; snapshots only where the file system can do them (no promise on ext4 or xfs); on btrfs a subvolume is created for the data path. On a container VServer no file system change is tried. Expected - directory, rights and file system kind in the log, exit code 0. Idempotent.
+  - back-to-layer:
+      switch:
+        - red:
+            when: '${ $context.layer.red or $context.source.red }'
+            then: package-source
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - red in the layer goes back to package-source (the steps are idempotent, a repeat is safe); after three red runs the script stops and the person reads the log. Green goes on to hardening.
+  - hardening-check:
+      call: fs-server-hardening:0.0.6@fs
+      with:
+        mode: report
+      export:
+        as: '${ $context + { hardening: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Only reads and reports - key-only SSH login (checked and reported, never switched off by us), open ports against the firewall base rules, state of unattended-upgrades. Expected - a report in the log, exit code 0, nothing changed.
+  - hardening-apply:
+      call: fs-server-hardening:0.0.6@fs
+      with:
+        mode: apply
+        ssh: keep-port-and-keys
+        firewall: base-rules
+        unattended-upgrades: true
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Changes only after this gate - the person confirms the report of hardening-check. Sets the firewall base rules (the running SSH port stays open, so no lock-out; no rule is active before the check that the current session is allowed) and installs unattended-upgrades. SSH settings are not changed; password login on is reported, the person decides. Expected - the changed files and rules in the log, exit code 0.
+  - kanidm:
+      call: fs-server-service:0.0.6@fs
+      with:
+        package: kanidmd
+        unit: kanidmd.service
+        unit-file: unchanged
+        config-from: ${ .input }
+      export:
+        as: '${ $context + { kanidm: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: First service - kanidmd from OUR package source (apt install kanidmd). The systemd unit stays as the package ships it (DynamicUser); only the configuration is written from the variables (domain or LAN name, bind address, data under the data path), no secret in the file or on the command line. Then enable and start. Expected - package installed, config written, unit active, exit code 0. Other services from the variable list follow the same pattern as further steps.
+  - check:
+      call: fs-server-check:0.0.6@fs
+      with:
+        services: ${ .input.services }
+        ports: from-plan
+      export:
+        as: '${ $context + { check: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The services run (systemctl is-active, no failed unit), the planned ports listen and only those, the answer of the service is looked at locally. Expected - one line per check in the log, exit code 0. Not proven on the server until the person hands back the log.
+  - back-to-service:
+      switch:
+        - red:
+            when: '${ $context.check.red and $context.check.tries < 3 }'
+            then: kanidm
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a red check goes back to kanidm up to three times (idempotent); then the flow goes on and the log shows the red lines to the person. A restart of the machine or a reinstall is never a jump back, it is a human gate.
+  - schedule:
+      call: fs-server-timer:0.0.6@fs
+      with:
+        unit: freesynergy-security-updates.timer
+        runs: gate-none-steps
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The person sets up, once, a systemd timer ON the server for security updates (steps with gate none). Without an AI, the log as always. Only steps that need no approval run by schedule; everything with a gate waits for the person. Expected - timer enabled, next run shown, exit code 0.
+  - hand-back:
+      call: return-log:0.0.6@fs
+      with:
+        files: [bestand.txt, plan.txt, protocol.log]
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The person hands back the one log file (the full log, appended only; secrets are redacted). Agents read it, they never log in. Each step of this run also leaves a short summary for the history (ADR 0020, 0079).
