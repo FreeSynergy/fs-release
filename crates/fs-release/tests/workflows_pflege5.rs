@@ -35,7 +35,7 @@ fn counter_an_own_review_step_before_the_release_is_caught() {
     let text = read("frontend-umbau");
     let doubled = text.replacen(
         "  - release:",
-        "  - review:\n      call: review-ai:0.0.5@fs\n  - release:",
+        "  - review:\n      call: review-ai:0.0.6@fs\n  - release:",
         1,
     );
     assert_ne!(doubled, text);
@@ -43,17 +43,17 @@ fn counter_an_own_review_step_before_the_release_is_caught() {
 }
 
 /// Every read of an earlier task output is `$context.<key>` and the file exports that key (`{ <key>: . }`); a read of
-/// `${ .<name> }` other than `.input` cannot be resolved in Serverless Workflow 1.0.
+/// `${ .<name> }` other than `.input` cannot be resolved in Serverless Workflow 1.0. The export comes before the read (in file order).
 fn data_flow_resolvable(text: &str) -> bool {
     if text.split("${ .").skip(1).any(|r| !r.starts_with("input")) {
         return false;
     }
-    text.split("$context.").skip(1).all(|r| {
-        let key: String = r
+    text.match_indices("$context.").all(|(at, _)| {
+        let key: String = text[at + "$context.".len()..]
             .chars()
             .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
             .collect();
-        text.contains(&format!("{{ {key}: . }}"))
+        text[..at].contains(&format!("{{ {key}: . }}"))
     })
 }
 
@@ -73,6 +73,10 @@ fn counter_a_read_without_export_is_caught() {
     ));
     assert!(!data_flow_resolvable(
         &text.replace("$context.count", ".count")
+    ));
+    // read before the export: the export of `assign` stays, but a read of it comes first
+    assert!(!data_flow_resolvable(
+        &text.replacen("do:\n", "do:\n  # ${ $context.assign }\n", 1)
     ));
 }
 
@@ -134,8 +138,8 @@ fn upstream_anfrage_has_the_channel_choice_before_the_send() {
 fn counter_channel_as_machine_or_after_the_send_is_caught() {
     let text = read("upstream-anfrage");
     let machine = text.replacen(
-        "  - choose-channel:\n      call: choose-channel:0.0.5@fs\n      with:\n        upstream: ${ .input.upstream }\n      export:\n        as: '${ $context + { channel: . } }'\n      metadata:\n        freesynergy.net:actor: human",
-        "  - choose-channel:\n      call: choose-channel:0.0.5@fs\n      with:\n        upstream: ${ .input.upstream }\n      export:\n        as: '${ $context + { channel: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
+        "  - choose-channel:\n      call: choose-channel:0.0.6@fs\n      with:\n        upstream: ${ .input.upstream }\n      export:\n        as: '${ $context + { channel: . } }'\n      metadata:\n        freesynergy.net:actor: human",
+        "  - choose-channel:\n      call: choose-channel:0.0.6@fs\n      with:\n        upstream: ${ .input.upstream }\n      export:\n        as: '${ $context + { channel: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
         1,
     );
     assert_ne!(machine, text);
@@ -164,8 +168,8 @@ fn wrapper_einbindung_compares_licenses_by_script() {
 fn counter_a_license_compare_by_the_agent_is_caught() {
     let text = read("wrapper-einbindung");
     let changed = text.replacen(
-        "call: license-compare:0.0.5@fs\n      with:\n        crate: ${ .input.crate }\n      export:\n        as: '${ $context + { license: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
-        "call: license-compare:0.0.5@fs\n      with:\n        crate: ${ .input.crate }\n      export:\n        as: '${ $context + { license: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
+        "call: license-compare:0.0.6@fs\n      with:\n        crate: ${ .input.crate }\n      export:\n        as: '${ $context + { license: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
+        "call: license-compare:0.0.6@fs\n      with:\n        crate: ${ .input.crate }\n      export:\n        as: '${ $context + { license: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
         1,
     );
     assert_ne!(changed, text);

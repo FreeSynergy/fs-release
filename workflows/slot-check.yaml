@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: slot-check
-  version: 0.0.5
+  version: 0.0.6
   title: Check the build slots for orphans and memory
 do:
   - holders:
-      call: fuser-lock:0.0.5@fs
+      call: fuser-lock:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -15,7 +15,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: fuser on every build.lock shows who holds a slot.
   - processes:
-      call: pgrep-builds:0.0.5@fs
+      call: pgrep-builds:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -23,7 +23,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: pgrep lists cargo, rustc and test processes; a process without a running run is an orphan.
   - log:
-      call: read-slots-log:0.0.5@fs
+      call: read-slots-log:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -31,7 +31,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Reads slots-watch.log for memory and slot history; memory figures come from the log, not from a guess.
   - end-orphans:
-      call: end-orphans:0.0.5@fs
+      call: end-orphans:0.0.6@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application

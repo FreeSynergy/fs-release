@@ -1,0 +1,62 @@
+# A decision of the strategy: look up what is already decided first, ask the user only on a departure or a gap, write the result down.
+# Reason (strategy c5): the strategy chose Fluent although ADR 0057 says MF2. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: entscheidung
+  version: 0.0.6
+  title: Check the existing ADRs, ask the user only where needed, record the result
+do:
+  - adr-search:
+      call: adr-search:0.0.6@fs
+      with:
+        terms: ${ .input.terms }
+      export:
+        as: '${ $context + { adrs: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Script scripts/adr-search - `git grep -i` of the terms on fs-documentation origin/main in conventions/decisions and todo; the result is the list ADR/line (or `no hits`), whatever it finds.
+  - evaluate:
+      call: evaluate-adrs:0.0.6@fs
+      with:
+        topic: ${ .input.topic }
+        adrs: ${ $context.adrs }
+      export:
+        as: '${ $context + { verdict: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The strategy reads the hits. A decision that exists applies and is followed; the result is `open` only for a departure from an ADR or for a missing decision, with the ADR numbers and the reason.
+  - ask:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: user-decision
+          version: 0.0.6
+        input:
+          topic: ${ .input.topic }
+          terms: ${ .input.terms }
+      if: ${ $context.verdict.open }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Only when `open` - the user decides (user-decision.yaml, which searches the ADRs itself first); the answer is taken as it is. Without `open` the existing ADR applies and nobody is asked.
+  - record:
+      call: record-adr:0.0.6@fs
+      if: ${ $context.verdict.open }
+      with:
+        topic: ${ .input.topic }
+        verdict: ${ $context.verdict }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The result is written down as a new ADR or as a supplement to the ADR it departs from (adr-write.yaml carries it into the docs, the person publishes); an existing decision that simply applied needs no entry.

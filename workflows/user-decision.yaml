@@ -3,21 +3,34 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: user-decision
-  version: 0.0.5
+  version: 0.0.6
   title: Ask the user, record the answer, turn it into an order
 do:
+  - adr-search:
+      call: adr-search:0.0.6@fs
+      with:
+        terms: ${ .input.terms }
+      export:
+        as: '${ $context + { adrs: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Script scripts/adr-search - `git grep -i` of the terms on fs-documentation origin/main in conventions/decisions and todo; the result is the list ADR/line (or `no hits`). It comes before every question so that no decision is asked twice or overturned unseen (the strategy once chose Fluent although ADR 0057 says MF2).
   - question:
-      call: write-question:0.0.5@fs
+      call: write-question:0.0.6@fs
       with:
         topic: ${ .input.topic }
+        known: ${ $context.adrs }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Formulates one clear question with the options and a recommendation; repeat until it is clear.
+        freesynergy.net:summary: Formulates one clear question with the options and a recommendation, naming the ADRs found (a recommendation that departs from one says so); repeat until it is clear.
   - answer:
-      call: ask:0.0.5@fs
+      call: ask:0.0.6@fs
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -25,7 +38,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user answers; the answer is taken as it is.
   - record:
-      call: write-memory:0.0.5@fs
+      call: write-memory:0.0.6@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -33,7 +46,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The answer goes into memory and the handoff file (handoff-update.yaml) so that it survives a session change.
   - order:
-      call: write-order:0.0.5@fs
+      call: write-order:0.0.6@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application

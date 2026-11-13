@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: report-to-strategy
-  version: 0.0.5
+  version: 0.0.6
   title: Report a result or a blocker to the strategy
 do:
   - gather:
-      call: gather-report:0.0.5@fs
+      call: gather-report:0.0.6@fs
       with:
         workflow: ${ .input.workflow }
         run: ${ .input.run }
@@ -18,7 +18,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Collects only the workflow, the run id, the result or blocker, the images and the costs; nothing else goes in.
   - questions:
-      call: list-questions:0.0.5@fs
+      call: list-questions:0.0.6@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -26,7 +26,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Open questions come last, one per line, so that the strategy can answer them one by one.
   - send:
-      call: send-report:0.0.5@fs
+      call: send-report:0.0.6@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application

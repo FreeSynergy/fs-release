@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.6
+
+- All crates, all flows, `chains/release.chain.yaml` and all `@fs` calls at 0.0.6 (crate version = tag).
+- [EFFIZIENZ] (strategy c5) as step rules in `agent-run` and `review`: one run = one gate cycle; gates once per head (the head hash is in the report and a green result for exactly that head is reused); reviews read only the delta with the file list of the order; the order names the files to read; mechanics (fmt, rule check, push, tag, clean-up) is a script of the coordinator; after a timeout (rc=124) find the cause first, restart from the WIP commit. `scripts/measure-prompts.py --since <date>` now compares cost and tokens per run (5 build and 5 review runs before and after the date), not the prompt size; tests with counter-tests in `tests/measure_prompts.rs`.
+- New flow `entscheidung` (`adr-search` machine, `evaluate` ai, `ask` = `user-decision` human gate only when `open`, `record` ai) and `user-decision` starts with `adr-search`; new script `scripts/adr-search` (`git grep -i -F` of the terms on fs-documentation `origin/main` in `conventions/decisions` and `todo`, output `ADR <number> <file>:<line>: <text>`); tests in `tests/adr_search.rs` on a temporary git repo. Reason: the strategy chose Fluent although ADR 0057 says MF2.
+- `frontend-umbau`: new steps `texte` (ai, `Words`/MF2 after ADR 0057, German and English), `texts-check` (machine, gate `texts-check`) and `texts-again` (`switch`) before the token steps, in the same run per crate.
+- Small points of the 0.0.5 review: `rules.md` is `/srv/FreeSynergy/.scratch/api-runner/rules.md` (named in the flows, README and `docs/prompt-template.md`; no copy in the repo). The jumps back that were only in a summary are `switch` with `then`: `frontend-round` (`picture-again` to `gap-list`, `gates-again` and `acceptance-again` to `build`) and `bugfix` (`red-back` to `fix`); `gates`/`picture-verdict` export their result. The test `data_flow_resolvable` also checks that the export comes before the read. `upstream-anfrage` `hand-text`: the person writes, the agent does nothing in that step. Left over: the summary-only "red goes back" of `publish-doc`, `workflow-pflege`, `handoff-update`, `dossier`, `adr-write`, and the "NEIN goes back to convert" of `release-flow`. Not proven: the `@fs` functions (`adr-search`, `evaluate-adrs`, `record-adr`, `texts-convert-ai`, `texts-check` are new names), the file of ADR 0057 in fs-documentation, a real SW 1.0 runtime run.
+
 ## 0.0.5
 
 - All crates, all flows, `chains/release.chain.yaml` and all `@fs` calls at 0.0.5 (crate version = tag).

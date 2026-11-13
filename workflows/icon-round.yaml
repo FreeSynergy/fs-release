@@ -4,11 +4,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: icon-round
-  version: 0.0.5
+  version: 0.0.6
   title: From new icon images through the user's verdict into the catalog
 do:
   - draw:
-      call: draw-ai:0.0.5@fs
+      call: draw-ai:0.0.6@fs
       with:
         icons: ${ .input.icons }
       metadata:
@@ -18,7 +18,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Draws the new versions of the icons; repeat until they render and pass the format checks.
   - compare:
-      call: show-images:0.0.5@fs
+      call: show-images:0.0.6@fs
       with:
         old: ${ .input.old }
         new: ${ .input.new }
@@ -29,7 +29,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Shows every icon old next to new; whatever they look like, the state changes to shown.
   - verdict:
-      call: ask:0.0.5@fs
+      call: ask:0.0.6@fs
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -37,7 +37,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user decides per icon - old, new or draw again; the verdict is taken as it is.
   - export:
-      call: png-export:0.0.5@fs
+      call: png-export:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -45,7 +45,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: PNG export of the accepted icons and the hash of every file; repeat until export and hash match.
   - catalog:
-      call: catalog-entry:0.0.5@fs
+      call: catalog-entry:0.0.6@fs
       with:
         schema: 2
         license: ${ .input.license }
@@ -60,7 +60,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.5
+          version: 0.0.6
         input:
           head: ${ .input.branch }
       metadata:
@@ -70,7 +70,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reviews exactly this head of the catalog change; JA is bound to it.
   - publish:
-      call: publish:0.0.5@fs
+      call: publish:0.0.6@fs
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

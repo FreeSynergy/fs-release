@@ -5,11 +5,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: upstream-anfrage
-  version: 0.0.5
+  version: 0.0.6
   title: Send one request to an upstream project by the channel the person chooses
 do:
   - draft:
-      call: draft-issue:0.0.5@fs
+      call: draft-issue:0.0.6@fs
       with:
         upstream: ${ .input.upstream }
         evidence: ${ .input.evidence }
@@ -22,7 +22,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body.
   - rules:
-      call: upstream-rules:0.0.5@fs
+      call: upstream-rules:0.0.6@fs
       with:
         upstream: ${ .input.upstream }
         draft: ${ $context.draft }
@@ -48,7 +48,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a rules hit goes back to draft with the hits as the order, a clean draft goes on to the approval.
   - approval:
-      call: approve:0.0.5@fs
+      call: approve:0.0.6@fs
       with:
         draft: ${ $context.draft }
       metadata:
@@ -58,7 +58,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user's YES for exactly this text, given beforehand; without it nothing is sent, a changed text needs a new YES.
   - choose-channel:
-      call: choose-channel:0.0.5@fs
+      call: choose-channel:0.0.6@fs
       with:
         upstream: ${ .input.upstream }
       export:
@@ -68,9 +68,9 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The person chooses the channel for this upstream - `tracker` (the upstream's own issue tracker, e.g. a GitHub issue under the user's account, only after the user's release for exactly this channel), `git-bug` (only if we have write access to the upstream's repository; `git-bug push` over SSH fails otherwise) or `direct` (Discord or mail, the user writes it themselves and the agent only delivers the text). Without a choice nothing is sent.
+        freesynergy.net:summary: The person chooses the channel for this upstream - `tracker` (the upstream's own issue tracker, e.g. a GitHub issue under the user's account, only after the user's release for exactly this channel), `git-bug` (only if we have write access to the upstream's repository; `git-bug push` over SSH fails otherwise) or `direct` (Discord or mail, the user writes it themselves with the approved text as the template). Without a choice nothing is sent.
   - send:
-      call: send-issue:0.0.5@fs
+      call: send-issue:0.0.6@fs
       if: '${ $context.channel != "direct" }'
       with:
         upstream: ${ .input.upstream }
@@ -85,7 +85,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Script - sends by the chosen channel, only the approved text, only after the YES and the choice; `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id.
   - hand-text:
-      call: hand-text:0.0.5@fs
+      call: hand-text:0.0.6@fs
       if: '${ $context.channel == "direct" }'
       with:
         draft: ${ $context.draft }
@@ -94,9 +94,9 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Direct contact (Discord, mail) - the user writes the message themselves; the agent delivers only the approved text and sends nothing.
+        freesynergy.net:summary: Direct contact (Discord, mail) - the person writes and sends the message themselves, with the approved text as the template; the machine sends nothing and the agent does nothing in this step.
   - record:
-      call: note-history:0.0.5@fs
+      call: note-history:0.0.6@fs
       with:
         id: ${ $context.send.id }
         channel: ${ $context.channel }

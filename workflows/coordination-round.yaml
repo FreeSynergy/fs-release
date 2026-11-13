@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: coordination-round
-  version: 0.0.5
+  version: 0.0.6
   title: The coordinator checks the runs, evaluates finished ones, starts reviews
 do:
   - cost-log:
-      call: read-cost-log:0.0.5@fs
+      call: read-cost-log:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -15,7 +15,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Reads the cost log; the state changes to read, whatever it says.
   - evaluate:
-      call: read-run-result:0.0.5@fs
+      call: read-run-result:0.0.6@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -23,7 +23,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Evaluates every finished run - its report, its commits, what is proven and what is not.
   - fmt-rules-commit:
-      call: fmt-rules-commit:0.0.5@fs
+      call: fmt-rules-commit:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -35,7 +35,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.5
+          version: 0.0.6
         input:
           head: ${ .input.branch }
       metadata:
@@ -49,7 +49,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: slot-check
-          version: 0.0.5
+          version: 0.0.6
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -57,7 +57,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Looks for orphaned build slots (fuser on build.lock), slot-check.yaml.
   - report-need:
-      call: report-need:0.0.5@fs
+      call: report-need:0.0.6@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application

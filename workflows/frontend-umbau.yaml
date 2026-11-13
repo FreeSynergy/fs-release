@@ -1,16 +1,55 @@
 # Convert existing building blocks and Frontends to the layers of ADR 0074: theme contract with fixed block names, DTCG tokens, no fixed colors or spacings in blocks or Frontends, arrangement separate. Goal: new Frontends are built quickly from blocks.
 # The ADR is conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md in fs-documentation.
-# One run per block group (input.group). Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters repo,
+# One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters repo,
 # branch, head, delta, group` (docs/prompt-template.md). FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: frontend-umbau
-  version: 0.0.5
+  version: 0.0.6
   title: Convert one group of building blocks to the layers of ADR 0074
 do:
+  - texte:
+      call: texts-convert-ai:0.0.6@fs
+      with:
+        group: ${ .input.group }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: First the texts, then the tokens, in the same run per crate. The agent moves every fixed text of the group to `Words` with MF2 messages (ADR 0057, not Fluent), German and English together; own worktree, local commits ([COMMIT]), no push, no tag; report per [BERICHT].
+  - texts-check:
+      call: texts-check:0.0.6@fs
+      with:
+        group: ${ .input.group }
+      export:
+        as: '${ $context + { texts: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script - the gate `texts-check` - no fixed text left in the group, every message in de and en, valid MF2; the result is `red` or not.
+  - texts-again:
+      switch:
+        - red:
+            when: '${ $context.texts.red }'
+            then: texte
+        - done:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a red `texts-check` goes back to texte, only green texts go on to the token steps.
   - count:
-      call: count-fixed-values:0.0.5@fs
+      call: count-fixed-values:0.0.6@fs
       with:
         group: ${ .input.group }
       export:
@@ -22,7 +61,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Script - counts in the group the fixed colors, fixed spacings and block names that are not in the contract (ADR 0074, conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md); whatever the numbers are, they are written down as the starting state.
   - assign:
-      call: assign-tokens:0.0.5@fs
+      call: assign-tokens:0.0.6@fs
       with:
         group: ${ .input.group }
         counted: ${ $context.count }
@@ -35,7 +74,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent maps every counted value to a DTCG token and every block to its fixed contract name (WAI-ARIA, Open UI); a value without a fitting token is listed, not invented.
   - before:
-      call: render-images:0.0.5@fs
+      call: render-images:0.0.6@fs
       with:
         group: ${ .input.group }
         state: before
@@ -46,7 +85,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Renders the images of the group before the change (the reference for the pixel comparison).
   - convert:
-      call: convert-ai:0.0.5@fs
+      call: convert-ai:0.0.6@fs
       with:
         group: ${ .input.group }
         mapping: ${ $context.assign }
@@ -61,7 +100,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent replaces fixed colors, spacings and names by tokens and contract names and keeps the arrangement in its own layer. Own worktree, local commits ([COMMIT]), no push, no tag; report per [BERICHT]. The loop back from `repeat` runs until the script counts 0 fixed colors and spacings.
   - recount:
-      call: count-fixed-values:0.0.5@fs
+      call: count-fixed-values:0.0.6@fs
       with:
         group: ${ .input.group }
       export:
@@ -73,7 +112,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - the same count as at the start; the result is `fixed` (colors and spacings still fixed).
   - gates:
-      call: gates:0.0.5@fs
+      call: gates:0.0.6@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -83,7 +122,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh ([GATES]), the one definition of the checks; the result is `red` or not.
   - same-pictures:
-      call: pixel-compare:0.0.5@fs
+      call: pixel-compare:0.0.6@fs
       with:
         group: ${ .input.group }
       export:
@@ -112,7 +151,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.5
+          version: 0.0.6
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

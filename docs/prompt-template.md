@@ -5,16 +5,20 @@
 `[WORTWAHL]`, `[BERICHT]`, `[REVIEW]`); der Agent liest beide selbst. Nicht in den Auftrag gehören: die Gate-Befehle, die
 Bash-Regeln, die Berichtsform, die JA/NEIN-Bindung an den Kopf, die Prüfliste je Art (Review), die Wortwahl. In den Auftrag
 gehört nur, was sich von Lauf zu Lauf ändert: die Parameter `repo`, `branch`, `head`, `delta` und der Auftragsinhalt (was
-konkret zu bauen, zu beheben, zu prüfen ist, mit den Nutzerbefunden im Wortlaut). Messen: `python3 -I scripts/measure-prompts.py`
-(mittlere Auftragsgröße und Kosten je Art: build, fix, rev, dossier).
+konkret zu bauen, zu beheben, zu prüfen ist, mit den Nutzerbefunden im Wortlaut). `rules.md` ist die Datei
+`/srv/FreeSynergy/.scratch/api-runner/rules.md` (diese gilt; im Repo gibt es keine Kopie). Messen zählt Kosten und Tokens je
+Lauf, nicht die Auftragsgröße: `python3 -I scripts/measure-prompts.py --since <Datum>` (je 5 Build- und Review-Läufe vor und nach
+dem Datum; ohne `--since` die mittlere Größe und Kosten je Art).
 
 **EN.** An agent order names only the workflow, the step and the parameters. Everything recurring is in the workflow file
 (`workflows/<name>.yaml`, a `summary` per step) and in `rules.md` (blocks `[GATES]`, `[BASH]`, `[COMMIT]`, `[TESTS]`,
 `[WORTWAHL]`, `[BERICHT]`, `[REVIEW]`); the agent reads both itself. Not in the order: the gate commands, the bash rules, the
 report form, the JA/NEIN binding to the head, the check list per kind (review), the wording rules. In the order goes only
 what changes from run to run: the parameters `repo`, `branch`, `head`, `delta` and the content (what exactly to build, fix or
-check, with the user's findings verbatim). Measure with `python3 -I scripts/measure-prompts.py` (mean order size and cost per
-kind: build, fix, rev, dossier).
+check, with the user's findings verbatim). `rules.md` is the file `/srv/FreeSynergy/.scratch/api-runner/rules.md` (that one
+applies; there is no copy in the repo). Measuring counts cost and tokens per run, not the order size:
+`python3 -I scripts/measure-prompts.py --since <date>` (5 build and 5 review runs before and after the date; without `--since`
+the mean size and cost per kind).
 
 ## Template (each at most 12 lines)
 

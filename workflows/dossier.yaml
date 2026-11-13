@@ -5,11 +5,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: dossier
-  version: 0.0.5
+  version: 0.0.6
   title: Research a Frontend into a dossier and publish it to the docs
 do:
   - research:
-      call: research-ai:0.0.5@fs
+      call: research-ai:0.0.6@fs
       with:
         frontend: ${ .input.frontend }
         repo: ${ .input.repo }
@@ -22,7 +22,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Writes one research file each for states, dialogs, menus and context menus, shortcuts, workflows, acceptance.md and gaps into R2; every fact has a source, what is not proven is marked [nicht belegt]; ADR 0013 - nothing is copied. Read-only on the Frontend, no network beyond the sources named in the order, commits per [COMMIT], report per [BERICHT].
   - check-docs:
-      call: check-docs:0.0.5@fs
+      call: check-docs:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -30,7 +30,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: check-docs on the dossier; red goes back to research until it is green.
   - publish:
-      call: docs-main:0.0.5@fs
+      call: docs-main:0.0.6@fs
       with:
         frontend: ${ .input.frontend }
       metadata:

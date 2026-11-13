@@ -48,8 +48,8 @@ fn upstream_anfrage_sends_only_after_the_rules_and_the_person_approved() {
 fn counter_upstream_anfrage_an_agent_approval_or_a_swapped_order_is_caught() {
     let text = read("upstream-anfrage");
     let ai = text.replacen(
-        "  - approval:\n      call: approve:0.0.5@fs\n      with:\n        draft: ${ $context.draft }\n      metadata:\n        freesynergy.net:actor: human",
-        "  - approval:\n      call: approve:0.0.5@fs\n      with:\n        draft: ${ $context.draft }\n      metadata:\n        freesynergy.net:actor: ai",
+        "  - approval:\n      call: approve:0.0.6@fs\n      with:\n        draft: ${ $context.draft }\n      metadata:\n        freesynergy.net:actor: human",
+        "  - approval:\n      call: approve:0.0.6@fs\n      with:\n        draft: ${ $context.draft }\n      metadata:\n        freesynergy.net:actor: ai",
         1,
     );
     assert_ne!(ai, text);
@@ -75,8 +75,8 @@ fn frontend_umbau_counts_and_compares_by_script() {
 fn counter_frontend_umbau_a_count_by_the_agent_is_caught() {
     let text = read("frontend-umbau");
     let changed = text.replacen(
-        "  - recount:\n      call: count-fixed-values:0.0.5@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { recount: . } }'\n      metadata:\n        freesynergy.net:actor: machine\n        freesynergy.net:actor-type: Service",
-        "  - recount:\n      call: count-fixed-values:0.0.5@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { recount: . } }'\n      metadata:\n        freesynergy.net:actor: ai\n        freesynergy.net:actor-type: Application",
+        "  - recount:\n      call: count-fixed-values:0.0.6@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { recount: . } }'\n      metadata:\n        freesynergy.net:actor: machine\n        freesynergy.net:actor-type: Service",
+        "  - recount:\n      call: count-fixed-values:0.0.6@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { recount: . } }'\n      metadata:\n        freesynergy.net:actor: ai\n        freesynergy.net:actor-type: Application",
         1,
     );
     assert_ne!(changed, text);

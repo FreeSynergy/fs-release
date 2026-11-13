@@ -1,15 +1,19 @@
 # An Opus review: read-only, the verdict goes into BERICHT.md, JA/NEIN, a JA is bound to exactly one head.
 # The order to the reviewer is compact: `Workflow review, step <id>, parameters repo, branch, head, delta, scope, tests`
-# (docs/prompt-template.md); the check list below and rules.md [REVIEW] [BERICHT] are not repeated in the order. FS profile: see README.md.
+# (docs/prompt-template.md); the check list below and rules.md [REVIEW] [BERICHT] are not repeated in the order. rules.md is the file
+# /srv/FreeSynergy/.scratch/api-runner/rules.md (the one that applies; there is no copy in the repo). FS profile: see README.md.
+# [EFFIZIENZ] (strategy c5) as step rules: a review reads only the delta (git diff <old>..<new>) with the file list of the order;
+# gates run once per head - a green result for exactly this head is reused, the review does not run them again unless told to;
+# the order names the files to read; mechanics is a script of the coordinator; after a timeout find the cause first (rc=124).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: review
-  version: 0.0.5
+  version: 0.0.6
   title: Opus reviews one head and writes a report with JA or NEIN
 do:
   - request:
-      call: review-request:0.0.5@fs
+      call: review-request:0.0.6@fs
       with:
         head: ${ .input.head }
         delta: ${ .input.delta }
@@ -20,7 +24,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Writes the file Opus reads (diff, gate output) for exactly the head ${ .input.head }.
   - read:
-      call: review-ai:0.0.5@fs
+      call: review-ai:0.0.6@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -33,9 +37,9 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Opus only reads ([REVIEW]); it changes no code, writes only BERICHT.md and runs only the named tests, never the whole workspace while the slots are busy ([GATES]). Check list by kind - code - rules of the order, tests with a counter-test per rule, files <= 300 lines, no stray files, no orphan processes; workflow files - actor/gate/kind per step, sub-workflows exist at the version; docs - sources, DE/EN in step; icons or images - license and look. Findings as file:line, blocker versus small point, and what is not proven.
+        freesynergy.net:summary: Opus only reads ([REVIEW]); it changes no code, writes only BERICHT.md and runs only the named tests, never the whole workspace while the slots are busy ([GATES]). Check list by kind - code - rules of the order, tests with a counter-test per rule, files <= 300 lines, no stray files, no orphan processes; workflow files - actor/gate/kind per step, sub-workflows exist at the version; docs - sources, DE/EN in step; icons or images - license and look. Findings as file:line, blocker versus small point, and what is not proven. [EFFIZIENZ] - only the delta with the file list of the order is read, not the whole repo; the gate result of exactly this head (head hash in the build report) is reused, not run again; only the files the order names and what they directly need are read; after a timeout or rc=124 the cause is checked first (lock holders, orphans, slot queue), then the review restarts with a continuation prompt, never blindly.
   - verdict:
-      call: verdict:0.0.5@fs
+      call: verdict:0.0.6@fs
       with:
         report: BERICHT.md
       metadata:
@@ -45,7 +49,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Line 1 of the report is JA or NEIN ([BERICHT]) for the push of release-<version> and the tag after green CI; a JA names exactly one head and is void for any other, NEIN comes with findings.
   - bind:
-      call: approval:0.0.5@fs
+      call: approval:0.0.6@fs
       with:
         head: ${ .input.head }
       metadata:

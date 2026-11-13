@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: cost-reconcile
-  version: 0.0.5
+  version: 0.0.6
   title: Compare the cost log with the console, write the correction, check the limit
 do:
   - compare:
-      call: cost-compare:0.0.5@fs
+      call: cost-compare:0.0.6@fs
       with:
         console: ${ .input.console }
       export:
@@ -19,7 +19,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - log sum against the console figure the user named; the difference is computed, not guessed.
   - unknown:
-      call: mark-unknown:0.0.5@fs
+      call: mark-unknown:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -27,7 +27,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - aborted runs without a cost figure are marked cost UNKNOWN, never as zero.
   - correction:
-      call: cost-correction:0.0.5@fs
+      call: cost-correction:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -35,7 +35,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - appends one correction line with the difference to the log; existing lines are never changed.
   - explain:
-      call: explain-deviation:0.0.5@fs
+      call: explain-deviation:0.0.6@fs
       if: ${ $context.compare.deviates }
       metadata:
         freesynergy.net:actor: ai
@@ -44,7 +44,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Only when the log deviates from the console - the agent looks for the cause (runs without a figure, a wrong rate) and reports it; the corrected figures stay as the script wrote them.
   - limit:
-      call: cost-limit:0.0.5@fs
+      call: cost-limit:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service

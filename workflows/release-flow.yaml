@@ -5,7 +5,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: release-flow
-  version: 0.0.5
+  version: 0.0.6
   title: Release a branch of a program as a pre-release and bring it into the catalog
 do:
   - lift:
@@ -13,7 +13,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: lift
-          version: 0.0.5
+          version: 0.0.6
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -21,7 +21,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sub-workflow lift.yaml with --commit; red here stops the flow before any review.
   - gates:
-      call: gates:0.0.5@fs
+      call: gates:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -29,7 +29,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh on a fresh clone, the one definition of the checks.
   - review-request:
-      call: review-request:0.0.5@fs
+      call: review-request:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -49,7 +49,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reviews the head and writes the approval file; a new head makes a JA invalid.
   - tag:
-      call: tag:0.0.5@fs
+      call: tag:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -57,7 +57,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Annotated tag v<version> on the approved head, locally.
   - push:
-      call: push:0.0.5@fs
+      call: push:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -77,7 +77,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: CI of the pushed branch release-<version> must be green for exactly this head; red stops the flow.
   - main-ff:
-      call: merge-ff:0.0.5@fs
+      call: merge-ff:0.0.6@fs
       with:
         into: main
       metadata:
@@ -99,7 +99,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release).
   - bump:
-      call: bump:0.0.5@fs
+      call: bump:0.0.6@fs
       with:
         workflow: bump.yml
         repo: FreeSynergy/fs-catalog

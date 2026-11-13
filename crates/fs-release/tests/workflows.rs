@@ -201,7 +201,7 @@ fn mutation_duplicate_step_name_is_red() {
 #[test]
 fn mutation_missing_document_version_is_red() {
     assert_red("release-flow", "document.version", |t| {
-        t.replacen("  version: 0.0.5\n", "", 1)
+        t.replacen("  version: 0.0.6\n", "", 1)
     });
 }
 
@@ -229,6 +229,6 @@ fn mutation_wrong_dsl_and_empty_do_are_red() {
 #[test]
 fn a_step_without_a_task_type_is_red() {
     assert_red("lift", "no task type", |t| {
-        t.replacen("      call: deps:0.0.5@fs\n", "", 1)
+        t.replacen("      call: deps:0.0.6@fs\n", "", 1)
     });
 }

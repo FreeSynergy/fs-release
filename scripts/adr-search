@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Search the decisions (ADRs) and the todo list of fs-documentation for terms, before a question goes to the user.
+
+usage: python3 -I adr-search [--repo DIR] [--ref REF] <term>...
+defaults: --repo /srv/FreeSynergy/fs-documentation, --ref origin/main (the published state, not a working copy).
+
+Runs `git grep -i -n -F` for any of the terms in `conventions/decisions` and `todo` of that ref and prints one line per hit:
+`ADR <number> <file>:<line>: <text>` for a decision (number = leading digits of the file name) and `todo <file>:<line>: <text>`
+for the todo list. exit 0 with the hits or with `no hits`, 1 when the repo or the ref is unusable, 2 without a term.
+"""
+import re
+import subprocess
+import sys
+
+REPO = "/srv/FreeSynergy/fs-documentation"
+REF = "origin/main"
+PATHS = ("conventions/decisions", "todo")
+
+
+def search(repo, ref, terms):
+    """The hit lines as printed; raises RuntimeError when git cannot search (no repo, unknown ref)."""
+    cmd = ["git", "-C", repo, "grep", "-i", "-n", "-F"]
+    for term in terms:
+        cmd += ["-e", term]
+    out = subprocess.run(cmd + [ref, "--", *PATHS], capture_output=True, text=True, check=False)
+    if out.returncode not in (0, 1):
+        raise RuntimeError(out.stderr.strip() or f"git grep failed ({out.returncode})")
+    hits = []
+    for line in out.stdout.splitlines():
+        path, number, text = line.removeprefix(ref + ":").split(":", 2)
+        name = path.rsplit("/", 1)[-1]
+        adr = re.match(r"(\d+)-", name) if path.startswith("conventions/decisions/") else None
+        kind = f"ADR {adr.group(1)}" if adr else "todo"
+        hits.append(f"{kind} {path}:{number}: {text.strip()}")
+    return hits
+
+
+def main(argv):
+    repo, ref, terms = REPO, REF, []
+    args = iter(argv[1:])
+    for a in args:
+        if a == "--repo":
+            repo = next(args, repo)
+        elif a == "--ref":
+            ref = next(args, ref)
+        else:
+            terms.append(a)
+    if not terms:
+        print("usage: adr-search [--repo DIR] [--ref REF] <term>...")
+        return 2
+    try:
+        hits = search(repo, ref, terms)
+    except (RuntimeError, OSError) as e:
+        print(f"adr-search: {e}")
+        return 1
+    print("\n".join(hits) if hits else "no hits")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

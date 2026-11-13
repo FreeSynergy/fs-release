@@ -4,7 +4,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: bugfix
-  version: 0.0.5
+  version: 0.0.6
   title: From a user finding to a fixed and released bug
 do:
   - finding:
@@ -17,7 +17,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user's finding (what was done, what was expected, what happened) is taken as it is.
   - reproduce:
-      call: build-ai:0.0.5@fs
+      call: build-ai:0.0.6@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -30,7 +30,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent writes a test that fails for exactly this bug (red); repeat until it is red for the right reason. Commands one at a time ([BASH]), local commits ([COMMIT]).
   - fix:
-      call: build-ai:0.0.5@fs
+      call: build-ai:0.0.6@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -44,19 +44,34 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent changes the code in its own worktree and commits locally ([COMMIT]); no push, no tag; the report follows [BERICHT] (finding, cause, fix, gates).
   - green:
-      call: gates:0.0.5@fs
+      call: gates:0.0.6@fs
+      export:
+        as: '${ $context + { gates: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: scripts/gates.sh ([GATES]); the new test and all others are green, red goes back to fix (a LLM only on red).
+        freesynergy.net:summary: scripts/gates.sh ([GATES]); the new test and all others must be green; the result is `red` or not (an LLM only on red).
+  - red-back:
+      switch:
+        - red:
+            when: '${ $context.gates.red }'
+            then: fix
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - red gates go back to fix, green ones go on to the release.
   - release:
       run:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.5
+          version: 0.0.6
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
