@@ -2,13 +2,10 @@
 //! the code, and mutations (broken YAML, missing actor, duplicate name, ...) that must turn the check red.
 
 mod support;
-
+use fs_release::lift::{self, LiftOpts};
 use std::fs;
 use std::path::{Path, PathBuf};
-
-use fs_release::lift::{self, LiftOpts};
 use support::{have_yaml, python};
-
 const FILES: [&str; 23] = [
     "adr-write",
     "agent-run",
@@ -118,16 +115,29 @@ fn every_catalog_call_and_the_chain_file_carry_the_crate_version() {
         }
     }
     let chain = fs::read_to_string(root().join("chains/release.chain.yaml")).unwrap();
-    assert!(chain.contains(&format!("\nversion: {version}\n")), "chain version");
-    assert!(chain.contains(&format!("\ncatalog: fs/{version}\n")), "chain catalog");
+    assert!(
+        chain.contains(&format!("\nversion: {version}\n")),
+        "chain version"
+    );
+    assert!(
+        chain.contains(&format!("\ncatalog: fs/{version}\n")),
+        "chain catalog"
+    );
 }
 
 #[test]
 fn nobody_pushes_or_merges_as_an_agent_and_the_coordinator_is_the_person() {
     for f in FILES {
-        assert!(!read(f).contains("gate: coordinator"), "{f}.yaml: the coordinator is `gate: human`");
+        assert!(
+            !read(f).contains("gate: coordinator"),
+            "{f}.yaml: the coordinator is `gate: human`"
+        );
     }
-    for (file, step) in [("publish-doc", "push"), ("adr-write", "push"), ("workflow-pflege", "to-main")] {
+    for (file, step) in [
+        ("publish-doc", "push"),
+        ("adr-write", "push"),
+        ("workflow-pflege", "to-main"),
+    ] {
         let text = read(file);
         let body = text.split(&format!("  - {step}:")).nth(1).unwrap();
         let body = body.split("\n  - ").next().unwrap();
@@ -144,10 +154,16 @@ fn the_cost_figures_are_a_script_and_the_agent_only_explains_a_deviation() {
     for step in ["compare", "unknown", "correction", "limit"] {
         let body = text.split(&format!("  - {step}:")).nth(1).unwrap();
         let body = body.split("\n  - ").next().unwrap();
-        assert!(body.contains("actor: machine"), "cost-reconcile step {step} is a script");
+        assert!(
+            body.contains("actor: machine"),
+            "cost-reconcile step {step} is a script"
+        );
     }
     let body = text.split("  - explain:").nth(1).unwrap();
-    assert!(body.contains("actor: ai") && body.contains("if: "), "the agent only on a deviation");
+    assert!(
+        body.contains("actor: ai") && body.contains("if: "),
+        "the agent only on a deviation"
+    );
 }
 
 #[test]
