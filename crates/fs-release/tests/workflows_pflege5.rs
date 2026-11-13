@@ -6,17 +6,26 @@ mod support;
 use support::workflows::{read, step_body, step_names, FILES};
 
 fn position(text: &str, step: &str) -> usize {
-    step_names(text).iter().position(|n| n == step).unwrap_or_else(|| panic!("no step {step}"))
+    step_names(text)
+        .iter()
+        .position(|n| n == step)
+        .unwrap_or_else(|| panic!("no step {step}"))
 }
 
 /// The one Opus review of a head sits in `release-flow`: no own `review` step, and the release step runs that flow.
 fn single_review(text: &str) -> bool {
-    !step_names(text).contains(&"review".to_string()) && step_body(text, "release").contains("name: release-flow")
+    !step_names(text).contains(&"review".to_string())
+        && step_body(text, "release").contains("name: release-flow")
 }
 
 #[test]
 fn flows_that_release_have_no_second_review() {
-    for f in ["frontend-umbau", "wrapper-einbindung", "bugfix", "frontend-round"] {
+    for f in [
+        "frontend-umbau",
+        "wrapper-einbindung",
+        "bugfix",
+        "frontend-round",
+    ] {
         assert!(single_review(&read(f)), "{f}");
     }
 }
@@ -24,7 +33,11 @@ fn flows_that_release_have_no_second_review() {
 #[test]
 fn counter_an_own_review_step_before_the_release_is_caught() {
     let text = read("frontend-umbau");
-    let doubled = text.replacen("  - release:", "  - review:\n      call: review-ai:0.0.5@fs\n  - release:", 1);
+    let doubled = text.replacen(
+        "  - release:",
+        "  - review:\n      call: review-ai:0.0.5@fs\n  - release:",
+        1,
+    );
     assert_ne!(doubled, text);
     assert!(!single_review(&doubled));
 }
@@ -36,7 +49,10 @@ fn data_flow_resolvable(text: &str) -> bool {
         return false;
     }
     text.split("$context.").skip(1).all(|r| {
-        let key: String = r.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+        let key: String = r
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
         text.contains(&format!("{{ {key}: . }}"))
     })
 }
@@ -52,8 +68,12 @@ fn task_outputs_are_exported_before_they_are_read() {
 #[test]
 fn counter_a_read_without_export_is_caught() {
     let text = read("frontend-umbau");
-    assert!(!data_flow_resolvable(&text.replace("{ assign: . }", "{ other: . }")));
-    assert!(!data_flow_resolvable(&text.replace("$context.count", ".count")));
+    assert!(!data_flow_resolvable(
+        &text.replace("{ assign: . }", "{ other: . }")
+    ));
+    assert!(!data_flow_resolvable(
+        &text.replace("$context.count", ".count")
+    ));
 }
 
 #[test]
@@ -65,14 +85,21 @@ fn the_loops_back_are_switch_with_then() {
     ] {
         let body = step_body(&read(f), step);
         assert!(body.contains("switch:") && body.contains(target), "{f}");
-        assert!(body.contains("actor: machine"), "{f}: the loop decision is a script");
+        assert!(
+            body.contains("actor: machine"),
+            "{f}: the loop decision is a script"
+        );
     }
 }
 
 #[test]
 fn counter_a_loop_to_a_missing_step_is_red() {
-    support::workflows::assert_red("frontend-umbau", "no step of this flow", |t| t.replacen("then: convert", "then: nowhere", 1));
-    support::workflows::assert_red("upstream-anfrage", "no step of this flow", |t| t.replacen("then: draft", "then: drfat", 1));
+    support::workflows::assert_red("frontend-umbau", "no step of this flow", |t| {
+        t.replacen("then: convert", "then: nowhere", 1)
+    });
+    support::workflows::assert_red("upstream-anfrage", "no step of this flow", |t| {
+        t.replacen("then: draft", "then: drfat", 1)
+    });
 }
 
 /// The person chooses the channel after the approval and before the send; the send runs for the other channels only.
@@ -90,7 +117,13 @@ fn upstream_anfrage_has_the_channel_choice_before_the_send() {
     let text = read("upstream-anfrage");
     assert!(channel_before_send(&text));
     let choose = step_body(&text, "choose-channel");
-    for word in ["tracker", "git-bug", "direct", "write access", "the user writes it themselves"] {
+    for word in [
+        "tracker",
+        "git-bug",
+        "direct",
+        "write access",
+        "the user writes it themselves",
+    ] {
         assert!(choose.contains(word), "{word}");
     }
     let hand = step_body(&text, "hand-text");
@@ -143,17 +176,29 @@ fn counter_a_license_compare_by_the_agent_is_caught() {
 fn frontend_umbau_names_the_adr_file() {
     let name = "conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md";
     assert!(read("frontend-umbau").contains(name));
-    assert!(!read("frontend-umbau").replace(name, "").contains("0074-stil"));
+    assert!(!read("frontend-umbau")
+        .replace(name, "")
+        .contains("0074-stil"));
 }
 
 /// The compact order: the flow names the template and the `rules.md` blocks instead of the agent order repeating them.
 fn compact_order(text: &str) -> bool {
-    text.contains("docs/prompt-template.md") && ["[GATES]", "[BERICHT]", "[COMMIT]", "[REVIEW]"].iter().any(|b| text.contains(b))
+    text.contains("docs/prompt-template.md")
+        && ["[GATES]", "[BERICHT]", "[COMMIT]", "[REVIEW]"]
+            .iter()
+            .any(|b| text.contains(b))
 }
 
 #[test]
 fn the_flows_for_agents_name_the_template_and_the_rules_blocks() {
-    for f in ["agent-run", "bugfix", "review", "frontend-round", "frontend-umbau", "dossier"] {
+    for f in [
+        "agent-run",
+        "bugfix",
+        "review",
+        "frontend-round",
+        "frontend-umbau",
+        "dossier",
+    ] {
         assert!(compact_order(&read(f)), "{f}");
     }
 }
@@ -162,6 +207,10 @@ fn the_flows_for_agents_name_the_template_and_the_rules_blocks() {
 fn counter_without_the_template_or_the_blocks_is_caught() {
     let text = read("review");
     assert!(!compact_order(&text.replace("docs/prompt-template.md", "")));
-    let bare = text.replace("[GATES]", "").replace("[BERICHT]", "").replace("[COMMIT]", "").replace("[REVIEW]", "");
+    let bare = text
+        .replace("[GATES]", "")
+        .replace("[BERICHT]", "")
+        .replace("[COMMIT]", "")
+        .replace("[REVIEW]", "");
     assert!(!compact_order(&bare));
 }

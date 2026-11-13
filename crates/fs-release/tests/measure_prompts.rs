@@ -7,7 +7,8 @@ use std::path::Path;
 
 use support::{python, workflows::root};
 
-const COSTS: &str = "| Datum | Aufgabe | Modell | USD | Tokens | Ergebnis |\n|---|---|---|---|---|---|\n\
+const COSTS: &str =
+    "| Datum | Aufgabe | Modell | USD | Tokens | Ergebnis |\n|---|---|---|---|---|---|\n\
 | 2026-11-12 | wiki-008 | sonnet | 0.20 | 1000 | success: a |\n\
 | 2026-11-12 | wiki-009 | sonnet | 0.40 | 3000 | success: b |\n\
 | 2026-11-12 | wiki-fix | sonnet | 0.50 | 500 | success: c |\n\
@@ -35,7 +36,12 @@ fn sample() -> (tempfile::TempDir, tempfile::TempDir) {
 fn run(prompts: &Path, costs: &Path) -> (i32, String) {
     python(
         &root().join("scripts/measure-prompts.py"),
-        &[Path::new("--prompts"), prompts, Path::new("--costs"), &costs.join("kosten.md")],
+        &[
+            Path::new("--prompts"),
+            prompts,
+            Path::new("--costs"),
+            &costs.join("kosten.md"),
+        ],
     )
 }
 
@@ -44,10 +50,22 @@ fn the_table_has_mean_size_and_cost_per_kind() {
     let (prompts, costs) = sample();
     let (code, out) = run(prompts.path(), costs.path());
     assert_eq!(code, 0, "{out}");
-    assert!(out.contains("| build | 2 | 2000 | 2 | 0.3000 | 2000 |"), "{out}");
-    assert!(out.contains("| fix | 1 | 500 | 1 | 0.5000 | 500 |"), "{out}");
-    assert!(out.contains("| rev | 1 | 2000 | 1 | 1.0000 | 2000 |"), "{out}");
-    assert!(out.contains("| dossier | 1 | 700 | 1 | 0.1000 | 400 |"), "{out}");
+    assert!(
+        out.contains("| build | 2 | 2000 | 2 | 0.3000 | 2000 |"),
+        "{out}"
+    );
+    assert!(
+        out.contains("| fix | 1 | 500 | 1 | 0.5000 | 500 |"),
+        "{out}"
+    );
+    assert!(
+        out.contains("| rev | 1 | 2000 | 1 | 1.0000 | 2000 |"),
+        "{out}"
+    );
+    assert!(
+        out.contains("| dossier | 1 | 700 | 1 | 0.1000 | 400 |"),
+        "{out}"
+    );
 }
 
 #[test]
@@ -55,7 +73,10 @@ fn counter_aborted_run_and_foreign_prompt_do_not_count() {
     let (prompts, costs) = sample();
     let (_, out) = run(prompts.path(), costs.path());
     assert!(!out.contains("9999"), "research-x.txt is not a kind: {out}");
-    assert!(!out.contains("| build | 2 | 2000 | 3 |"), "the run without a figure was counted: {out}");
+    assert!(
+        !out.contains("| build | 2 | 2000 | 3 |"),
+        "the run without a figure was counted: {out}"
+    );
 }
 
 #[test]
