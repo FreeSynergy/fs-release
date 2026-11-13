@@ -9,8 +9,8 @@ do:
   - cost-log:
       call: read-cost-log:0.0.3@fs
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Reads the cost log; the state changes to read, whatever it says.

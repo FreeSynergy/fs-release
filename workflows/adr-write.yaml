@@ -51,8 +51,8 @@ do:
           name: publish-doc
           version: 0.0.3
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
-        freesynergy.net:gate: coordinator
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Rebase, generator and fast-forward push (publish-doc.yaml).
+        freesynergy.net:summary: The coordinator pushes - rebase, generator and fast-forward push (publish-doc.yaml); the agent never does.

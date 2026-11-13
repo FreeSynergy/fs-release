@@ -8,7 +8,7 @@ document:
   title: Remove the throw-away build targets of finished runs
 do:
   - dry-run:
-      call: cleanup-targets:0.1.0@fs
+      call: cleanup-targets:0.0.3@fs
       with:
         mode: dry-run
       metadata:
@@ -18,12 +18,12 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Lists what would be deleted, deletes nothing.
   - apply:
-      call: cleanup-targets:0.1.0@fs
+      call: cleanup-targets:0.0.3@fs
       with:
         mode: apply
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
-        freesynergy.net:gate: coordinator
+        freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: Deletes the listed targets (APPLY); the coordinator looked at the dry run first.

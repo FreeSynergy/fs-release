@@ -104,6 +104,53 @@ fn the_list_equals_the_files_in_the_folder_and_all_carry_the_crate_version() {
 }
 
 #[test]
+fn every_catalog_call_and_the_chain_file_carry_the_crate_version() {
+    let version = env!("CARGO_PKG_VERSION");
+    for f in FILES {
+        for line in read(f).lines() {
+            if let Some((_, call)) = line.trim().split_once("call: ") {
+                let call = call.trim();
+                assert!(
+                    call.ends_with(&format!(":{version}@fs")),
+                    "{f}.yaml: catalog call {call:?} is not at {version}"
+                );
+            }
+        }
+    }
+    let chain = fs::read_to_string(root().join("chains/release.chain.yaml")).unwrap();
+    assert!(chain.contains(&format!("\nversion: {version}\n")), "chain version");
+    assert!(chain.contains(&format!("\ncatalog: fs/{version}\n")), "chain catalog");
+}
+
+#[test]
+fn nobody_pushes_or_merges_as_an_agent_and_the_coordinator_is_the_person() {
+    for f in FILES {
+        assert!(!read(f).contains("gate: coordinator"), "{f}.yaml: the coordinator is `gate: human`");
+    }
+    for (file, step) in [("publish-doc", "push"), ("adr-write", "push"), ("workflow-pflege", "to-main")] {
+        let text = read(file);
+        let body = text.split(&format!("  - {step}:")).nth(1).unwrap();
+        let body = body.split("\n  - ").next().unwrap();
+        assert!(
+            body.contains("actor: human") && body.contains("gate: human"),
+            "{file}.yaml step {step}: push and merge are the person's"
+        );
+    }
+}
+
+#[test]
+fn the_cost_figures_are_a_script_and_the_agent_only_explains_a_deviation() {
+    let text = read("cost-reconcile");
+    for step in ["compare", "unknown", "correction", "limit"] {
+        let body = text.split(&format!("  - {step}:")).nth(1).unwrap();
+        let body = body.split("\n  - ").next().unwrap();
+        assert!(body.contains("actor: machine"), "cost-reconcile step {step} is a script");
+    }
+    let body = text.split("  - explain:").nth(1).unwrap();
+    assert!(body.contains("actor: ai") && body.contains("if: "), "the agent only on a deviation");
+}
+
+#[test]
 fn picture_acceptance_keeps_the_user_verdict_human_and_subjective() {
     let text = read("picture-acceptance");
     let step = text.split("  - user-verdict:").nth(1).unwrap();
@@ -232,6 +279,6 @@ fn mutation_wrong_dsl_and_empty_do_are_red() {
 #[test]
 fn a_step_without_a_task_type_is_red() {
     assert_red("lift", "no task type", |t| {
-        t.replacen("      call: deps:0.1.0@fs\n", "", 1)
+        t.replacen("      call: deps:0.0.3@fs\n", "", 1)
     });
 }

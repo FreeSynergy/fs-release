@@ -37,8 +37,8 @@ do:
       with:
         branch: main
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
-        freesynergy.net:gate: coordinator
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Fast-forward push to main through the worktree, never forced; a push that is not a fast-forward goes back to rebase.
+        freesynergy.net:summary: The coordinator pushes fast-forward to main through the worktree, never forced; a push that is not a fast-forward goes back to rebase; the agent never does.

@@ -1,4 +1,4 @@
-# One round on a Frontend: dossier, gap list, images, build, acceptance by clicking through the working flows, release.
+# One round on a Frontend: dossier, gap list, images, the user's verdict, build, acceptance by clicking through the working flows, release.
 # Agents never push, tag or merge. FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -16,11 +16,11 @@ do:
         input:
           frontend: ${ .input.frontend }
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
-        freesynergy.net:gate: none
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The research dossier of the Frontend exists and passes check-docs (sub-workflow dossier.yaml); repeat until it does.
+        freesynergy.net:summary: The research dossier of the Frontend exists and passes check-docs (sub-workflow dossier.yaml, research by the agent, check-docs by the machine); repeat until it does. The sub-workflow ends with the human publish into the docs main branch, so the step carries that gate.
   - gap-list:
       call: gap-list:0.0.3@fs
       with:
@@ -42,6 +42,21 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Renders the images of the gap list (old and new state) and shows them; whatever they look like, the state changes to shown.
+  - picture-verdict:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: picture-acceptance
+          version: 0.0.3
+        input:
+          model: ${ .input.model }
+          ours: ${ .images }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The user's verdict on the images (picture-acceptance.yaml) is taken as it is; not accepted goes back to build with the user's words as the order.
   - build:
       call: build-ai:0.0.3@fs
       with:
@@ -65,25 +80,20 @@ do:
       with:
         file: ${ .input.dossier }/acceptance.md
       metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script - reads acceptance.md of the dossier and clicks through every working flow listed there in the running Frontend (virtual session); a flow that fails goes back to build.
+  - acceptance-red:
+      call: explain-red:0.0.3@fs
+      if: ${ .acceptance.red }
+      metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Clicks through every working flow listed in acceptance.md of the dossier in the running Frontend (virtual session); a flow that fails goes back to build.
-  - review:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: review
-          version: 0.0.3
-        input:
-          head: ${ .input.branch }
-      metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
-        freesynergy.net:gate: opus-ja
-        freesynergy.net:kind: subjective
-        freesynergy.net:summary: Opus reviews exactly this head (sub-workflow review.yaml); a JA is bound to this head.
+        freesynergy.net:summary: Only when a flow failed - the agent finds the cause and writes the order for build; the script decides green or red, not the agent.
   - release:
       run:
         workflow:
@@ -95,4 +105,4 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: After Opus JA and green CI the human or the coordinator merges and releases (release-flow.yaml); agents never do.
+        freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge.

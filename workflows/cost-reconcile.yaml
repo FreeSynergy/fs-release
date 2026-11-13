@@ -11,32 +11,41 @@ do:
       with:
         console: ${ .input.console }
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Log sum against the console figure the user named; the difference is computed, not guessed.
+        freesynergy.net:summary: Script - log sum against the console figure the user named; the difference is computed, not guessed.
   - unknown:
       call: mark-unknown:0.0.3@fs
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Aborted runs without a cost figure are marked cost UNKNOWN, never as zero.
+        freesynergy.net:summary: Script - aborted runs without a cost figure are marked cost UNKNOWN, never as zero.
   - correction:
       call: cost-correction:0.0.3@fs
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Appends one correction line with the difference to the log; existing lines are never changed.
-  - limit:
-      call: cost-limit:0.0.3@fs
+        freesynergy.net:summary: Script - appends one correction line with the difference to the log; existing lines are never changed.
+  - explain:
+      call: explain-deviation:0.0.3@fs
+      if: ${ .compare.deviates }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
-        freesynergy.net:gate: coordinator
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Only when the log deviates from the console - the agent looks for the cause (runs without a figure, a wrong rate) and reports it; the corrected figures stay as the script wrote them.
+  - limit:
+      call: cost-limit:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Checks the corrected sum against the limit; over the limit halts new runs until the coordinator decides.
+        freesynergy.net:summary: Script - checks the corrected sum against the limit; over the limit halts new runs until the coordinator decides.

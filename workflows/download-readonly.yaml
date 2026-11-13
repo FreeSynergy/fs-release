@@ -24,7 +24,7 @@ do:
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
-        freesynergy.net:gate: coordinator
+        freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: The coordinator downloads into an own new empty folder under .scratch/downloads/.
   - hash:

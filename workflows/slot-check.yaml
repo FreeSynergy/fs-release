@@ -25,8 +25,8 @@ do:
   - log:
       call: read-slots-log:0.0.3@fs
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Reads slots-watch.log for memory and slot history; memory figures come from the log, not from a guess.
@@ -35,6 +35,6 @@ do:
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
-        freesynergy.net:gate: coordinator
+        freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: Ends orphans only when their working directory is a test folder; anything else is reported and left alone.

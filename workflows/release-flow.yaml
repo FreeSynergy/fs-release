@@ -21,7 +21,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sub-workflow lift.yaml with --commit; red here stops the flow before any review.
   - gates:
-      call: gates:0.1.0@fs
+      call: gates:0.0.3@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -29,7 +29,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh on a fresh clone, the one definition of the checks.
   - review-request:
-      call: review-request:0.1.0@fs
+      call: review-request:0.0.3@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -49,7 +49,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reviews the head and writes the approval file; a new head makes a JA invalid.
   - tag:
-      call: tag:0.1.0@fs
+      call: tag:0.0.3@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -57,7 +57,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Annotated tag v<version> on the approved head, locally.
   - push:
-      call: push:0.1.0@fs
+      call: push:0.0.3@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -99,7 +99,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release).
   - bump:
-      call: bump:0.1.0@fs
+      call: bump:0.0.3@fs
       with:
         workflow: bump.yml
         repo: FreeSynergy/fs-catalog

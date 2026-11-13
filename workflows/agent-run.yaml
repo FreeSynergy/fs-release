@@ -17,7 +17,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The order (task text, base commit, branch name unreviewed/<task>) comes from the coordinator or the user.
   - worktree:
-      call: worktree:0.1.0@fs
+      call: worktree:0.0.3@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -25,7 +25,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Creates the agent's own git worktree on the branch; the agent works only there.
   - build:
-      call: build-ai:0.1.0@fs
+      call: build-ai:0.0.3@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -33,7 +33,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent changes code and tests, commits locally; no push, no tag, no release.
   - fmt:
-      call: fmt:0.1.0@fs
+      call: fmt:0.0.3@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -41,7 +41,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: cargo fmt by the coordinator's machine step, not by the agent.
   - review:
-      call: review-ai:0.1.0@fs
+      call: review-ai:0.0.3@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -49,7 +49,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reads the diff; a JA is bound to exactly this head, NEIN comes with findings.
   - cleanup:
-      call: remove-build-dir:0.1.0@fs
+      call: remove-build-dir:0.0.3@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -58,7 +58,7 @@ do:
         freesynergy.net:summary: The run removes its own throw-away build folder (target/) at the end, success or not.
         freesynergy.net:may-fail: a folder that is already gone is fine
   - publish:
-      call: publish:0.1.0@fs
+      call: publish:0.0.3@fs
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

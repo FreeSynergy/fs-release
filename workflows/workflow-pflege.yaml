@@ -58,7 +58,7 @@ do:
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
-        freesynergy.net:gate: coordinator
+        freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: The coordinator brings the checked flow into main; the agent never does.
   - run-step:

@@ -184,8 +184,12 @@ chain's `tag` step, not again by `bump` (`gh release view` has no machine-readab
 catalog's `sign` and `test` runs follow there and are not polled by this step. Tests use a mock `gh`, no real call. A flow at
 `--reach shared` now ends with HALT `reach-limit` at `bump` after the push (before: DONE).
 `workflows/` holds the visible workflows (Serverless Workflow 1.0 YAML, FS profile, draft `ENTWURF-workflow-standard.md` v3):
-`release-flow`, `lift`, `catalog-bump`, `cleanup-targets`, `agent-run`; every step has `freesynergy.net:actor` (human / ai /
-machine) and `freesynergy.net:gate`. They are checked by `scripts/check_workflows.py` (in `gates.sh` and in
+23 flows, listed with their purpose in `workflows/README.md` (release and build: `release-flow`, `lift`, `catalog-bump`,
+`cleanup-targets`, `agent-run`, `bugfix`, `review`; Frontend: `frontend-round`, `dossier`, `icon-round`, `picture-acceptance`;
+coordinator and strategy flows); every step has `freesynergy.net:actor` (human / ai / machine), `freesynergy.net:actor-type`,
+`freesynergy.net:gate` and `freesynergy.net:kind` (objective / subjective). The coordinator acts as the person: push, tag and
+merge steps are `actor: human` with `gate: human` (or the release-flow gates `opus-ja` / `preapproved-list`), never `ai`; a
+step that only computes or reads is `machine`, `ai` only where judgment is needed. They are checked by `scripts/check_workflows.py` (in `gates.sh` and in
 `crates/fs-release/tests/workflows.rs`, which also compares the step names of `lift` and `flow` with the code). A second step
 will let `fs-release flow` read them. The evaluation of the exit codes of `check_yaml.py` and `check_workflows.py` sits in
 `scripts/gates-files.sh` (called by `gates.sh`) and is tested alone (`tests/gates_files.rs`: broken file → exit 1 and the
@@ -193,4 +197,4 @@ name of the failed check). Limit: `gates.sh` as a whole (fmt, clippy, test) is n
 path of `gates-files.sh` is not run there.
 
 ### Changes
-- 0.2.0: `yaml-check` in lift and gates; `bump` in the flow; `workflows/` with the schema check. (No CHANGELOG file exists in this repo.)
+- 0.2.0: `yaml-check` in lift and gates; `bump` in the flow; `workflows/` with the schema check. (Later changes: see `CHANGELOG.md`.)
