@@ -49,7 +49,13 @@ impl Preapproved {
         let _ = git::raw(
             ctx,
             dir,
-            &["fetch", "--quiet", "--end-of-options", "origin", LIST_BRANCH],
+            &[
+                "fetch",
+                "--quiet",
+                "--end-of-options",
+                "origin",
+                LIST_BRANCH,
+            ],
         )?;
         let spec = format!("refs/remotes/origin/{LIST_BRANCH}:.fs/preapproved.toml");
         let o = git::raw(ctx, dir, &["show", &spec])?;

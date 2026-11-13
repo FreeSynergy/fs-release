@@ -68,5 +68,8 @@ fn a_broken_file_in_workflows_is_red_at_the_schema_check() {
     fs::write(tmp.path().join("workflows/x.yaml"), BAD).unwrap();
     let (code, err) = run(tmp.path());
     assert_eq!(code, 1, "{err}");
-    assert!(err.contains("gates FAILED: workflows/ schema check"), "{err}");
+    assert!(
+        err.contains("gates FAILED: workflows/ schema check"),
+        "{err}"
+    );
 }

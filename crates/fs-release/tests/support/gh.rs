@@ -52,8 +52,10 @@ impl Runner for MockGh {
         };
         if line.starts_with("release view") {
             return match self.release {
-                Some(draft) => ok(&format!("{{\"isDraft\":{draft},\"isPrerelease\":{}}}",
-                    !self.full)),
+                Some(draft) => ok(&format!(
+                    "{{\"isDraft\":{draft},\"isPrerelease\":{}}}",
+                    !self.full
+                )),
                 None => Ok(Out {
                     code: 1,
                     stdout: String::new(),
