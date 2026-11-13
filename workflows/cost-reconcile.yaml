@@ -1,0 +1,42 @@
+# The cost log against the console of the provider. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: cost-reconcile
+  version: 0.0.3
+  title: Compare the cost log with the console, write the correction, check the limit
+do:
+  - compare:
+      call: cost-compare:0.0.3@fs
+      with:
+        console: ${ .input.console }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Log sum against the console figure the user named; the difference is computed, not guessed.
+  - unknown:
+      call: mark-unknown:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Aborted runs without a cost figure are marked cost UNKNOWN, never as zero.
+  - correction:
+      call: cost-correction:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Appends one correction line with the difference to the log; existing lines are never changed.
+  - limit:
+      call: cost-limit:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: coordinator
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Checks the corrected sum against the limit; over the limit halts new runs until the coordinator decides.

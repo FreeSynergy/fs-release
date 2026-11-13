@@ -1,0 +1,46 @@
+# A change of the strategy session: the new session takes over without loss. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: restart-handoff
+  version: 0.0.3
+  title: A new strategy session takes over from the handoff
+do:
+  - read-handoff:
+      call: read-file:0.0.3@fs
+      with:
+        file: todo/handoff-strategy.md
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Reads the handoff file; the state changes to read.
+  - read-memory:
+      call: read-memory:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Reads the memory index and the files it names; a note that names a file or a flag is checked before it is used.
+  - inform:
+      call: inform-coordinator:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Tells the coordinator that the new session is there and from which handoff it works.
+  - take-over:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: coordination-round
+          version: 0.0.3
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Takes over the running runs - one round of coordination-round.yaml shows what runs and what is finished.

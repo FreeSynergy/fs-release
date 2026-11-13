@@ -5,7 +5,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: release-flow
-  version: 0.0.2
+  version: 0.0.3
   title: Release a branch of a program as a pre-release and bring it into the catalog
 do:
   - lift:
@@ -13,7 +13,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: lift
-          version: 0.0.2
+          version: 0.0.3
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -64,6 +64,28 @@ do:
         freesynergy.net:gate: preapproved-list
         freesynergy.net:kind: objective
         freesynergy.net:summary: Branch (reach shared) and tag (reach public), never forced; the repo must be on the pre-approved list.
+  - ci:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.ci.green
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: CI of the pushed branch release-<version> must be green for exactly this head; red stops the flow.
+  - main-ff:
+      call: merge-ff:0.0.3@fs
+      with:
+        into: main
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The human or the coordinator fast-forwards main to the green, approved head (no merge commit, never forced); agents never do.
   - release:
       listen:
         to:

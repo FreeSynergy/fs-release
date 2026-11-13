@@ -4,7 +4,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: agent-run
-  version: 0.0.2
+  version: 0.0.3
   title: An agent builds a change in its own worktree, Opus reviews it, a human publishes it
 do:
   - order:

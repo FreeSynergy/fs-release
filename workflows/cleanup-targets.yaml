@@ -4,7 +4,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: cleanup-targets
-  version: 0.0.2
+  version: 0.0.3
   title: Remove the throw-away build targets of finished runs
 do:
   - dry-run:

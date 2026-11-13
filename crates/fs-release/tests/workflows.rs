@@ -9,17 +9,30 @@ use std::path::{Path, PathBuf};
 use fs_release::lift::{self, LiftOpts};
 use support::{have_yaml, python};
 
-const FILES: [&str; 10] = [
+const FILES: [&str; 23] = [
+    "adr-write",
     "agent-run",
     "bugfix",
     "catalog-bump",
     "cleanup-targets",
+    "coordination-round",
+    "cost-reconcile",
     "dossier",
+    "download-readonly",
     "frontend-round",
+    "handoff-update",
     "icon-round",
     "lift",
+    "picture-acceptance",
+    "publish-doc",
     "release-flow",
+    "report-to-strategy",
+    "restart-handoff",
     "review",
+    "slot-check",
+    "user-decision",
+    "wip-continue",
+    "workflow-pflege",
 ];
 
 fn root() -> PathBuf {
@@ -71,6 +84,31 @@ fn the_real_files_pass_the_schema_check() {
     }
     let (code, out) = python(&script(), &[&root().join("workflows")]);
     assert_eq!(code, if have_yaml() { 0 } else { 2 }, "{out}");
+}
+
+#[test]
+fn the_list_equals_the_files_in_the_folder_and_all_carry_the_crate_version() {
+    let mut on_disk: Vec<String> = fs::read_dir(root().join("workflows"))
+        .unwrap()
+        .filter_map(|e| {
+            let name = e.unwrap().file_name().into_string().unwrap();
+            name.strip_suffix(".yaml").map(str::to_string)
+        })
+        .collect();
+    on_disk.sort();
+    assert_eq!(on_disk, FILES);
+    let version = format!("  version: {}\n", env!("CARGO_PKG_VERSION"));
+    for f in FILES {
+        assert!(read(f).contains(&version), "{f}.yaml: document.version");
+    }
+}
+
+#[test]
+fn picture_acceptance_keeps_the_user_verdict_human_and_subjective() {
+    let text = read("picture-acceptance");
+    let step = text.split("  - user-verdict:").nth(1).unwrap();
+    let step = step.split("\n  - ").next().unwrap();
+    assert!(step.contains("actor: human") && step.contains("kind: subjective"));
 }
 
 #[test]
@@ -166,7 +204,7 @@ fn mutation_duplicate_step_name_is_red() {
 #[test]
 fn mutation_missing_document_version_is_red() {
     assert_red("release-flow", "document.version", |t| {
-        t.replacen("  version: 0.0.2\n", "", 1)
+        t.replacen("  version: 0.0.3\n", "", 1)
     });
 }
 

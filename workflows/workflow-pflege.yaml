@@ -1,0 +1,73 @@
+# Rule: every work step runs through a workflow. A step without a workflow first gets one (written or extended here).
+# Agents never push, tag or merge; the merge into main is the coordinator's. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: workflow-pflege
+  version: 0.0.3
+  title: A step has no workflow - write or extend the flow, check it, bring it into main, then run the step
+do:
+  - detect:
+      call: find-flow:0.0.3@fs
+      with:
+        step: ${ .input.step }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Looks in workflows/ for a flow with this step; none found means the work may not start, the next step writes it.
+  - write:
+      call: build-ai:0.0.3@fs
+      with:
+        task: write or extend the flow for ${ .input.step } (Serverless Workflow 1.0 plus FS profile, no special forms, importable 1:1 into fs-workflows)
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The agent writes or extends the file in its own worktree and commits locally; kind per step, only steps that really happen.
+  - schema-check:
+      call: check-workflows:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: python3 -I scripts/check_workflows.py workflows; red goes back to write, skipped (no PyYAML) is not green.
+  - glance:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.3
+        input:
+          head: ${ .input.branch }
+          scope: short
+      if: ${ .input.new_gate_or_right }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: A short Opus look, only when the change brings a new gate or a new right; otherwise skipped.
+  - to-main:
+      call: merge-ff:0.0.3@fs
+      with:
+        into: main
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: coordinator
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The coordinator brings the checked flow into main; the agent never does.
+  - run-step:
+      call: run-flow-step:0.0.3@fs
+      with:
+        step: ${ .input.step }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Only now the work step runs, as the order says - Workflow X, step Y, parameters.

@@ -4,7 +4,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: lift
-  version: 0.0.2
+  version: 0.0.3
   title: Lift a program onto new fs-components / fs-interfaces tags
 do:
   - deps:

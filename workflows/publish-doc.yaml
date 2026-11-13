@@ -1,0 +1,44 @@
+# A document (ADR, dossier page) into the docs main branch. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: publish-doc
+  version: 0.0.3
+  title: Check the docs, rebase, generate, fast-forward push through the worktree
+do:
+  - check-docs:
+      call: check-docs:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: check-docs.sh on the changed files; red goes back to the author.
+  - rebase:
+      call: rebase:0.0.3@fs
+      with:
+        onto: origin/main
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Rebases the own worktree branch onto the current origin main, not interactive.
+  - generate:
+      call: docs-generate:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Runs the generator over the docs (index, overview); its output is committed with the change.
+  - push:
+      call: push-ff:0.0.3@fs
+      with:
+        branch: main
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: coordinator
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Fast-forward push to main through the worktree, never forced; a push that is not a fast-forward goes back to rebase.

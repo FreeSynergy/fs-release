@@ -1,0 +1,43 @@
+# Pictures of a Frontend: model (Vorbild) against ours, two verdicts. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: picture-acceptance
+  version: 0.0.3
+  title: Show model and our pictures, take the strategy's and the user's verdict
+do:
+  - pictures:
+      call: show-images:0.0.3@fs
+      with:
+        model: ${ .input.model }
+        ours: ${ .input.ours }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Shows the model (Vorbild) and our picture side by side; whatever they look like, the state changes to shown.
+  - strategy-verdict:
+      call: verdict-ai:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The strategy judges each pair - accepted or what differs; it is an opinion, not a measurement.
+  - user-verdict:
+      call: ask:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The user's verdict is subjective and is taken as it is; nobody argues it down.
+  - next:
+      call: route-verdict:0.0.3@fs
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Accepted goes on to the next step of the round; not accepted goes back to the build with the user's words as the order.

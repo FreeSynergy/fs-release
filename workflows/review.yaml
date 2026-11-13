@@ -4,11 +4,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: review
-  version: 0.0.2
+  version: 0.0.3
   title: Opus reviews one head and writes a report with JA or NEIN
 do:
   - request:
-      call: review-request:0.0.2@fs
+      call: review-request:0.0.3@fs
       with:
         head: ${ .input.head }
       metadata:
@@ -18,7 +18,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Writes the file Opus reads (diff, gate output) for exactly the head ${ .input.head }.
   - read:
-      call: review-ai:0.0.2@fs
+      call: review-ai:0.0.3@fs
       with:
         head: ${ .input.head }
         scope: ${ .input.scope }
@@ -29,7 +29,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Opus only reads; it changes no code and writes only BERICHT.md (findings, what was checked, what is not proven).
   - verdict:
-      call: verdict:0.0.2@fs
+      call: verdict:0.0.3@fs
       with:
         report: BERICHT.md
       metadata:
@@ -39,7 +39,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The report ends with JA or NEIN; a JA names exactly one head and is void for any other, NEIN comes with findings.
   - bind:
-      call: approval:0.0.2@fs
+      call: approval:0.0.3@fs
       with:
         head: ${ .input.head }
       metadata:
