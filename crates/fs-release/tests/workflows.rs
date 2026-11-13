@@ -4,75 +4,9 @@
 mod support;
 use fs_release::lift::{self, LiftOpts};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use support::workflows::{assert_red, read, root, script, step_names, FILES};
 use support::{have_yaml, python};
-const FILES: [&str; 23] = [
-    "adr-write",
-    "agent-run",
-    "bugfix",
-    "catalog-bump",
-    "cleanup-targets",
-    "coordination-round",
-    "cost-reconcile",
-    "dossier",
-    "download-readonly",
-    "frontend-round",
-    "handoff-update",
-    "icon-round",
-    "lift",
-    "picture-acceptance",
-    "publish-doc",
-    "release-flow",
-    "report-to-strategy",
-    "restart-handoff",
-    "review",
-    "slot-check",
-    "user-decision",
-    "wip-continue",
-    "workflow-pflege",
-];
-
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
-fn script() -> PathBuf {
-    root().join("scripts/check_workflows.py")
-}
-
-fn read(name: &str) -> String {
-    fs::read_to_string(root().join("workflows").join(format!("{name}.yaml"))).unwrap()
-}
-
-/// The step names of a file (`  - name:` lines of the `do` list; the files keep that layout).
-fn step_names(text: &str) -> Vec<String> {
-    text.lines()
-        .filter_map(|l| l.strip_prefix("  - ")?.strip_suffix(':'))
-        .map(str::to_string)
-        .collect()
-}
-
-/// A copy of `workflows/` in a temp folder with `file` changed by `edit`; returns exit code and output of the check.
-fn mutated(file: &str, edit: impl Fn(String) -> String) -> (i32, String) {
-    let tmp = tempfile::tempdir().unwrap();
-    for f in FILES {
-        let text = read(f);
-        let text = if f == file { edit(text) } else { text };
-        fs::write(tmp.path().join(format!("{f}.yaml")), text).unwrap();
-    }
-    python(&script(), &[tmp.path()])
-}
-
-/// A mutation must turn the check red and say `needle`; without `PyYAML` the check says `skipped` (exit 2) instead.
-fn assert_red(file: &str, needle: &str, edit: impl Fn(String) -> String) {
-    let (code, out) = mutated(file, edit);
-    if have_yaml() {
-        assert_eq!(code, 1, "{out}");
-        assert!(out.contains(needle), "wanted {needle:?} in:\n{out}");
-    } else {
-        assert_eq!(code, 2, "{out}");
-    }
-}
 
 #[test]
 fn the_real_files_pass_the_schema_check() {
@@ -267,7 +201,7 @@ fn mutation_duplicate_step_name_is_red() {
 #[test]
 fn mutation_missing_document_version_is_red() {
     assert_red("release-flow", "document.version", |t| {
-        t.replacen("  version: 0.0.3\n", "", 1)
+        t.replacen("  version: 0.0.4\n", "", 1)
     });
 }
 
@@ -295,6 +229,6 @@ fn mutation_wrong_dsl_and_empty_do_are_red() {
 #[test]
 fn a_step_without_a_task_type_is_red() {
     assert_red("lift", "no task type", |t| {
-        t.replacen("      call: deps:0.0.3@fs\n", "", 1)
+        t.replacen("      call: deps:0.0.4@fs\n", "", 1)
     });
 }

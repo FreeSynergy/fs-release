@@ -8,6 +8,7 @@ on:
       working-directory: { type: string, default: ".", description: "Directory of the Cargo workspace (and root for the rules checker)" }
       apt-packages: { type: string, default: "", description: "System packages needed to build/test" }
       runs-on: { type: string, default: ubuntu-24.04, description: "Runner label" }
+      software-gpu: { type: boolean, default: false, description: "Repos with window tests: installs lavapipe (software Vulkan adapter) and the fonts the tests need; merged with apt-packages" }
       test-env: { type: string, default: "", description: "Environment for the test step, one KEY=VALUE per line (for tests that need a tool the runner lacks and say so)" }
 
 permissions:
@@ -28,10 +29,17 @@ jobs:
         with:
           persist-credentials: false
       - name: System packages
-        if: inputs.apt-packages != ''
+        if: inputs.apt-packages != '' || inputs.software-gpu
         env:
           PACKAGES: ${{ inputs.apt-packages }}
+          SOFTWARE_GPU: ${{ inputs.software-gpu }}
         run: |
+          if [ "$SOFTWARE_GPU" = "true" ]; then
+            PACKAGES="$PACKAGES mesa-vulkan-drivers libvulkan1 fonts-dejavu-core fonts-noto-core"
+          fi
+          # one list, every package once (apt-packages and software-gpu may name the same one)
+          # shellcheck disable=SC2086
+          PACKAGES=$(printf '%s\n' $PACKAGES | awk '!seen[$0]++' | tr '\n' ' ')
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES

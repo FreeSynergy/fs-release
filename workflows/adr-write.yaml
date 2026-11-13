@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: adr-write
-  version: 0.0.3
+  version: 0.0.4
   title: From an ADR draft through the user's decision into the docs
 do:
   - draft:
-      call: adr-draft:0.0.3@fs
+      call: adr-draft:0.0.4@fs
       with:
         topic: ${ .input.topic }
       metadata:
@@ -21,7 +21,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: user-decision
-          version: 0.0.3
+          version: 0.0.4
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -29,7 +29,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user decides on the draft (user-decision.yaml); the decision is taken as it is.
   - work-in:
-      call: adr-update:0.0.3@fs
+      call: adr-update:0.0.4@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -37,7 +37,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Works the decision into the ADR; the status follows the decision, nothing is added on the side.
   - check-docs:
-      call: check-docs:0.0.3@fs
+      call: check-docs:0.0.4@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -49,7 +49,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: publish-doc
-          version: 0.0.3
+          version: 0.0.4
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

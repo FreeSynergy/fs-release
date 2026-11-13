@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.4
+
+- All crates, all flows, `chains/release.chain.yaml` and all `@fs` calls at 0.0.4 (crate version = tag).
+- `workflows/`: three new flows - `frontend-umbau` (convert building blocks to the layers of ADR 0074: theme contract with fixed block names, DTCG tokens, no fixed colors or spacings, arrangement separate; counts and pixel comparison are scripts, one Opus review, release by the person), `upstream-anfrage` (one git-bug issue at an upstream: draft, rules check incl. the upstream's CLAUDE.md, the user's YES, send by git transport, history) and `wrapper-einbindung` (foreign crate by git pin unchanged, own wrapper crate, Cargo.lock checked in, license gate in the GitHub CI, pin bump as its own run). They reuse `review` and `release-flow` as sub-workflows instead of copying them. The schema is unchanged.
+- Tests: the file list and helpers moved to `tests/support/workflows.rs`; `tests/workflows_new.rs` checks the roles and the order of the new flows and that every sub-workflow exists at the crate version, each rule with a counter-test on a changed copy.
+- `.github/workflows/check.yml`: new input `software-gpu` (boolean, default false) installs `mesa-vulkan-drivers libvulkan1 fonts-dejavu-core fonts-noto-core` (lavapipe) for repos with window tests; merged with `apt-packages` without duplicates; documented in `docs/usage.md`.
+- ADR 0074 was not in `fs-documentation` at the time of writing (last ADR there: 0055); `frontend-umbau` follows the user's decision of 13 November, to be compared with the ADR once it is there.
+
 ## 0.0.3
 
 - All crates and all flows at 0.0.3 (crate version = tag).

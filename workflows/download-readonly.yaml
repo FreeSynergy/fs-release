@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: download-readonly
-  version: 0.0.3
+  version: 0.0.4
   title: Download into an own empty folder, unpack, read, run nothing
 do:
   - approval:
-      call: ask:0.0.3@fs
+      call: ask:0.0.4@fs
       with:
         question: may ${ .input.url } be downloaded
       metadata:
@@ -17,7 +17,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The strategy approves the download; the coordinator carries the approval, without it nothing happens.
   - download:
-      call: download:0.0.3@fs
+      call: download:0.0.4@fs
       with:
         url: ${ .input.url }
         folder: .scratch/downloads/${ .input.name }
@@ -28,7 +28,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The coordinator downloads into an own new empty folder under .scratch/downloads/.
   - hash:
-      call: sha256:0.0.3@fs
+      call: sha256:0.0.4@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -36,7 +36,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Notes the SHA-256 of the file.
   - unpack:
-      call: unpack-only:0.0.3@fs
+      call: unpack-only:0.0.4@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -44,7 +44,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Only unpacks in the same folder; nothing is executed, built or installed, scripts are not started.
   - read:
-      call: read-only:0.0.3@fs
+      call: read-only:0.0.4@fs
       with:
         folder: .scratch/downloads/${ .input.name }
       metadata:

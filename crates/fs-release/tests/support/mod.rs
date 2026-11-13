@@ -12,6 +12,7 @@ use tempfile::TempDir;
 
 pub mod flow;
 pub mod gh;
+pub mod workflows;
 
 pub fn git(dir: &Path, args: &[&str]) -> String {
     let o = Command::new("git")

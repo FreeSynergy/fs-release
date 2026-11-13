@@ -6,7 +6,7 @@ Application, `machine` = Service; dazu `freesynergy.net:actor-type`) und `freesy
 `opus-ja`, `human`, oder `none`) und `freesynergy.net:kind` (`objective` = wiederholen, bis das Ziel erreicht ist, z. B.
 Tests grün; `subjective` = Zustand ändern, egal wie das Ergebnis ist, z. B. Bilder zeigen, Urteil einholen). Die Dateien
 sind 1:1 in fs-workflows importierbar: Serverless Workflow 1.0 plus FS-Profil, keine Sonderformen. Alle tragen
-`document.version` = Crate-Version = Tag (0.0.3). Agenten pushen, taggen und mergen nie. Heute sind sie Beschreibung und
+`document.version` = Crate-Version = Tag (0.0.4). Agenten pushen, taggen und mergen nie. Heute sind sie Beschreibung und
 werden nur geprüft (`scripts/check_workflows.py`, Test `crates/fs-release/tests/workflows.rs`; Schrittnamen von `lift` und
 `flow` müssen mit dem Code übereinstimmen). In einem zweiten Schritt liest `fs-release flow` diese Dateien und führt den
 Ablauf daraus aus. Keine Geheimnisse in diese Dateien.
@@ -19,7 +19,10 @@ finding="..."`. Der Agent arbeitet nur die genannten Schritte ab und meldet im B
 **Die Flows.**
 - Release und Bau: `release-flow` (lift, gates, Review, Tag, Push, CI, ff main, Release, bump, sign), `lift`, `catalog-bump`,
   `cleanup-targets`, `agent-run`, `bugfix`, `review`.
-- Frontend und Bilder: `frontend-round`, `dossier`, `icon-round`, `picture-acceptance`.
+- Frontend und Bilder: `frontend-round`, `frontend-umbau` (Bestand auf die Schichten nach ADR 0074), `dossier`, `icon-round`,
+  `picture-acceptance`.
+- Fremdes: `upstream-anfrage` (ein git-bug-Issue an einen Upstream), `wrapper-einbindung` (fremde Crate per Git-Pin
+  unverändert, eigene Wrapper-Crate, Lizenz-Gate in der CI).
 - Koordinator: `coordination-round`, `cost-reconcile`, `report-to-strategy`, `slot-check`, `wip-continue`, `download-readonly`,
   `publish-doc`, `workflow-pflege`.
 - Strategie: `adr-write`, `user-decision`, `handoff-update`, `restart-handoff`.
@@ -30,7 +33,7 @@ Application, `machine` = Service; plus `freesynergy.net:actor-type`) and `freesy
 `opus-ja`, `human`, or `none`) and `freesynergy.net:kind` (`objective` = repeat until the goal is reached, e.g. tests
 green; `subjective` = change the state whatever the result, e.g. show images, ask for a verdict). The files import 1:1 into
 fs-workflows: Serverless Workflow 1.0 plus the FS profile, no special forms. All carry `document.version` = crate version
-= tag (0.0.3). Agents never push, tag or merge. For now they are a description and are only checked
+= tag (0.0.4). Agents never push, tag or merge. For now they are a description and are only checked
 (`scripts/check_workflows.py`, test `crates/fs-release/tests/workflows.rs`; the step names of `lift` and `flow` must match
 the code). In a second step `fs-release flow` will read these files and run the process from them. No secrets in these
 files.

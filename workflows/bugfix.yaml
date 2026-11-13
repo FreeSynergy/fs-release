@@ -4,7 +4,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: bugfix
-  version: 0.0.3
+  version: 0.0.4
   title: From a user finding to a fixed and released bug
 do:
   - finding:
@@ -17,7 +17,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user's finding (what was done, what was expected, what happened) is taken as it is.
   - reproduce:
-      call: build-ai:0.0.3@fs
+      call: build-ai:0.0.4@fs
       with:
         task: write a test that reproduces ${ .input.finding }
       metadata:
@@ -27,7 +27,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent writes a test that fails for exactly this bug (red); repeat until it is red for the right reason.
   - fix:
-      call: build-ai:0.0.3@fs
+      call: build-ai:0.0.4@fs
       with:
         task: fix the code, change no test
       metadata:
@@ -37,7 +37,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent changes the code in its own worktree and commits locally; no push, no tag.
   - green:
-      call: gates:0.0.3@fs
+      call: gates:0.0.4@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -49,7 +49,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.3
+          version: 0.0.4
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

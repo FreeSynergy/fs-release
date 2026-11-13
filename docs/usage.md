@@ -50,8 +50,13 @@ of a repo; it runs on every push. It needs no secrets and only `contents: read`.
 3. `cargo test --workspace --all-features`
 4. `python3 -I scripts/check_rust_rules.py <root>` (ADR 0043), taken from this repo at the same ref as the workflow (`actions/rust-rules`), no download
 
-Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`. Unlike `ci.yml` there is no MSRV or cargo-deny step
-and no feature selection: everything is checked with all features. Repos can run both.
+Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`, `test-env`, `software-gpu` (boolean, default false). Unlike
+`ci.yml` there is no MSRV or cargo-deny step and no feature selection: everything is checked with all features. Repos can run both.
+
+`software-gpu: true` is for repos with window tests (fs-wiki, fs-tasks, fs-components, ...): it installs exactly
+`mesa-vulkan-drivers libvulkan1 fonts-dejavu-core fonts-noto-core` (lavapipe is the software graphics adapter, the fonts make the
+rendered text the same on every runner). It is merged with `apt-packages` into one list without duplicates, so a repo needs only
+`software-gpu: true` instead of naming the packages.
 
 ## Release
 

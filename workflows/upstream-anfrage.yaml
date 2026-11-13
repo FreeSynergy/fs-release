@@ -1,0 +1,62 @@
+# One git-bug issue to an upstream project. The text is drafted by the agent, the person approves, a script sends it.
+# Blinc: NO AI attribution in issue, PR or commit; no new Blinc PR without asking the user. Agents never push to our repos, tag or merge. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: upstream-anfrage
+  version: 0.0.4
+  title: File one git-bug issue at an upstream project
+do:
+  - draft:
+      call: draft-issue:0.0.4@fs
+      with:
+        upstream: ${ .input.upstream }
+        evidence: ${ .input.evidence }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body.
+  - rules:
+      call: upstream-rules:0.0.4@fs
+      with:
+        upstream: ${ .input.upstream }
+        draft: ${ .draft }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script - reads the CLAUDE.md of the upstream clone (Blinc - /srv/FreeSynergy/blinc) and checks the draft against it; for Blinc no Claude, Anthropic or AI mention, no Co-Authored-By, no session link, no robot footer; a new Blinc PR needs the user's question first. A hit goes back to draft.
+  - approval:
+      call: approve:0.0.4@fs
+      with:
+        draft: ${ .draft }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The user's YES for exactly this text, given beforehand; without it nothing is sent, a changed text needs a new YES.
+  - send:
+      call: git-bug-send:0.0.4@fs
+      with:
+        upstream: ${ .input.upstream }
+        draft: ${ .draft }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Script - creates the issue with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote (git transport); only the approved text, only after the YES.
+  - record:
+      call: note-history:0.0.4@fs
+      with:
+        id: ${ .send.id }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The agent notes the history - upstream, issue id, date, the approved text, later answers - in the report; no planning files in the upstream.

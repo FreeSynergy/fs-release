@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: catalog-bump
-  version: 0.0.3
+  version: 0.0.4
   title: Raise a program in the catalog, sign the catalog, test it
 do:
   - bump:
-      call: bump:0.0.3@fs
+      call: bump:0.0.4@fs
       with:
         workflow: bump.yml
         repo: FreeSynergy/fs-catalog
@@ -18,7 +18,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: bump.yml (dispatch, or its 15-minute schedule) finds the new published Pre-release and raises the tag in packages.toml.
   - sign:
-      call: sign:0.0.3@fs
+      call: sign:0.0.4@fs
       with:
         workflow: sign.yml
         repo: FreeSynergy/fs-catalog
@@ -29,7 +29,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Signs catalog.xml with the project key (the key is a repository secret, never in a file).
   - test:
-      call: check:0.0.3@fs
+      call: check:0.0.4@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service

@@ -1,6 +1,6 @@
 [package]
 name = "fs-release"
-version = "0.0.3"
+version = "0.0.4"
 description = "fs-release: lift a program onto new fs-components / fs-interfaces tags and walk it through review, tag and push as one deterministic command"
 edition.workspace = true
 license.workspace = true
