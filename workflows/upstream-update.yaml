@@ -1,5 +1,6 @@
 # An upstream program has a new release: check it (severity, tag to commit, signature state), pin it in the mirror, check capabilities against the new book,
-# review, build in CI, release as Pre-release, raise in the catalog. Security fixes (high, critical) go first. Agents never push, tag or merge.
+# review, tag and push, start the mirror build by hand, publish the draft as Pre-release, raise in the catalog. Security fixes (high, critical) go first.
+# Agents never push, tag or merge. The mirror build only makes a DRAFT; publishing is a step of its own.
 # Order: `Workflow upstream-update, step check-upstream, parameters upstream, repo, from, book`. FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -20,7 +21,18 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Is there a new upstream tag? Read the release text and the security advisories (gh api, read only), rate the severity (critical, high, medium, low, none), resolve tag to commit (gh api, the commit the tag points to, not the tag object), look at the signature state of tag and commit (unsigned stays unsigned, a change is reported). Output - tag, commit, date, severity, advisory ids, signature state.
+        freesynergy.net:summary: Is there a new upstream tag? Read the release text and the security advisories (gh api, read only), rate the severity (critical, high, medium, low, none), resolve tag to commit (gh api, the commit the tag points to, not the tag object), look at the signature state of tag and commit (unsigned stays unsigned, a change is reported). Output - tag, commit, date, severity, advisory ids, signature state. High or critical severity goes first.
+  - compare:
+      call: compare-versions:0.0.6@fs
+      with:
+        from: ${ .input.from }
+        to: ${ $context.upstream.tag }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: gh api compare from...to (read only) - do the build toolchain (rust-toolchain, MSRV), the dependencies (Cargo.lock) or the build profile change? The answer goes into the report and decides whether mirror.yml needs a change.
   - pin:
       call: pin-mirror:0.0.6@fs
       with:
@@ -32,17 +44,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Sets mirror.toml (version, released, tag, commit, artefact names, container note), the capabilities.toml sources and version, scripts and tests that carry the old version, and the README; adds the security note (severity, advisory, fixed in) to the docs. Only the pinned commit counts; never an unresolved tag.
-  - docs:
-      call: docs-sync:0.0.6@fs
-      with:
-        languages: [de, en]
-      metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: docs/de and docs/en are adapted together (mirror.md, capabilities.md, date of the check); both languages say the same, no word of one side missing in the other.
+        freesynergy.net:summary: Sets mirror.toml (version, released, tag, commit, artefact names, container note), the capabilities.toml sources and version, scripts and tests that carry the old version, and the README; adds the security note (severity, advisory, fixed in). Only the pinned commit counts; never an unresolved tag.
   - capabilities-check:
       call: capabilities-check:0.0.6@fs
       with:
@@ -56,25 +58,39 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Every capability line is checked against the book of the NEW version (page and sentence quoted in the report); a line the book does not show is marked 'not proven', never guessed; a changed support value (yes, no, unstable) is reported and decided in the review.
-  - compare:
-      call: compare-versions:0.0.6@fs
+  - docs:
+      call: docs-sync:0.0.6@fs
       with:
-        from: ${ .input.from }
-        to: ${ $context.upstream.tag }
+        languages: [de, en]
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: gh api compare from...to (read only) - do the build toolchain (rust-toolchain, MSRV), the dependencies (Cargo.lock) or the build profile change? The answer goes into the report and decides whether mirror.yml needs a change.
+        freesynergy.net:summary: docs/de and docs/en are generated and adapted together (mirror.md, capabilities.md, date of the check); both languages say the same.
   - local-gates:
       call: repo-gates:0.0.6@fs
+      export:
+        as: '${ $context + { gates: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The local gates of the repo (verify-mirror selftest, repo_tool.py checks, rust rules where they apply); red goes back to pin. Gates once per head.
+        freesynergy.net:summary: The local gates of the repo (verify-mirror selftest, repo_tool.py checks, rust rules where they apply), once per head.
+  - back-to-pin:
+      switch:
+        - red:
+            when: '${ $context.gates.red }'
+            then: pin
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a red gate goes back to pin with the findings as the order, green goes on to the review.
   - review:
       call: review-ai:0.0.6@fs
       with:
@@ -86,17 +102,35 @@ do:
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Strategy (Opus) reviews the delta and answers YES or NO bound to exactly this head; a security fix with severity high or critical is reviewed the same day. Without the YES nothing is pushed or published.
-  - push-branch:
+  - tag:
+      call: tag:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Annotated tag v<version> of the mirror on the approved head, locally (as in release-flow).
+  - push:
       call: push:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: preapproved-list
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Branch release-<version> and tag, never forced; the repo must be on the pre-approved list (as in release-flow); agents never push, the coordinator does.
+  - start-build:
+      call: dispatch-workflow:0.0.6@fs
       with:
-        branch: release-${ $context.upstream.version }
+        workflow: mirror.yml
+        inputs:
+          draft_release: true
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
-        freesynergy.net:gate: opus-ja
+        freesynergy.net:gate: preapproved-list
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The coordinator pushes the branch release-<version> after the YES, never forced; the agent never pushes.
-  - mirror-ci:
+        freesynergy.net:summary: The coordinator starts the mirror build by hand (workflow_dispatch of mirror.yml with draft_release=true); the build does not start by itself. It builds from source at the pinned commit (refuses if the tag no longer resolves to it), adds source tarball and SBOM, signs, and creates a DRAFT release only.
+  - wait-build:
       listen:
         to:
           one:
@@ -107,19 +141,28 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: mirror.yml builds from source at the pinned commit (refuses if the tag no longer resolves to it), adds source tarball and SBOM, signs; red stops the flow.
-  - release:
-      listen:
-        to:
-          one:
-            with:
-              type: net.freesynergy.release.published
+        freesynergy.net:summary: The flow waits for exactly this run of mirror.yml; red stops the flow, nothing is published.
+  - publish:
+      call: publish-release:0.0.6@fs
+      with:
+        from: draft
+        to: pre-release
       metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: mirror.yml never publishes. The person or the coordinator turns the draft into a Pre-release, only with the YES of strategy or the user for exactly this head; this is a step of its own, not a pipeline behaviour.
+  - catalog-entry:
+      call: catalog-entry:0.0.6@fs
+      with:
+        program: ${ .input.upstream }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: The Pre-release is published by the pipeline (tag v<version> of the mirror) only behind the YES of exactly this head.
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Is the program in the catalog already? If not, the entry is created first (decision of strategy). fs-kanidm has had no release and no catalog entry so far - the first run creates both.
   - catalog-bump:
       run:
         workflow:
@@ -129,9 +172,9 @@ do:
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
+        freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Sub-workflow catalog-bump - the new Pre-release is raised in packages.toml and the catalog is signed.
+        freesynergy.net:summary: Sub-workflow catalog-bump after the Pre-release is published, behind the approval, public reach only (as in release-flow).
   - catalog-check:
       call: check:0.0.6@fs
       metadata:

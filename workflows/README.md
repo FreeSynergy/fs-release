@@ -29,7 +29,7 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
   `cleanup-targets`, `agent-run`, `bugfix`, `review`.
 - Frontend und Bilder: `frontend-round`, `frontend-umbau` (Bestand auf die Schichten nach ADR 0074), `dossier`, `icon-round`,
   `picture-acceptance`.
-- Fremdes: `upstream-anfrage` (ein git-bug-Issue an einen Upstream), `upstream-update` (neuer Upstream-Release in Spiegel und Katalog, Sicherheitsfixes zuerst), `wrapper-einbindung` (fremde Crate per Git-Pin
+- Fremdes: `upstream-anfrage` (ein git-bug-Issue an einen Upstream), `upstream-update` (neuer Upstream-Release in Spiegel und Katalog, Sicherheitsfixes zuerst; der Spiegel-Bau erzeugt nur einen Entwurf, die Veröffentlichung ist ein eigener Schritt mit Freigabe; fs-kanidm hat bisher kein Release und keinen Katalog-Eintrag, der erste Lauf legt beides an), `wrapper-einbindung` (fremde Crate per Git-Pin
   unverändert, eigene Wrapper-Crate, Lizenz-Gate in der CI).
 - Koordinator: `coordination-round`, `cost-reconcile`, `report-to-strategy`, `slot-check`, `wip-continue`, `download-readonly`,
   `publish-doc`, `workflow-pflege`.
