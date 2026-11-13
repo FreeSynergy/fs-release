@@ -9,12 +9,17 @@ use std::path::{Path, PathBuf};
 use fs_release::lift::{self, LiftOpts};
 use support::{have_yaml, python};
 
-const FILES: [&str; 5] = [
+const FILES: [&str; 10] = [
     "agent-run",
+    "bugfix",
     "catalog-bump",
     "cleanup-targets",
+    "dossier",
+    "frontend-round",
+    "icon-round",
     "lift",
     "release-flow",
+    "review",
 ];
 
 fn root() -> PathBuf {
@@ -161,7 +166,17 @@ fn mutation_duplicate_step_name_is_red() {
 #[test]
 fn mutation_missing_document_version_is_red() {
     assert_red("release-flow", "document.version", |t| {
-        t.replacen("  version: 0.2.0\n", "", 1)
+        t.replacen("  version: 0.0.2\n", "", 1)
+    });
+}
+
+#[test]
+fn mutation_missing_or_unknown_kind_is_red() {
+    assert_red("bugfix", "kind", |t| {
+        t.replacen("        freesynergy.net:kind: objective\n", "", 1)
+    });
+    assert_red("bugfix", "'maybe'", |t| {
+        t.replacen("kind: objective", "kind: maybe", 1)
     });
 }
 

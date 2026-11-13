@@ -1,0 +1,98 @@
+# One round on a Frontend: dossier, gap list, images, build, acceptance by clicking through the working flows, release.
+# Agents never push, tag or merge. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: frontend-round
+  version: 0.0.2
+  title: A Frontend round from the research dossier to the release
+do:
+  - dossier:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: dossier
+          version: 0.0.2
+        input:
+          frontend: ${ .input.frontend }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The research dossier of the Frontend exists and passes check-docs (sub-workflow dossier.yaml); repeat until it does.
+  - gap-list:
+      call: gap-list:0.0.2@fs
+      with:
+        frontend: ${ .input.frontend }
+        dossier: ${ .input.dossier }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Compares dossier (states, dialogs, menus, shortcuts, workflows, gaps) with our Frontend and writes the list of what is missing.
+  - images:
+      call: render-images:0.0.2@fs
+      with:
+        frontend: ${ .input.frontend }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Renders the images of the gap list (old and new state) and shows them; whatever they look like, the state changes to shown.
+  - build:
+      call: build-ai:0.0.2@fs
+      with:
+        branch: ${ .input.branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The agent builds the gaps in its own worktree and commits locally; repeat until the gates are green, no push, no tag.
+  - gates:
+      call: gates:0.0.2@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/gates.sh, the one definition of the checks; red goes back to build.
+  - acceptance:
+      call: click-through:0.0.2@fs
+      with:
+        file: ${ .input.dossier }/acceptance.md
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Clicks through every working flow listed in acceptance.md of the dossier in the running Frontend (virtual session); a flow that fails goes back to build.
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.2
+        input:
+          head: ${ .input.branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Opus reviews exactly this head (sub-workflow review.yaml); a JA is bound to this head.
+  - release:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: release-flow
+          version: 0.0.2
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: After Opus JA and green CI the human or the coordinator merges and releases (release-flow.yaml); agents never do.

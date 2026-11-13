@@ -4,7 +4,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: agent-run
-  version: 0.1.0
+  version: 0.0.2
   title: An agent builds a change in its own worktree, Opus reviews it, a human publishes it
 do:
   - order:
@@ -14,6 +14,7 @@ do:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
         freesynergy.net:summary: The order (task text, base commit, branch name unreviewed/<task>) comes from the coordinator or the user.
   - worktree:
       call: worktree:0.1.0@fs
@@ -21,6 +22,7 @@ do:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
+        freesynergy.net:kind: objective
         freesynergy.net:summary: Creates the agent's own git worktree on the branch; the agent works only there.
   - build:
       call: build-ai:0.1.0@fs
@@ -28,6 +30,7 @@ do:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
+        freesynergy.net:kind: objective
         freesynergy.net:summary: The agent changes code and tests, commits locally; no push, no tag, no release.
   - fmt:
       call: fmt:0.1.0@fs
@@ -35,6 +38,7 @@ do:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
+        freesynergy.net:kind: objective
         freesynergy.net:summary: cargo fmt by the coordinator's machine step, not by the agent.
   - review:
       call: review-ai:0.1.0@fs
@@ -42,6 +46,7 @@ do:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reads the diff; a JA is bound to exactly this head, NEIN comes with findings.
   - cleanup:
       call: remove-build-dir:0.1.0@fs
@@ -49,6 +54,7 @@ do:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
+        freesynergy.net:kind: objective
         freesynergy.net:summary: The run removes its own throw-away build folder (target/) at the end, success or not.
         freesynergy.net:may-fail: a folder that is already gone is fine
   - publish:
@@ -57,4 +63,5 @@ do:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
+        freesynergy.net:kind: objective
         freesynergy.net:summary: The human or the coordinator pushes, tags and merges (release-flow.yaml); the agent never does.

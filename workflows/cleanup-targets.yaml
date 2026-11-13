@@ -4,7 +4,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: cleanup-targets
-  version: 0.1.0
+  version: 0.0.2
   title: Remove the throw-away build targets of finished runs
 do:
   - dry-run:
@@ -15,6 +15,7 @@ do:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
         freesynergy.net:summary: Lists what would be deleted, deletes nothing.
   - apply:
       call: cleanup-targets:0.1.0@fs
@@ -24,4 +25,5 @@ do:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: coordinator
+        freesynergy.net:kind: objective
         freesynergy.net:summary: Deletes the listed targets (APPLY); the coordinator looked at the dry run first.

@@ -1,0 +1,79 @@
+# One icon round: images old and new, the user's verdict, then the catalog entry (PNG export, hash, license, schema 2).
+# Agents never push, tag or merge. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: icon-round
+  version: 0.0.2
+  title: From new icon images through the user's verdict into the catalog
+do:
+  - draw:
+      call: draw-ai:0.0.2@fs
+      with:
+        icons: ${ .input.icons }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Draws the new versions of the icons; repeat until they render and pass the format checks.
+  - compare:
+      call: show-images:0.0.2@fs
+      with:
+        old: ${ .input.old }
+        new: ${ .input.new }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Shows every icon old next to new; whatever they look like, the state changes to shown.
+  - verdict:
+      call: ask:0.0.2@fs
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The user decides per icon - old, new or draw again; the verdict is taken as it is.
+  - export:
+      call: png-export:0.0.2@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: PNG export of the accepted icons and the hash of every file; repeat until export and hash match.
+  - catalog:
+      call: catalog-entry:0.0.2@fs
+      with:
+        schema: 2
+        license: ${ .input.license }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Writes the catalog entries in schema 2 with PNG, hash and license; an icon without a license is red.
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.2
+        input:
+          head: ${ .input.branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Opus reviews exactly this head of the catalog change; JA is bound to it.
+  - publish:
+      call: publish:0.0.2@fs
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: After Opus JA and green CI the human or the coordinator merges; agents never do.

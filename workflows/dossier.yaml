@@ -1,0 +1,38 @@
+# The research dossier of a Frontend: files in R2 with sourced facts, check-docs, then the docs main branch.
+# FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: dossier
+  version: 0.0.2
+  title: Research a Frontend into a dossier and publish it to the docs
+do:
+  - research:
+      call: research-ai:0.0.2@fs
+      with:
+        frontend: ${ .input.frontend }
+        files: [states, dialogs, menus, context-menus, shortcuts, workflows, acceptance, gaps]
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Writes one research file each for states, dialogs, menus and context menus, shortcuts, workflows, acceptance.md and gaps into R2; every fact has a source, what is not proven is marked [nicht belegt]; ADR 0013 - nothing is copied.
+  - check-docs:
+      call: check-docs:0.0.2@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: check-docs on the dossier; red goes back to research until it is green.
+  - publish:
+      call: docs-main:0.0.2@fs
+      with:
+        frontend: ${ .input.frontend }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The human or the coordinator brings the green dossier into the docs main branch; the agent never does.

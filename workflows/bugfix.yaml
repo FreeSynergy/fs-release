@@ -1,0 +1,73 @@
+# A bug report from the user to a release: reproduce red, fix, green, short Opus look, release. Agents never push, tag or
+# merge. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: bugfix
+  version: 0.0.2
+  title: From a user finding to a fixed and released bug
+do:
+  - finding:
+      set:
+        finding: ${ .input.finding }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The user's finding (what was done, what was expected, what happened) is taken as it is.
+  - reproduce:
+      call: build-ai:0.0.2@fs
+      with:
+        task: write a test that reproduces ${ .input.finding }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The agent writes a test that fails for exactly this bug (red); repeat until it is red for the right reason.
+  - fix:
+      call: build-ai:0.0.2@fs
+      with:
+        task: fix the code, change no test
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The agent changes the code in its own worktree and commits locally; no push, no tag.
+  - green:
+      call: gates:0.0.2@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/gates.sh; the new test and all others are green, red goes back to fix (a LLM only on red).
+  - glance:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.2
+        input:
+          head: ${ .input.branch }
+          scope: short
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: A short Opus look at the diff (review.yaml); JA is bound to exactly this head.
+  - release:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: release-flow
+          version: 0.0.2
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: After Opus JA and green CI the human or the coordinator merges and releases; agents never do.

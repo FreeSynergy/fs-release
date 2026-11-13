@@ -6,7 +6,8 @@ exit 0 green, 1 red (every problem on its own line `file: reason`), 2 skipped (n
 
 Per file: parses; `document` has dsl (1.0.x), namespace, name, version; `do` is a non-empty list; every step is one
 `name: task` pair with a task type, a unique name, `freesynergy.net:actor` (human | ai | machine), the matching
-`freesynergy.net:actor-type` (Person | Application | Service, the ActivityStreams types) and `freesynergy.net:gate`.
+`freesynergy.net:actor-type` (Person | Application | Service, the ActivityStreams types) and `freesynergy.net:gate` and `freesynergy.net:kind` (objective = repeat until the goal is reached; subjective = change the
+state whatever the result, e.g. show images, ask for a verdict).
 """
 import glob
 import os
@@ -15,7 +16,9 @@ import sys
 
 ACTORS = {"human": "Person", "ai": "Application", "machine": "Service"}
 TASK_TYPES = {"call", "do", "emit", "for", "fork", "listen", "raise", "run", "set", "switch", "try", "wait"}
+KINDS = ("objective", "subjective")
 ACTOR, ATYPE, GATE = "freesynergy.net:actor", "freesynergy.net:actor-type", "freesynergy.net:gate"
+KIND = "freesynergy.net:kind"
 
 
 def check_step(item, seen, where):
@@ -41,6 +44,8 @@ def check_step(item, seen, where):
         problems.append(f"{where}: {ATYPE} must be {ACTORS[actor]} for actor {actor}")
     if not isinstance(meta.get(GATE), str) or not meta[GATE].strip():
         problems.append(f"{where}: {GATE} is missing (a name, or `none`)")
+    if meta.get(KIND) not in KINDS:
+        problems.append(f"{where}: {KIND} is {meta.get(KIND)!r}, allowed: {', '.join(KINDS)}")
     return problems
 
 
