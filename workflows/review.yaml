@@ -1,16 +1,18 @@
 # An Opus review: read-only, the verdict goes into BERICHT.md, JA/NEIN, a JA is bound to exactly one head.
-# FS profile: see README.md.
+# The order to the reviewer is compact: `Workflow review, step <id>, parameters repo, branch, head, delta, scope, tests`
+# (docs/prompt-template.md); the check list below and rules.md [REVIEW] [BERICHT] are not repeated in the order. FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: review
-  version: 0.0.4
+  version: 0.0.5
   title: Opus reviews one head and writes a report with JA or NEIN
 do:
   - request:
-      call: review-request:0.0.4@fs
+      call: review-request:0.0.5@fs
       with:
         head: ${ .input.head }
+        delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -18,18 +20,22 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Writes the file Opus reads (diff, gate output) for exactly the head ${ .input.head }.
   - read:
-      call: review-ai:0.0.4@fs
+      call: review-ai:0.0.5@fs
       with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
         head: ${ .input.head }
+        delta: ${ .input.delta }
         scope: ${ .input.scope }
+        tests: ${ .input.tests }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Opus only reads; it changes no code and writes only BERICHT.md (findings, what was checked, what is not proven).
+        freesynergy.net:summary: Opus only reads ([REVIEW]); it changes no code, writes only BERICHT.md and runs only the named tests, never the whole workspace while the slots are busy ([GATES]). Check list by kind - code - rules of the order, tests with a counter-test per rule, files <= 300 lines, no stray files, no orphan processes; workflow files - actor/gate/kind per step, sub-workflows exist at the version; docs - sources, DE/EN in step; icons or images - license and look. Findings as file:line, blocker versus small point, and what is not proven.
   - verdict:
-      call: verdict:0.0.4@fs
+      call: verdict:0.0.5@fs
       with:
         report: BERICHT.md
       metadata:
@@ -37,9 +43,9 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The report ends with JA or NEIN; a JA names exactly one head and is void for any other, NEIN comes with findings.
+        freesynergy.net:summary: Line 1 of the report is JA or NEIN ([BERICHT]) for the push of release-<version> and the tag after green CI; a JA names exactly one head and is void for any other, NEIN comes with findings.
   - bind:
-      call: approval:0.0.4@fs
+      call: approval:0.0.5@fs
       with:
         head: ${ .input.head }
       metadata:

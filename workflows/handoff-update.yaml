@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: handoff-update
-  version: 0.0.4
+  version: 0.0.5
   title: Bring todo/handoff-strategy.md and the memory up to date
 do:
   - collect:
-      call: collect-state:0.0.4@fs
+      call: collect-state:0.0.5@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -15,7 +15,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Collects the open runs, decisions, open questions and what is not proven since the last update.
   - handoff-file:
-      call: write-handoff:0.0.4@fs
+      call: write-handoff:0.0.5@fs
       with:
         file: todo/handoff-strategy.md
       metadata:
@@ -25,7 +25,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Updates todo/handoff-strategy.md; no secrets in it.
   - memory:
-      call: write-memory:0.0.4@fs
+      call: write-memory:0.0.5@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -33,7 +33,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Brings the memory files and the index in line with the handoff file; a wrong entry is deleted, not left.
   - check-docs:
-      call: check-docs:0.0.4@fs
+      call: check-docs:0.0.5@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service

@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: wip-continue
-  version: 0.0.4
+  version: 0.0.5
   title: After a timeout save the work as WIP and continue with a follow-up prompt
 do:
   - detect:
-      call: exit-code:0.0.4@fs
+      call: exit-code:0.0.5@fs
       with:
         expect: 124
       metadata:
@@ -17,7 +17,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The run ended with rc=124 (timeout); any other code is not this flow.
   - commit-wip:
-      call: commit-wip:0.0.4@fs
+      call: commit-wip:0.0.5@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -25,7 +25,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Commits the state in the run's own worktree as WIP; no push, no reset.
   - prompt:
-      call: write-continue-prompt:0.0.4@fs
+      call: write-continue-prompt:0.0.5@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application

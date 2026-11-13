@@ -4,7 +4,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: frontend-round
-  version: 0.0.4
+  version: 0.0.5
   title: A Frontend round from the research dossier to the release
 do:
   - dossier:
@@ -12,7 +12,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: dossier
-          version: 0.0.4
+          version: 0.0.5
         input:
           frontend: ${ .input.frontend }
       metadata:
@@ -22,7 +22,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The research dossier of the Frontend exists and passes check-docs (sub-workflow dossier.yaml, research by the agent, check-docs by the machine); repeat until it does. The sub-workflow ends with the human publish into the docs main branch, so the step carries that gate.
   - gap-list:
-      call: gap-list:0.0.4@fs
+      call: gap-list:0.0.5@fs
       with:
         frontend: ${ .input.frontend }
         dossier: ${ .input.dossier }
@@ -33,9 +33,11 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Compares dossier (states, dialogs, menus, shortcuts, workflows, gaps) with our Frontend and writes the list of what is missing.
   - images:
-      call: render-images:0.0.4@fs
+      call: render-images:0.0.5@fs
       with:
         frontend: ${ .input.frontend }
+      export:
+        as: '${ $context + { images: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -47,10 +49,10 @@ do:
         workflow:
           namespace: freesynergy.net
           name: picture-acceptance
-          version: 0.0.4
+          version: 0.0.5
         input:
           model: ${ .input.model }
-          ours: ${ .images }
+          ours: ${ $context.images }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -58,17 +60,20 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user's verdict on the images (picture-acceptance.yaml) is taken as it is; not accepted goes back to build with the user's words as the order.
   - build:
-      call: build-ai:0.0.4@fs
+      call: build-ai:0.0.5@fs
       with:
+        repo: ${ .input.repo }
         branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent builds the gaps in its own worktree and commits locally; repeat until the gates are green, no push, no tag.
+        freesynergy.net:summary: The agent builds the gaps in its own worktree and commits locally ([COMMIT]); repeat until the gates are green ([GATES], commands one at a time per [BASH]), no push, no tag; report per [BERICHT]. Order - `Workflow frontend-round, step build, parameters repo, branch, head, delta, frontend` (docs/prompt-template.md).
   - gates:
-      call: gates:0.0.4@fs
+      call: gates:0.0.5@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -76,9 +81,11 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh, the one definition of the checks; red goes back to build.
   - acceptance:
-      call: click-through:0.0.4@fs
+      call: click-through:0.0.5@fs
       with:
         file: ${ .input.dossier }/acceptance.md
+      export:
+        as: '${ $context + { acceptance: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -86,8 +93,8 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - reads acceptance.md of the dossier and clicks through every working flow listed there in the running Frontend (virtual session); a flow that fails goes back to build.
   - acceptance-red:
-      call: explain-red:0.0.4@fs
-      if: ${ .acceptance.red }
+      call: explain-red:0.0.5@fs
+      if: ${ $context.acceptance.red }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -99,7 +106,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.4
+          version: 0.0.5
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

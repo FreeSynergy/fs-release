@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: picture-acceptance
-  version: 0.0.4
+  version: 0.0.5
   title: Show model and our pictures, take the strategy's and the user's verdict
 do:
   - pictures:
-      call: show-images:0.0.4@fs
+      call: show-images:0.0.5@fs
       with:
         model: ${ .input.model }
         ours: ${ .input.ours }
@@ -18,7 +18,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Shows the model (Vorbild) and our picture side by side; whatever they look like, the state changes to shown.
   - strategy-verdict:
-      call: verdict-ai:0.0.4@fs
+      call: verdict-ai:0.0.5@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -26,7 +26,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The strategy judges each pair - accepted or what differs; it is an opinion, not a measurement.
   - user-verdict:
-      call: ask:0.0.4@fs
+      call: ask:0.0.5@fs
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -34,7 +34,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user's verdict is subjective and is taken as it is; nobody argues it down.
   - next:
-      call: route-verdict:0.0.4@fs
+      call: route-verdict:0.0.5@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application

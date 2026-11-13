@@ -1,27 +1,33 @@
 # Convert existing building blocks and Frontends to the layers of ADR 0074: theme contract with fixed block names, DTCG tokens, no fixed colors or spacings in blocks or Frontends, arrangement separate. Goal: new Frontends are built quickly from blocks.
-# One run per block group (input.group). Agents never push, tag or merge. FS profile: see README.md.
+# The ADR is conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md in fs-documentation.
+# One run per block group (input.group). Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters repo,
+# branch, head, delta, group` (docs/prompt-template.md). FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: frontend-umbau
-  version: 0.0.4
+  version: 0.0.5
   title: Convert one group of building blocks to the layers of ADR 0074
 do:
   - count:
-      call: count-fixed-values:0.0.4@fs
+      call: count-fixed-values:0.0.5@fs
       with:
         group: ${ .input.group }
+      export:
+        as: '${ $context + { count: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Script - counts in the group the fixed colors, fixed spacings and block names that are not in the contract; whatever the numbers are, they are written down as the starting state.
+        freesynergy.net:summary: Script - counts in the group the fixed colors, fixed spacings and block names that are not in the contract (ADR 0074, conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md); whatever the numbers are, they are written down as the starting state.
   - assign:
-      call: assign-tokens:0.0.4@fs
+      call: assign-tokens:0.0.5@fs
       with:
         group: ${ .input.group }
-        counted: ${ .count }
+        counted: ${ $context.count }
+      export:
+        as: '${ $context + { assign: . } }'
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -29,7 +35,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent maps every counted value to a DTCG token and every block to its fixed contract name (WAI-ARIA, Open UI); a value without a fitting token is listed, not invented.
   - before:
-      call: render-images:0.0.4@fs
+      call: render-images:0.0.5@fs
       with:
         group: ${ .input.group }
         state: before
@@ -40,69 +46,76 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Renders the images of the group before the change (the reference for the pixel comparison).
   - convert:
-      call: convert-ai:0.0.4@fs
+      call: convert-ai:0.0.5@fs
       with:
         group: ${ .input.group }
-        mapping: ${ .assign }
+        mapping: ${ $context.assign }
+        repo: ${ .input.repo }
         branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent replaces fixed colors, spacings and names by tokens and contract names and keeps the arrangement in its own layer; repeat until the script counts 0 fixed colors and spacings. Own worktree, local commits, no push, no tag.
+        freesynergy.net:summary: The agent replaces fixed colors, spacings and names by tokens and contract names and keeps the arrangement in its own layer. Own worktree, local commits ([COMMIT]), no push, no tag; report per [BERICHT]. The loop back from `repeat` runs until the script counts 0 fixed colors and spacings.
   - recount:
-      call: count-fixed-values:0.0.4@fs
+      call: count-fixed-values:0.0.5@fs
       with:
         group: ${ .input.group }
+      export:
+        as: '${ $context + { recount: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Script - the same count as at the start; anything but 0 fixed colors and spacings goes back to convert.
+        freesynergy.net:summary: Script - the same count as at the start; the result is `fixed` (colors and spacings still fixed).
   - gates:
-      call: gates:0.0.4@fs
+      call: gates:0.0.5@fs
+      export:
+        as: '${ $context + { gates: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: scripts/gates.sh, the one definition of the checks; red goes back to convert.
+        freesynergy.net:summary: scripts/gates.sh ([GATES]), the one definition of the checks; the result is `red` or not.
   - same-pictures:
-      call: pixel-compare:0.0.4@fs
+      call: pixel-compare:0.0.5@fs
       with:
         group: ${ .input.group }
+      export:
+        as: '${ $context + { pictures: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Script - renders the images after the change and compares them pixel by pixel with the before images; the conversion must not change the look (default theme), a difference goes back to convert.
-  - review:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: review
-          version: 0.0.4
-        input:
-          head: ${ .input.head }
-          scope: ${ .input.group }
+        freesynergy.net:summary: Script - renders the images after the change and compares them pixel by pixel with the before images; the conversion must not change the look (default theme); the result is `different` or not.
+  - repeat:
+      switch:
+        - again:
+            when: '${ $context.recount.fixed > 0 or $context.gates.red or $context.pictures.different }'
+            then: convert
+        - done:
+            then: continue
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
-        freesynergy.net:gate: opus-ja
-        freesynergy.net:kind: subjective
-        freesynergy.net:summary: The one Opus review of this head (review.yaml); NEIN goes back to convert with the findings as the order.
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - fixed values left, red gates or a changed picture go back to convert, otherwise on to the release.
   - release:
       run:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.4
+          version: 0.0.5
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: release-flow.yaml takes the reviewed head through CI to the release; the person merges and releases, agents never do. No second review here.
+        freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja; NEIN goes back to convert with the findings as the order), then CI; the person merges and releases, agents never do. There is no second review here.

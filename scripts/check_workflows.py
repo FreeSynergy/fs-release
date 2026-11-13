@@ -7,7 +7,8 @@ exit 0 green, 1 red (every problem on its own line `file: reason`), 2 skipped (n
 Per file: parses; `document` has dsl (1.0.x), namespace, name, version; `do` is a non-empty list; every step is one
 `name: task` pair with a task type, a unique name, `freesynergy.net:actor` (human | ai | machine), the matching
 `freesynergy.net:actor-type` (Person | Application | Service, the ActivityStreams types) and `freesynergy.net:gate` and `freesynergy.net:kind` (objective = repeat until the goal is reached; subjective = change the
-state whatever the result, e.g. show images, ask for a verdict).
+state whatever the result, e.g. show images, ask for a verdict). A `then` (task or `switch` case) is continue, exit, end
+or the name of a step of the same flow.
 """
 import glob
 import os
@@ -17,6 +18,7 @@ import sys
 ACTORS = {"human": "Person", "ai": "Application", "machine": "Service"}
 TASK_TYPES = {"call", "do", "emit", "for", "fork", "listen", "raise", "run", "set", "switch", "try", "wait"}
 KINDS = ("objective", "subjective")
+FLOW_WORDS = {"continue", "exit", "end"}
 ACTOR, ATYPE, GATE = "freesynergy.net:actor", "freesynergy.net:actor-type", "freesynergy.net:gate"
 KIND = "freesynergy.net:kind"
 
@@ -68,6 +70,26 @@ def check_doc(doc):
     seen = set()
     for i, item in enumerate(steps):
         problems += check_step(item, seen, f"do[{i}]")
+    return problems + check_then(steps, seen)
+
+
+def check_then(steps, names):
+    """Every flow directive `then` (on a task or in a `switch` case) is continue, exit, end or the name of a step."""
+    problems = []
+    for item in steps:
+        if not isinstance(item, dict) or len(item) != 1:
+            continue
+        ((name, task),) = item.items()
+        if not isinstance(task, dict):
+            continue
+        targets = [task.get("then")]
+        if isinstance(task.get("switch"), list):
+            for case in task["switch"]:
+                if isinstance(case, dict):
+                    targets += [c.get("then") for c in case.values() if isinstance(c, dict)]
+        for target in targets:
+            if target is not None and target not in FLOW_WORDS and target not in names:
+                problems.append(f"step {name!r}: `then` names {target!r}, which is no step of this flow")
     return problems
 
 

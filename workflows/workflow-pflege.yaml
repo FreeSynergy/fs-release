@@ -4,11 +4,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: workflow-pflege
-  version: 0.0.4
+  version: 0.0.5
   title: A step has no workflow - write or extend the flow, check it, bring it into main, then run the step
 do:
   - detect:
-      call: find-flow:0.0.4@fs
+      call: find-flow:0.0.5@fs
       with:
         step: ${ .input.step }
       metadata:
@@ -18,7 +18,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Looks in workflows/ for a flow with this step; none found means the work may not start, the next step writes it.
   - write:
-      call: build-ai:0.0.4@fs
+      call: build-ai:0.0.5@fs
       with:
         task: write or extend the flow for ${ .input.step } (Serverless Workflow 1.0 plus FS profile, no special forms, importable 1:1 into fs-workflows)
       metadata:
@@ -28,7 +28,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent writes or extends the file in its own worktree and commits locally; kind per step, only steps that really happen.
   - schema-check:
-      call: check-workflows:0.0.4@fs
+      call: check-workflows:0.0.5@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -40,7 +40,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.4
+          version: 0.0.5
         input:
           head: ${ .input.branch }
           scope: short
@@ -52,7 +52,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: A short Opus look, only when the change brings a new gate or a new right; otherwise skipped.
   - to-main:
-      call: merge-ff:0.0.4@fs
+      call: merge-ff:0.0.5@fs
       with:
         into: main
       metadata:
@@ -62,7 +62,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The coordinator brings the checked flow into main; the agent never does.
   - run-step:
-      call: run-flow-step:0.0.4@fs
+      call: run-flow-step:0.0.5@fs
       with:
         step: ${ .input.step }
       metadata:

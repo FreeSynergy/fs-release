@@ -4,8 +4,8 @@
 # steps[] -> do[] (one task each), call: fs.<command> -> a `call: function` task of the catalog "fs",
 # risk / reach / actor -> metadata of the task. No loops, no expressions, no shell.
 chain: release
-version: 0.0.4
-catalog: fs/0.0.4
+version: 0.0.5
+catalog: fs/0.0.5
 steps:
   - { id: gates,    call: fs.gates,    risk: start,   reach: local,  actor: program }
   - { id: review,   call: fs.review,   risk: view,    reach: local,  actor: llm }

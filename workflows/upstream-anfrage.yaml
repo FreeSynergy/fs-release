@@ -1,17 +1,20 @@
-# One git-bug issue to an upstream project. The text is drafted by the agent, the person approves, a script sends it.
-# Blinc: NO AI attribution in issue, PR or commit; no new Blinc PR without asking the user. Agents never push to our repos, tag or merge. FS profile: see README.md.
+# One request to an upstream project (an issue). The text is drafted by the agent, the person approves and chooses the channel, a script
+# sends it or the person writes it themselves. Blinc: NO AI attribution in issue, PR or commit; no new Blinc PR without asking the user.
+# Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence`. FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: upstream-anfrage
-  version: 0.0.4
-  title: File one git-bug issue at an upstream project
+  version: 0.0.5
+  title: Send one request to an upstream project by the channel the person chooses
 do:
   - draft:
-      call: draft-issue:0.0.4@fs
+      call: draft-issue:0.0.5@fs
       with:
         upstream: ${ .input.upstream }
         evidence: ${ .input.evidence }
+      export:
+        as: '${ $context + { draft: . } }'
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -19,44 +22,87 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body.
   - rules:
-      call: upstream-rules:0.0.4@fs
+      call: upstream-rules:0.0.5@fs
       with:
         upstream: ${ .input.upstream }
-        draft: ${ .draft }
+        draft: ${ $context.draft }
+      export:
+        as: '${ $context + { rules: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Script - reads the CLAUDE.md of the upstream clone (Blinc - /srv/FreeSynergy/blinc) and checks the draft against it; for Blinc no Claude, Anthropic or AI mention, no Co-Authored-By, no session link, no robot footer; a new Blinc PR needs the user's question first. A hit goes back to draft.
+        freesynergy.net:summary: Script - reads the CLAUDE.md of the upstream clone (Blinc - /srv/FreeSynergy/blinc) and checks the draft against it; for Blinc no Claude, Anthropic or AI mention, no Co-Authored-By, no session link, no robot footer; a new Blinc PR needs the user's question first. The result is `hits`, the list of broken rules.
+  - back-to-draft:
+      switch:
+        - hits:
+            when: '${ ($context.rules.hits | length) > 0 }'
+            then: draft
+        - clean:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a rules hit goes back to draft with the hits as the order, a clean draft goes on to the approval.
   - approval:
-      call: approve:0.0.4@fs
+      call: approve:0.0.5@fs
       with:
-        draft: ${ .draft }
+        draft: ${ $context.draft }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user's YES for exactly this text, given beforehand; without it nothing is sent, a changed text needs a new YES.
-  - send:
-      call: git-bug-send:0.0.4@fs
+  - choose-channel:
+      call: choose-channel:0.0.5@fs
       with:
         upstream: ${ .input.upstream }
-        draft: ${ .draft }
+      export:
+        as: '${ $context + { channel: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The person chooses the channel for this upstream - `tracker` (the upstream's own issue tracker, e.g. a GitHub issue under the user's account, only after the user's release for exactly this channel), `git-bug` (only if we have write access to the upstream's repository; `git-bug push` over SSH fails otherwise) or `direct` (Discord or mail, the user writes it themselves and the agent only delivers the text). Without a choice nothing is sent.
+  - send:
+      call: send-issue:0.0.5@fs
+      if: '${ $context.channel != "direct" }'
+      with:
+        upstream: ${ .input.upstream }
+        draft: ${ $context.draft }
+        channel: ${ $context.channel }
+      export:
+        as: '${ $context + { send: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Script - creates the issue with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote (git transport); only the approved text, only after the YES.
-  - record:
-      call: note-history:0.0.4@fs
+        freesynergy.net:summary: Script - sends by the chosen channel, only the approved text, only after the YES and the choice; `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id.
+  - hand-text:
+      call: hand-text:0.0.5@fs
+      if: '${ $context.channel == "direct" }'
       with:
-        id: ${ .send.id }
+        draft: ${ $context.draft }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Direct contact (Discord, mail) - the user writes the message themselves; the agent delivers only the approved text and sends nothing.
+  - record:
+      call: note-history:0.0.5@fs
+      with:
+        id: ${ $context.send.id }
+        channel: ${ $context.channel }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The agent notes the history - upstream, issue id, date, the approved text, later answers - in the report; no planning files in the upstream.
+        freesynergy.net:summary: The agent notes the history - upstream, channel, issue id (none for `direct`), date, the approved text, later answers - in the report; no planning files in the upstream.

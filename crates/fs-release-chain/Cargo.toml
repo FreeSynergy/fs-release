@@ -1,6 +1,6 @@
 [package]
 name = "fs-release-chain"
-version = "0.0.4"
+version = "0.0.5"
 description = "The release chain (gates, push, CI, merge, tag, release, catalog bump, sign, check) as one command"
 edition.workspace = true
 license.workspace = true

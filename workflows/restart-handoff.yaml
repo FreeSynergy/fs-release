@@ -3,11 +3,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: restart-handoff
-  version: 0.0.4
+  version: 0.0.5
   title: A new strategy session takes over from the handoff
 do:
   - read-handoff:
-      call: read-file:0.0.4@fs
+      call: read-file:0.0.5@fs
       with:
         file: todo/handoff-strategy.md
       metadata:
@@ -17,7 +17,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Reads the handoff file; the state changes to read.
   - read-memory:
-      call: read-memory:0.0.4@fs
+      call: read-memory:0.0.5@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -25,7 +25,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Reads the memory index and the files it names; a note that names a file or a flag is checked before it is used.
   - inform:
-      call: inform-coordinator:0.0.4@fs
+      call: inform-coordinator:0.0.5@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -37,7 +37,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: coordination-round
-          version: 0.0.4
+          version: 0.0.5
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application

@@ -1,14 +1,15 @@
 # Use a foreign crate UNCHANGED by git pin: no copy, no fork, [patch] only in our own workspace root, our own adapter crate (the wrapper), Cargo.lock checked in, license gate in the GitHub CI (cargo-deny, not local).
-# A pin bump is its own run with the same gates. Agents never push, tag or merge. FS profile: see README.md.
+# A pin bump is its own run with the same gates. Agents never push, tag or merge. Order: `Workflow wrapper-einbindung, step <id>,
+# parameters repo, branch, head, delta, crate, rev, wrapper` (docs/prompt-template.md). FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: wrapper-einbindung
-  version: 0.0.4
+  version: 0.0.5
   title: Use a foreign crate by git pin behind our own wrapper crate
 do:
   - pin:
-      call: git-pin:0.0.4@fs
+      call: git-pin:0.0.5@fs
       with:
         crate: ${ .input.crate }
         rev: ${ .input.rev }
@@ -19,18 +20,22 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent adds the foreign crate as a git dependency with a fixed revision (no copy, no fork); a needed change goes to the upstream as an issue (upstream-anfrage.yaml), or at most as `[patch]` in our own workspace root, never inside the dependency.
   - wrapper:
-      call: wrapper-crate:0.0.4@fs
+      call: wrapper-crate:0.0.5@fs
       with:
         crate: ${ .input.crate }
         wrapper: ${ .input.wrapper }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent writes our own adapter crate; only the wrapper names the foreign crate, the rest of the workspace uses the wrapper's interface. Repeat until check and test of the wrapper are green.
+        freesynergy.net:summary: The agent writes our own adapter crate; only the wrapper names the foreign crate, the rest of the workspace uses the wrapper's interface. Local commits ([COMMIT]), report per [BERICHT]. The loop back from `repeat` runs until check and test of the wrapper are green.
   - lock:
-      call: lock-checked-in:0.0.4@fs
+      call: lock-checked-in:0.0.5@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -38,47 +43,60 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - Cargo.lock is checked in and holds the pinned revision; the build runs with --locked.
   - license:
-      call: license-gate:0.0.4@fs
+      call: license-compare:0.0.5@fs
       with:
         crate: ${ .input.crate }
-      metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent checks the licenses of the new crate and its dependencies against deny.toml and extends the allow list only with a written reason per exception (e.g. BSL-1.0, Unlicense, 0BSD, LLVM-exception); cargo-deny itself runs in the GitHub CI step, not locally.
-  - gates:
-      call: gates:0.0.4@fs
+      export:
+        as: '${ $context + { license: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: scripts/gates.sh with check and test of the wrapper; red goes back to wrapper.
-  - review:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: review
-          version: 0.0.4
-        input:
-          head: ${ .input.head }
-          scope: ${ .input.wrapper }
+        freesynergy.net:summary: Script - lists the licenses of the new crate and its dependencies (cargo metadata) and compares them with the allow list of deny.toml; the result is the list `exceptions` of licenses not yet allowed. cargo-deny itself runs in the GitHub CI step, not locally.
+  - license-reasons:
+      call: license-reasons-ai:0.0.5@fs
+      if: '${ ($context.license.exceptions | length) > 0 }'
+      with:
+        exceptions: ${ $context.license.exceptions }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
-        freesynergy.net:gate: opus-ja
-        freesynergy.net:kind: subjective
-        freesynergy.net:summary: The one Opus review of this head (review.yaml); it also reads the license exceptions and the pin.
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Only when the script found exceptions - the agent writes the reason per exception (e.g. BSL-1.0, Unlicense, 0BSD, LLVM-exception) and extends the allow list of deny.toml by exactly those; the agent never decides alone whether a license is acceptable, the review reads the reasons.
+  - gates:
+      call: gates:0.0.5@fs
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/gates.sh ([GATES]) with check and test of the wrapper; the result is `red` or not.
+  - repeat:
+      switch:
+        - red:
+            when: ${ $context.gates.red }
+            then: wrapper
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - red gates go back to wrapper, otherwise on to the release.
   - release:
       run:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.4
+          version: 0.0.5
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: release-flow.yaml runs the CI (with the cargo-deny license gate) and the person merges and releases; a pin bump is its own run of this flow starting at pin.
+        freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (it also reads the license reasons and the pin), then the CI with the cargo-deny license gate; the person merges and releases. A pin bump is its own run of this flow starting at pin. There is no second review here.
