@@ -10,7 +10,7 @@ use fs_release_chain::sys::{SystemClock, SystemRunner};
 
 use crate::flow;
 use crate::lift::{self, LiftOpts};
-use crate::task::run_all;
+use crate::task::{run_all, NOT_RUN};
 
 #[derive(Parser)]
 #[command(
@@ -143,7 +143,7 @@ fn lift_cmd(a: &LiftArgs) -> i32 {
     for s in rep
         .steps
         .iter()
-        .filter(|s| s.status == "skipped" && s.secs > 0.0)
+        .filter(|s| s.status == "skipped" && s.detail != NOT_RUN)
     {
         println!("  WARNING {} skipped: {}", s.name, s.detail);
     }

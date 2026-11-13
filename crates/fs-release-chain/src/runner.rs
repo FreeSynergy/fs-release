@@ -15,6 +15,7 @@ use crate::steps::Frame;
 
 fn preflight(ctx: &Ctx) -> Result<(), Stop> {
     let t = &ctx.target;
+    crate::slug::validate_branch(&t.base).map_err(Stop::red)?;
     if t.branch == t.base {
         return Err(Stop::red(format!(
             "{} is the base branch: the chain releases a branch, main only moves by merge-ff",

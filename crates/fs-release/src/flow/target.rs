@@ -29,6 +29,7 @@ pub fn build_target(
     {
         return Err(format!("--version {version}: use N.N.N without the v"));
     }
+    fs_release_chain::slug::validate_branch(base).map_err(|e| format!("--base: {e}"))?;
     let git = |args: &[&str]| -> Result<String, String> {
         let cmd = Cmd {
             program: "git".into(),

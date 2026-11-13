@@ -9,6 +9,9 @@ use serde::Serialize;
 /// with the reason, never as `ok`.
 pub const SKIPPED: &str = "skipped: ";
 
+/// Detail of a record that never ran because an earlier step was not green (not a step that skipped its own check).
+pub const NOT_RUN: &str = "an earlier step was not green";
+
 /// One step of a run. The same trait serves the lift steps and the flow steps, so a workflow file can call either by name.
 pub trait Task<C> {
     /// Fixed name (`deps`, `lock`, `fmt`, `tag`, ...).
@@ -64,7 +67,7 @@ pub fn run_all<C>(tasks: &[Box<dyn Task<C>>], ctx: &C) -> (Vec<Record>, Option<(
             records.push(Record {
                 name,
                 status: "skipped".into(),
-                detail: "an earlier step was not green".into(),
+                detail: NOT_RUN.into(),
                 first_error: None,
                 secs: 0.0,
             });

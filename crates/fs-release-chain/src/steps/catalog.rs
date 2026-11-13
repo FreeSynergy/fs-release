@@ -75,7 +75,7 @@ impl Step for Bump {
                 dir.display()
             )));
         }
-        git::out(f.ctx, &dir, &["fetch", "--quiet", "origin", &t.base])?;
+        git::out(f.ctx, &dir, &["fetch", "--quiet", "--end-of-options", "origin", &t.base])?;
         let (local, remote) = (
             git::rev(f.ctx, &dir, "HEAD")?,
             git::rev(f.ctx, &dir, &format!("refs/remotes/origin/{}", t.base))?,

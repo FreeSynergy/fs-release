@@ -12,7 +12,8 @@ use crate::task::Task;
 /// The catalog workflow that raises the tag in `packages.toml` (`gh workflow run bump.yml -R <catalog>`).
 pub const BUMP_WORKFLOW: &str = "bump.yml";
 
-/// After the Pre-release is published: starts `bump.yml` of the catalog repo. Public reach, the repo and the catalog must be on the
+/// After the Pre-release is published (not a draft, `isPrerelease` set; that the tag is the approved head is checked by the
+/// chain's `tag` step, not again here): starts `bump.yml` of the catalog repo. Public reach, the repo and the catalog must be on the
 /// pre-approved list, and the approval of exactly this head is verified and audited like for tag and push. The catalog's own
 /// `sign` and `test` runs follow by themselves; this step does not poll them (the chain's `sign` / `check` steps do).
 pub struct BumpStep;
@@ -34,11 +35,11 @@ impl Task<Ctx<'_>> for BumpStep {
         let head = guard(ctx)?;
         green_report(ctx, &head)?;
         let tag = t.tag();
-        if gh::release_state(ctx, &t.slug, &tag)?.is_none_or(|r| r.draft) {
+        if gh::release_state(ctx, &t.slug, &tag)?.is_none_or(|r| r.draft || !r.prerelease) {
             return Err(Stop::halt(
                 "release",
                 format!(
-                    "release.yml to publish the Pre-release {tag} of {}: run again after it",
+                    "release.yml to publish the Pre-release (a draft or a full release does not count) {tag} of {}: run again after it",
                     t.slug
                 ),
             ));

@@ -10,6 +10,8 @@ pub struct MockGh {
     pub inner: SystemRunner,
     /// `None`: the tag has no release; `Some(draft)`.
     pub release: Option<bool>,
+    /// True: the release answers `isPrerelease: false` (a full release, not the Pre-release the bump follows).
+    pub full: bool,
     pub calls: RefCell<Vec<String>>,
 }
 
@@ -18,6 +20,7 @@ impl MockGh {
         MockGh {
             inner,
             release,
+            full: false,
             calls: RefCell::new(Vec::new()),
         }
     }
@@ -49,7 +52,8 @@ impl Runner for MockGh {
         };
         if line.starts_with("release view") {
             return match self.release {
-                Some(draft) => ok(&format!("{{\"isDraft\":{draft},\"isPrerelease\":true}}")),
+                Some(draft) => ok(&format!("{{\"isDraft\":{draft},\"isPrerelease\":{}}}",
+                    !self.full)),
                 None => Ok(Out {
                     code: 1,
                     stdout: String::new(),

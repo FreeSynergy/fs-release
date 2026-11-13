@@ -25,24 +25,6 @@ cargo fmt --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
 cargo test --workspace --all-features
 python3 -I "$rules" "$root"
-# yaml-check: every .github/workflows/*.yml parses (exit 2 = no PyYAML: nothing was checked, said loudly, not green-washed).
-rc=0
-python3 -I "$here/check_yaml.py" "$root" || rc=$?
-if [ "$rc" -eq 2 ]; then
-  echo "gates WARNING: yaml-check SKIPPED, the workflow files were not checked (install python3-pyyaml)" >&2
-elif [ "$rc" -ne 0 ]; then
-  echo "gates FAILED: yaml-check" >&2
-  exit 1
-fi
-# workflows/ (visible workflows, schema check) only in the repo that has the folder.
-if [ -d "$root/workflows" ]; then
-  rc=0
-  python3 -I "$here/check_workflows.py" "$root/workflows" || rc=$?
-  if [ "$rc" -eq 2 ]; then
-    echo "gates WARNING: workflow schema check SKIPPED (no PyYAML)" >&2
-  elif [ "$rc" -ne 0 ]; then
-    echo "gates FAILED: workflows/ schema check" >&2
-    exit 1
-  fi
-fi
+# yaml-check and the workflows/ schema check: own file, so the evaluation of their exit codes has a test.
+bash "$here/gates-files.sh" "$root"
 echo "gates ok: $root at $(git rev-parse --short HEAD 2>/dev/null || echo '?')"

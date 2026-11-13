@@ -75,6 +75,16 @@ fn no_release_or_a_draft_halts_for_the_release_and_starts_nothing() {
 }
 
 #[test]
+fn a_full_release_is_not_the_pre_release_and_starts_nothing() {
+    let (w, _) = approved();
+    let (mut mock, clock) = (MockGh::new(w.runner(), Some(false)), FakeClock::default());
+    mock.full = true;
+    let ctx = Ctx::new(w.target(), Reach::Public, Timing::standard(), &mock, &clock);
+    assert_eq!(halt(&BumpStep.run(&ctx)), "release");
+    assert_eq!(mock.dispatched(), Vec::<String>::new());
+}
+
+#[test]
 fn without_the_approval_of_this_head_nothing_is_started() {
     let (w, head) = approved();
     std::fs::remove_file(w.root().join(format!("freigaben/demo/{head}.ok"))).unwrap();

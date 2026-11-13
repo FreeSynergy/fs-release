@@ -11,7 +11,10 @@ use crate::outcome::Stop;
 /// The only repo whose `.fs/preapproved.toml` counts.
 pub const RELEASE_SLUG: &str = "FreeSynergy/fs-release";
 
-/// `.fs/preapproved.toml` of fs-release, read from `origin/<base>` of the checkout, not from `HEAD`.
+/// The one ref the list is read from, whatever `--base` the run targets (not settable from the command line).
+pub const LIST_BRANCH: &str = "main";
+
+/// `.fs/preapproved.toml` of fs-release, read from `origin/main` of the checkout, not from `HEAD`.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Preapproved {
@@ -26,9 +29,10 @@ pub struct Preapproved {
 }
 
 impl Preapproved {
-    /// Reads the list from `origin/<base>` of the fs-release checkout (`--release-dir`): the checkout's origin must be exactly
-    /// `FreeSynergy/fs-release`, the ref is fetched first (an existing one is used when the fetch fails), and the working
-    /// tree, `HEAD` and any local branch count for nothing. A release of fs-release itself therefore cannot bring its own list.
+    /// Reads the list from `origin/main` ([`LIST_BRANCH`]) of the fs-release checkout (`--release-dir`): the checkout's origin
+    /// must be exactly `FreeSynergy/fs-release`, the ref is fetched first (an existing one is used when the fetch fails), and
+    /// the working tree, `HEAD`, any local branch and the run's `--base` count for nothing. A release of fs-release itself,
+    /// or any other branch pushed to its origin, therefore cannot bring its own list.
     ///
     /// # Errors
     /// [`Stop::Red`] when the checkout is not fs-release or the file is damaged; [`Stop::Halt`] `not-preapproved` when
@@ -42,14 +46,17 @@ impl Preapproved {
                 dir.display()
             )));
         }
-        let base = &ctx.target.base;
-        let _ = git::raw(ctx, dir, &["fetch", "--quiet", "origin", base])?;
-        let spec = format!("refs/remotes/origin/{base}:.fs/preapproved.toml");
+        let _ = git::raw(
+            ctx,
+            dir,
+            &["fetch", "--quiet", "--end-of-options", "origin", LIST_BRANCH],
+        )?;
+        let spec = format!("refs/remotes/origin/{LIST_BRANCH}:.fs/preapproved.toml");
         let o = git::raw(ctx, dir, &["show", &spec])?;
         if !o.ok() {
             return Err(Stop::halt(
                 "not-preapproved",
-                format!(".fs/preapproved.toml on origin/{base} of the fs-release checkout"),
+                format!(".fs/preapproved.toml on origin/{LIST_BRANCH} of the fs-release checkout"),
             ));
         }
         toml::from_str(&o.stdout).map_err(|e| Stop::red(format!(".fs/preapproved.toml: {e}")))
