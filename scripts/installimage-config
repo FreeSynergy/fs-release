@@ -4,7 +4,7 @@
 DE: Erzeugt aus einer Variablen-Datei (KEY=VALUE) und optional einer bestand-JSON die installimage-Konfig.
     Ohne KI, ohne Netz, ohne Zeitstempel: gleiche Eingabe = gleiche Ausgabe. Loescht nichts, schreibt nur die
     Ausgabedatei. Das Loeschen macht allein installimage, vom Menschen im Rescue-System gestartet.
-EN: Builds the installimage config from a variable file and an optional bestand JSON. No AI, no network, no
+EN: Builds the installimage config from a variable file and an optional bestand report (JSON of fs-server-bestand). No AI, no network, no
     timestamps. Deletes nothing; only installimage (started by the person in the rescue system) deletes.
 
 Usage:
@@ -54,11 +54,39 @@ def read_vars(path):
 
 
 def read_bestand(path):
+    """Read the real fs-server-bestand report (schema of branch unreviewed/bestand, head f311b4f) and normalise it.
+
+    Used fields: section_status.boot and .disks (must be ok), summary.boot_mode (UEFI|BIOS),
+    summary.disks[{name,size_bytes}]. Missing or unusable fields are an error, never guessed.
+    """
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
     if not isinstance(data, dict):
         raise Bad(f"{path}: JSON object expected")
-    return data
+    summ = data.get("summary")
+    if not isinstance(summ, dict):
+        raise Bad(f"{path}: not an fs-server-bestand report (no summary object)")
+    stat = data.get("section_status") if isinstance(data.get("section_status"), dict) else {}
+    errs = []
+    for sec in ("boot", "disks"):
+        if stat.get(sec) != "ok":
+            errs.append(f"section {sec} has status {stat.get(sec)!r}, not ok (run as root and repeat)")
+    mode = str(summ.get("boot_mode", "")).upper()
+    if mode not in ("UEFI", "BIOS"):
+        errs.append(f"summary.boot_mode is {summ.get('boot_mode')!r}, expected UEFI or BIOS")
+    disks = []
+    raw = summ.get("disks")
+    if not isinstance(raw, list) or not raw:
+        errs.append("summary.disks missing or empty")
+    else:
+        for d in raw:
+            if not isinstance(d, dict) or not d.get("name") or not isinstance(d.get("size_bytes"), int) or d["size_bytes"] <= 0:
+                errs.append(f"summary.disks entry without name or positive size_bytes: {d!r}")
+            else:
+                disks.append({"name": d["name"], "size_gib": d["size_bytes"] / 1024 ** 3})
+    if errs:
+        raise Bad(f"{path}: " + "; ".join(errs))
+    return {"boot_mode": mode.lower(), "disks": disks}
 
 
 def num(text, what):
@@ -83,15 +111,22 @@ def merge(vars_, best):
         errs.append(f"BOOT_MODE {mode} contradicts bestand boot_mode {bmode}")
     mode = mode or bmode
     if mode not in ("uefi", "bios"):
-        errs.append("BOOT_MODE missing or not uefi|bios (set it or give the bestand JSON)")
+        errs.append("BOOT_MODE missing or not uefi|bios (set it or give --bestand with the fs-server-bestand report)")
     drives = [v[k] for k in ("DRIVE1", "DRIVE2") if k in v]
-    if not drives:
-        drives = ["/dev/" + d["name"] for d in disks[:2] if "name" in d]
-    sizes = [num(d["size_gib"], "bestand size_gib") for d in disks if "size_gib" in d]
+    if disks:
+        have = {d["name"]: d["size_gib"] for d in disks}
+        if not drives:
+            if len(disks) > 2:
+                errs.append(f"bestand lists {len(disks)} disks: set DRIVE1 (and DRIVE2) explicitly")
+            drives = ["/dev/" + d["name"] for d in disks[:2]]
+        for d in drives:
+            if d.removeprefix("/dev/") not in have:
+                errs.append(f"{d} is not in the bestand disks ({', '.join(sorted(have))})")
+    sizes = [d["size_gib"] for d in disks if "/dev/" + d["name"] in drives]
     if "DISK_SIZE_GIB" in v:
         small = num(v["DISK_SIZE_GIB"], "DISK_SIZE_GIB")
     elif sizes:
-        small = min(sizes[: max(len(drives), 1)])
+        small = min(sizes)
     else:
         small = None
     if errs:
@@ -204,6 +239,8 @@ def check(c, mode=None, small_gib=None):
     if raid == "1":
         if level not in need:
             e.append("SWRAIDLEVEL must be 0, 1, 5, 6 or 10 when SWRAID is 1")
+        elif level != "1":
+            e.append(f"RAID{level}: nicht unterstuetzt / not supported (only RAID1 with 1 or 2 drives for now)")
         elif len(names) < need[level]:
             e.append(f"RAID{level} needs at least {need[level]} drives, config has {len(names)}")
         if level in ("0", "5", "6", "10") and not any(p[1] == "/boot" for p in c["parts"]):

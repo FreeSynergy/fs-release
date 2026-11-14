@@ -12,7 +12,7 @@ Vor Montag wird nichts gelöscht; die Vorbereitung (Schritte 1 bis 4) ändert nu
    `DRIVE1`, `DRIVE2`, `BOOT_SIZE_MIB` (1024), `ESP_SIZE_MIB` (256), `SWAP_GIB` (8), `ROOT_GIB` (64), `FS_DATA=btrfs|zfs|none`.
    Den genauen `IMAGE`-Dateinamen kennst du erst im Rescue-System (Verzeichnis der Images); bis dahin Platzhalter, dann neu erzeugen.
 2. **Bestand vorher** (auf dem laufenden System): `fs-server-run` mit `fs-server-bestand`, Ausgabe `bestand-vorher.json`
-   zurück auf den lokalen Rechner. Er liefert Boot-Modus und Platten (angenommenes Format: siehe [nicht belegt]).
+   zurück auf den lokalen Rechner. Er liefert Boot-Modus und Platten (echtes Format des Berichts von `fs-server-bestand`, Branch `unreviewed/bestand`: `summary.boot_mode`, `summary.disks[{name,size_bytes}]`, `section_status`).
 3. **Konfig erzeugen:** `scripts/installimage-config --vars server.vars --bestand bestand-vorher.json --out installimage.conf`
    und `... --plan > plan.txt`. Lies `plan.txt` ganz.
 4. **Prüfen:** `scripts/installimage-config --check installimage.conf --vars server.vars --bestand bestand-vorher.json` muss `CHECK OK` melden.
@@ -62,9 +62,9 @@ Belegt nur im Quelltext von `github.com/hetzneronline/installimage` (`functions.
 **[nicht belegt]**
 - Die Aufrufzeile von `installimage` (Autosetup-Datei `/autosetup` kopieren oder Option) und die Dateinamen der Images (Debian 13/12, Ubuntu).
 - Das vollständige Verzeichnis zulässiger Dateisysteme in `PART` (das Skript kennt ext2/3/4, xfs, btrfs, swap, esp; weitere ungeprüft).
-- Die genaue Plattenzahl-Mindestgrenze für RAID 5/6/10 (Skript prüft sie, Zahl nicht gelesen; der Generator erzeugt nur RAID1).
+- RAID 5/6/10: bewusst nicht unterstützt (Fehlermeldung); der Generator erzeugt nur RAID1 mit 1 oder 2 Platten.
 - btrfs-RAID1 oder btrfs auf md innerhalb der installimage-Konfig: nicht möglich/ungeprüft, daher läuft der Datenteil nach dem ersten Start (Schritt 11).
 - ZFS (`FS_DATA=zfs`): weder in der Doku-Seite noch im gelesenen Quelltext; nur der Pool-Befehl als Hinweis im Plan.
-- Das Format der Ausgabe von `fs-server-bestand` (wir nehmen JSON mit `boot_mode` und `disks[{name,size_gib}]` an).
+- Das Format von `fs-server-bestand` ist jetzt aus dem Quelltext (Kopf f311b4f) übernommen; fehlende oder nicht `ok`-Felder sind ein Fehler, nichts wird geraten. Die Namen im Rescue-System können von denen im laufenden System abweichen (Reihenfolge sda/sdb): `DRIVE1`/`DRIVE2` nach dem Start im Rescue mit `lsblk` prüfen.
 - Das Verhalten bei einer Platte mit unterschiedlicher Größe (Generator nimmt die kleinere als Grenze).
 - Der Rescue-Ablauf im Robot wurde nicht an einem echten Server geprüft.
