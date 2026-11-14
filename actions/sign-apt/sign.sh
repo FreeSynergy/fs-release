@@ -2,7 +2,9 @@
 # Pattern: Strategy-by-presence (like sign-files). Signs dists/<suite>/Release of EVERY suite: InRelease (clearsign) + Release.gpg (detached, armoured).
 # Same hygiene as sign-files/sign.sh: private temp GNUPGHOME (0700) and passphrase file (0600), removed by a trap on EVERY exit.
 # Unlike sign-files it FAILS when the key is missing: an APT repository must never be published unsigned.
-# Usage: sign.sh REPO_DIR       (env GPG_PRIVATE_KEY, GPG_PASSPHRASE). Test: tests/packaging/sign-apt.sh.
+# The signature is made by exactly ONE signing subkey (SIGN_SUBKEY, forced with "!"): the secret holds only the subkey (gpg --export-secret-subkeys),
+# the primary key stays offline; a secret without that subkey is an error.
+# Usage: sign.sh REPO_DIR       (env GPG_PRIVATE_KEY, GPG_PASSPHRASE, SIGN_SUBKEY). Test: tests/packaging/sign-apt.sh.
 set -euo pipefail
 dir=${1:?usage: sign.sh REPO_DIR}
 if [[ -z "${GPG_PRIVATE_KEY:-}" ]]; then
@@ -28,11 +30,13 @@ trap cleanup EXIT
 chmod 700 "$GNUPGHOME"; chmod 600 "$pass_file"
 printf '%s' "${GPG_PASSPHRASE:-}" > "$pass_file"
 printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
-fpr=$(gpg --batch --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')
-[[ -n "$fpr" ]] || { echo "::error::no secret key found in GPG_PRIVATE_KEY"; exit 1; }
-# gpg picks the newest valid signing subkey of the primary fingerprint (no "!" forcing: a subkey-only secret works, an expired one is refused)
-gpg_opts=(--batch --yes --pinentry-mode loopback --passphrase-file "$pass_file" --local-user "$fpr" --digest-algo SHA512)
-echo "Signing key fingerprint: $fpr"
+sub=${SIGN_SUBKEY:-}; sub=${sub^^}; sub=${sub// /}
+[[ $sub =~ ^[0-9A-F]{40}$ ]] || { echo "::error::SIGN_SUBKEY must be the 40 hex digit fingerprint of the signing subkey"; exit 1; }
+gpg --batch --list-secret-keys --with-colons | awk -F: '/^ssb:/ {s=1; next} s && /^fpr:/ {print toupper($10); s=0}' | grep -qx "$sub" \
+  || { echo "::error::signing subkey $sub not found in GPG_PRIVATE_KEY"; exit 1; }
+# "!" forces exactly this subkey (gpg would otherwise pick the newest valid signing subkey)
+gpg_opts=(--batch --yes --pinentry-mode loopback --passphrase-file "$pass_file" --local-user "$sub!" --digest-algo SHA512)
+echo "Signing subkey fingerprint: $sub"
 for rel in "${releases[@]}"; do
   d=$(dirname "$rel")
   rm -f "$d/InRelease" "$d/Release.gpg"

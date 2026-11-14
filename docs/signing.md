@@ -10,8 +10,9 @@ The key is created and kept by the owner. Nothing in this repo generates one.
 
 ```sh
 export GNUPGHOME=$(mktemp -d)
-gpg --quick-generate-key "FreeSynergy Release <release@freesynergy.net>" ed25519 sign 3y
-gpg --list-secret-keys --keyid-format long        # note the fingerprint
+gpg --quick-generate-key "FreeSynergy Release <release@freesynergy.net>" ed25519 cert 3y   # primary key: certify only, stays offline
+gpg --quick-add-key <primary-fingerprint> ed25519 sign 1y                                    # signing subkey, the only key CI gets
+gpg --list-secret-keys --keyid-format long --with-subkey-fingerprints                        # note both fingerprints
 ```
 
 Ed25519 with a 3 year expiry; extending it later is a one-minute job and does not change the key.
@@ -36,12 +37,12 @@ Organisation level (recommended, one place for all repos): *Settings > Secrets a
 
 | Secret | Content |
 |--------|---------|
-| `GPG_PRIVATE_KEY` | full text of `FreeSynergy-release-secret.asc` |
+| `GPG_PRIVATE_KEY` | export of the signing subkey ONLY: `gpg --armor --export-secret-subkeys <subkey-fingerprint>!` (the primary key never goes to CI) |
 | `GPG_PASSPHRASE` | the passphrase (empty is allowed but discouraged) |
 
 Limit the secrets to the repositories that release. The caller workflows pass them explicitly; fs-release only uses
 them in the `finalize` job, never in jobs that run build scripts of the app.
-(A dedicated signing subkey that is exported without the primary key is an option for later: `gpg --export-secret-subkeys`.)
+The signing subkey without the primary key IS in use now: `actions/sign-apt` forces exactly one subkey (`signing-subkey` input, default `372A583D05BF8362604CF25DE26A2347F2B1C097`, with `!`) and fails if the secret does not contain it. Keep the offline backup of the full secret key as described above; only the subkey export goes into the secret. The subkey expires 2027-11-07: extend it offline, export it again and update the secret before then.
 
 ## Publish the public key
 

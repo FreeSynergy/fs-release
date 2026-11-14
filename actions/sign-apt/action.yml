@@ -2,8 +2,9 @@ name: sign-apt
 description: OpenPGP-sign the APT metadata (InRelease clear-signed, Release.gpg detached) of every suite below DIRECTORY/dists, only when the key secret is present. Needs gpg only (no apt tools).
 inputs:
   directory: { description: "Repository root that contains dists/<suite>/Release", default: repo }
-  private-key: { description: "ASCII-armoured secret key (signing subkey is enough)", default: "" }
+  private-key: { description: "ASCII-armoured secret key (only the signing subkey: gpg --export-secret-subkeys)", default: "" }
   passphrase: { description: "Key passphrase", default: "" }
+  signing-subkey: { description: "Fingerprint of the signing subkey that signs (forced with !)", default: "372A583D05BF8362604CF25DE26A2347F2B1C097" }
 runs:
   using: composite
   steps:
@@ -11,5 +12,6 @@ runs:
       env:
         GPG_PRIVATE_KEY: ${{ inputs.private-key }}
         GPG_PASSPHRASE: ${{ inputs.passphrase }}
+        SIGN_SUBKEY: ${{ inputs.signing-subkey }}
         DIR: ${{ inputs.directory }}
       run: '"$GITHUB_ACTION_PATH/sign.sh" "$DIR"'
