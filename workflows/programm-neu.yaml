@@ -1,4 +1,4 @@
-# New program: from the test question 'whose data?' to acceptance by the user, 17 steps in the phases P0 to P6.
+# New program: from the test question 'whose data?' to acceptance by the user, 17 steps (plus 9a) in the phases P0 to P6.
 # Every agent step (objective) is followed by an objective script check; red goes back (switch with then); every step names its ADRs
 # (freesynergy.net:adr). Outcomes Facette, Modul and Suite leave the flow at a stub (facette-abzweig, modul-abzweig, suite-abzweig, at the
 # end of the file); `facette-anlegen` does not exist yet (TODO, not invented). Agents never push, tag or merge, never touch a real server,
@@ -198,8 +198,8 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P1
-        freesynergy.net:adr: '0014, 0046'
-        freesynergy.net:summary: "Step 5 - the way of moving house: import and export of the formats of the widespread programs of this topic (read and write their files), as a command of the program, with sample files of those formats as fixtures; export is its own command, not saving (ADR 0046). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step umzug, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+        freesynergy.net:adr: '0014, 0046, 0085'
+        freesynergy.net:summary: "Step 5 - fix the formats and the way of moving house: the formats of the widespread programs of this topic (read and write their files) with sample files as fixtures, and for every time and every person field the inner form per ADR 0085 (draft): times in UTC plus IANA zone id where the local meaning counts, all-day dates without time, persons as references to People (frozen extract only for bookings, invoices, contracts); the commands for import and export themselves are built in step 9a; export is its own command, not saving (ADR 0046). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step umzug, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - umzug-check:
       call: roundtrip-check:0.0.6@fs
       with:
@@ -243,8 +243,8 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P2
-        freesynergy.net:adr: '0014, 0046, 0076'
-        freesynergy.net:summary: "Step 6 - the data model on the standards: types and fields map to the standards of step 3, storage through fs-store, history as AS2 activities through fs-history, saving is not exporting (ADR 0046: work on the database copy, export is separate). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step datenmodell, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+        freesynergy.net:adr: '0014, 0046, 0076, 0085'
+        freesynergy.net:summary: "Step 6 - the data model on the standards: types and fields map to the standards of step 3 (time and person fields as in step 5, ADR 0085 draft: UTC plus zone id, date only, person reference), storage through fs-store, history as AS2 activities through fs-history, saving is not exporting (ADR 0046: work on the database copy, export is separate). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step datenmodell, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - modell-check:
       call: model-check:0.0.6@fs
       with:
@@ -415,6 +415,51 @@ do:
         freesynergy.net:phase: P3
         freesynergy.net:adr: '0045'
         freesynergy.net:summary: "Control flow - a contract fault goes back to schnittstelle, any other red to engine."
+  - grenz-adapter:
+      call: boundary-adapter-ai:0.0.6@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0085, 0014, 0046'
+        freesynergy.net:summary: "Step 9a - importers and exporters as border adapters (ADR 0085, draft): every importer reads a foreign format and normalizes it into the inner model (times to UTC plus IANA zone id, all-day dates stay dates, person names become references to People or to the small local store); every exporter converts for the target and is its own command, not saving (ADR 0046); what cannot be mapped is kept as the original and reported. Tests with the sample files of step 5 and a round trip. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step grenz-adapter, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - grenz-check:
+      call: boundary-check:0.0.6@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { grenz: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0085'
+        freesynergy.net:summary: "Script - every import and export command has tests with foreign sample files; no free person name and no local time without zone in the inner model after an import; export of an all-day date stays a date; red otherwise. The result carries `red` (true = back)."
+  - grenz-again:
+      switch:
+        - red:
+            when: '${ $context.grenz.red }'
+            then: grenz-adapter
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0085'
+        freesynergy.net:summary: "Control flow - red goes back to grenz-adapter."
   - admin-frontend:
       call: admin-frontend-ai:0.0.6@fs
       with:

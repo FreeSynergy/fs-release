@@ -56,9 +56,9 @@ Bausteine. Format: `docs/baustein-zuordnung.md`, Selbsttest `scripts/test_bauste
 
 **Neues Programm (`programm-neu`, Nutzerwunsch 14.11.).** Ein Ablauf von der Prüffrage bis zur Abnahme, 17 Schritte in sieben Phasen:
 P0 (1 „wessen Daten?“, ADR 0076, Ausgang Programm / Facette / Modul / Suite; 2 Hub und Katalog, ADR 0068), P1 (3 Standards und ihre
-Testsammlungen, ADR 0014; 4 Kern-Crate, Wrapper statt Fork; 5 Import/Export der verbreiteten Formate, Umzugsweg), P2 (6 Datenmodell
+Testsammlungen, ADR 0014; 4 Kern-Crate, Wrapper statt Fork; 5 Formate festlegen (Zeiten UTC plus Zonen-Id, Personen als Verweis, ADR 0085 Entwurf) und Umzugsweg), P2 (6 Datenmodell
 auf Standards, Speichern ist nicht Exportieren, ADR 0046; 7 Themen-Schnittstelle, ADR 0045/0066; 8 Manifest, ADR 0068), P3 (9 Engine
-mit Vertragstests; 10 Admin-Frontend aus der Typbeschreibung), P4 (11 Vorbild-Dossier; 12 `frontend-round` mit Baustein-Zuordnung,
+mit Vertragstests; 9a Importer/Exporter als Grenz-Adapter nach ADR 0085 (Entwurf); 10 Admin-Frontend aus der Typbeschreibung), P4 (11 Vorbild-Dossier; 12 `frontend-round` mit Baustein-Zuordnung,
 Stil, Zusammensetzen, `menue-vergleich`; 13 Sprache MF2 de+en und Barrierefreiheit), P5 (14 Hub-Anmeldung und `fs-server`-Adapter
 nach ADR 0082; 15 Sicherheit, ADR 0054/0056/0067; 16 Pakete, Katalog ADR 0077, Doku, `release-flow`), P6 (17 Abnahme durch den
 Nutzer, Befunde laufen durch `bugfix`). Jeder Agentenschritt (`objective`) hat danach einen objektiven Skript-Prüfschritt; rot
@@ -113,9 +113,9 @@ hidden headers and no calculation module (formulas = a module, ADR 0084 pattern)
 
 **New program (`programm-neu`, user request 14 Nov).** One flow from the test question to acceptance, 17 steps in seven phases:
 P0 (1 "whose data?", ADR 0076, outcome Programm / Facette / Modul / Suite; 2 hub and catalog, ADR 0068), P1 (3 standards and their test
-collections, ADR 0014; 4 core crate, wrapper not fork; 5 import/export of the widespread formats, the way of moving house), P2 (6 data
+collections, ADR 0014; 4 core crate, wrapper not fork; 5 fix the formats (times UTC plus zone id, persons as references, ADR 0085 draft) and the way of moving house), P2 (6 data
 model on the standards, saving is not exporting, ADR 0046; 7 topic interface, ADR 0045/0066; 8 manifest, ADR 0068), P3 (9 engine with
-contract tests; 10 admin Frontend from the type description), P4 (11 model dossier; 12 `frontend-round` with block assignment, look,
+contract tests; 9a importers/exporters as border adapters per ADR 0085 (draft); 10 admin Frontend from the type description), P4 (11 model dossier; 12 `frontend-round` with block assignment, look,
 composition, `menue-vergleich`; 13 language MF2 de+en and accessibility), P5 (14 hub registration and the `fs-server` adapter per ADR
 0082; 15 security, ADR 0054/0056/0067; 16 packages, catalog ADR 0077, docs, `release-flow`), P6 (17 acceptance by the user, findings run
 through `bugfix`). Every agent step (`objective`) is followed by an objective script check; red jumps back by `switch`/`then`. Every step names its

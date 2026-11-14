@@ -6,7 +6,7 @@ mod support;
 use support::workflows::{assert_red, read, step_body, step_names};
 
 const FLOW: &str = "programm-neu";
-const MAIN: [&str; 17] = [
+const MAIN: [&str; 18] = [
     "wessen-daten",
     "katalog-suche",
     "standards",
@@ -16,6 +16,7 @@ const MAIN: [&str; 17] = [
     "schnittstelle",
     "manifest",
     "engine",
+    "grenz-adapter",
     "admin-frontend",
     "vorbild-dossier",
     "frontend",
@@ -76,7 +77,17 @@ fn the_17_steps_come_in_the_order_of_the_phases() {
     };
     let phases: Vec<char> = MAIN.iter().map(|s| phase(s)).collect();
     assert!(phases.windows(2).all(|p| p[0] <= p[1]), "{phases:?}");
-    assert_eq!((phases[0], phases[16]), ('0', '6'));
+    assert_eq!((phases[0], phases[17]), ('0', '6'));
+}
+
+#[test]
+fn the_border_adapter_step_and_the_formats_name_adr_0085() {
+    let text = read(FLOW);
+    for step in ["umzug", "datenmodell", "grenz-adapter"] {
+        assert!(step_body(&text, step).contains("0085"), "{step}");
+    }
+    // counter-test: without the reference the check finds nothing
+    assert!(!step_body(&text.replace("0085", "0000"), "grenz-adapter").contains("0085"));
 }
 
 #[test]
