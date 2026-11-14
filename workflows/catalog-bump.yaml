@@ -5,6 +5,14 @@ document:
   name: catalog-bump
   version: 0.0.6
   title: Raise a program in the catalog, sign the catalog, test it
+# Start by event (net.freesynergy.release.published, see README.md), nothing is sent across repos and no token is needed: fs-catalog
+# pulls. The 15-minute schedule of bump.yml (7,22,37,52 * * * *) stays as the safety net and is NOT changed; whether `every` and
+# `on` may stand together in SW 1.0.3 is not proven, so the net is described here and not as a second trigger.
+schedule:
+  on:
+    any:
+      - with:
+          type: net.freesynergy.release.published
 do:
   - bump:
       call: bump:0.0.6@fs
@@ -16,7 +24,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: bump.yml (dispatch, or its 15-minute schedule) finds the new published Pre-release and raises the tag in packages.toml.
+        freesynergy.net:summary: Started by the event release.published; bump.yml finds the new published Pre-release and raises the tag in packages.toml. The 15-minute schedule is the safety net (lost delivery, GitHub load); doing it twice is harmless (idempotent - no change, no commit, no sign). Gate none - a follow-up of the released step.
   - sign:
       call: sign:0.0.6@fs
       with:
@@ -28,6 +36,20 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Signs catalog.xml with the project key (the key is a repository secret, never in a file).
+  - announce-signed:
+      emit:
+        event:
+          with:
+            source: https://github.com/FreeSynergy/fs-catalog
+            type: net.freesynergy.catalog.signed
+            data:
+              commit: ${ .input.commit }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: sign.yml says at its end, after the push, that catalog.xml is signed (the sender of the event release-flow waits for).
   - test:
       call: check:0.0.6@fs
       metadata:
@@ -35,4 +57,18 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Looks at the catalog like a user - fresh clone, signature against the project key, the version is in it.
+        freesynergy.net:summary: Looks at the catalog like a user - fresh clone, signature against the project key, the version is in it. Planned (a task in the repo fs-catalog, not here) - it runs in the same sign.yml run after the push, because a push with GITHUB_TOKEN starts no other workflow; today it does not run by itself.
+  - announce-tested:
+      emit:
+        event:
+          with:
+            source: https://github.com/FreeSynergy/fs-catalog
+            type: net.freesynergy.catalog.tested
+            data:
+              ok: ${ .input.ok }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Result of the check; ok false is red (net.freesynergy.run.failed, issue with label rot).

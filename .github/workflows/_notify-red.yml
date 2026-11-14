@@ -1,0 +1,46 @@
+# Reusable red notice (event net.freesynergy.run.failed, no dispatch, no secret): one issue per workflow and repo, only GITHUB_TOKEN.
+# Red: opens the issue `rot: <workflow> <repo>` (label `rot`), or only comments when an open one exists.
+# Green: closes the open issue of the same title. The coordinator asks once for the whole organisation:
+#   gh search issues --owner FreeSynergy --label rot --state open
+# Call it as the last job of a workflow, with `if: always()`; usage and caller permissions: docs/notify-red.md
+name: _notify-red
+on:
+  workflow_call:
+    inputs:
+      workflow: { type: string, required: true, description: "Name of the workflow that ran (goes into the title)" }
+      failed: { type: boolean, required: true, description: "true = red, open or extend the issue; false = green, close it" }
+      run-url: { type: string, default: "", description: "Link to the run (default - the run of the caller)" }
+
+permissions:
+  issues: write
+
+jobs:
+  notify-red:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Open, extend or close the red issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          WORKFLOW: ${{ inputs.workflow }}
+          FAILED: ${{ inputs.failed }}
+          RUN_URL: ${{ inputs.run-url }}
+        run: |
+          set -eu
+          title="rot: ${WORKFLOW} ${GH_REPO}"
+          url="${RUN_URL:-${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}}"
+          # exact title match among the open issues with the label (the search is fuzzy)
+          open=$(gh issue list --state open --label rot --limit 100 --json number,title \
+            --jq "[.[] | select(.title == \"${title}\") | .number] | .[]")
+          if [ "$FAILED" = "true" ]; then
+            if [ -n "$open" ]; then
+              for n in $open; do gh issue comment "$n" --body "Red again: ${url}"; done
+            else
+              gh label create rot --color B60205 --description "A workflow run is red" || true
+              gh issue create --label rot --title "$title" \
+                --body "The workflow ${WORKFLOW} is red in ${GH_REPO}: ${url}
+          Look at the failed step. The issue closes itself at the next green run."
+            fi
+          else
+            for n in $open; do gh issue close "$n" --comment "Green again: ${url}"; done
+          fi

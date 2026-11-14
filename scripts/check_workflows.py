@@ -93,6 +93,40 @@ def check_then(steps, names):
     return problems
 
 
+def event_types(doc):
+    """(type, is_emit) of every `emit` step and every `listen` / `schedule.on` event of a flow."""
+    found = []
+
+    def walk(node, emit):
+        if isinstance(node, dict):
+            for key, val in node.items():
+                if key == "type" and isinstance(val, str) and val.startswith("net."):
+                    found.append((val, emit))
+                walk(val, emit or key == "emit")
+        elif isinstance(node, list):
+            for val in node:
+                walk(val, emit)
+
+    walk(doc.get("do"), False)
+    walk(doc.get("schedule"), False)
+    return found
+
+
+def check_events(doc, name, readme):
+    """Event rules: every type is `net.freesynergy.*` and in the README catalog; the coordinator starts with `rot-pruefen`."""
+    problems = []
+    for typ, _ in event_types(doc):
+        if not typ.startswith("net.freesynergy."):
+            problems.append(f"event type {typ!r} does not start with net.freesynergy.")
+        elif readme is not None and f"`{typ}`" not in readme:
+            problems.append(f"event type {typ!r} is not in the event catalog of README.md")
+    if name == "coordination-round":
+        first = next(iter(doc["do"][0]), None) if doc.get("do") else None
+        if first != "rot-pruefen":
+            problems.append("the first step must be `rot-pruefen` (the coordinator acts only on red or at gates)")
+    return problems
+
+
 def main(argv):
     try:
         if "--simulate-missing-yaml" in argv:
@@ -107,6 +141,8 @@ def main(argv):
         print(f"{folder}: no workflow files")
         return 1
     bad = 0
+    readme_path = os.path.join(folder, "README.md")
+    readme = open(readme_path, encoding="utf-8").read() if os.path.exists(readme_path) else None
     for path in files:
         rel = os.path.basename(path)
         try:
@@ -117,7 +153,10 @@ def main(argv):
             print(f"{rel}:{mark.line + 1 if mark else 0}: {getattr(e, 'problem', None) or 'not YAML'}")
             bad += 1
             continue
-        for p in check_doc(doc):
+        problems = check_doc(doc)
+        if not problems:
+            problems = check_events(doc, rel.rsplit(".", 1)[0], readme)
+        for p in problems:
             print(f"{rel}: {p}")
             bad += 1
     if not bad:

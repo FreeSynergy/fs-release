@@ -171,3 +171,14 @@ fn counter_a_jump_to_a_missing_step_is_red() {
         t.replacen("then: gap-list", "then: gap-lst", 1)
     });
 }
+
+#[test]
+fn the_coordinator_starts_with_the_red_check_and_events_are_net_freesynergy() {
+    assert_eq!(position(&read("coordination-round"), "rot-pruefen"), 0);
+    assert_red("coordination-round", "first step must be `rot-pruefen`", |t| {
+        swapped(&t, "rot-pruefen", "cost-log")
+    });
+    assert_red("release-flow", "does not start with net.freesynergy.", |t| {
+        t.replacen("type: net.freesynergy.release.published", "type: net.example.x", 1)
+    });
+}

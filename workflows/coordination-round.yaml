@@ -6,6 +6,14 @@ document:
   version: 0.0.6
   title: The coordinator checks the runs, evaluates finished ones, starts reviews
 do:
+  - rot-pruefen:
+      call: red-check:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'The coordinator acts only on red or at approval gates. One query - `gh search issues --owner FreeSynergy --label rot --state open` (red notices of _notify-red.yml, one issue per workflow and repo). Empty = silence, start nothing. Follow-ups after an approval (bump, sign, catalog check, package repos, docs build) the coordinator never starts by hand; they run by event/CI. Red = `bugfix` or `agent-run` for exactly this run; a gate is never bypassed.'
   - cost-log:
       call: read-cost-log:0.0.6@fs
       metadata:
@@ -63,4 +71,4 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Decides whether the strategy needs a report; if so report-to-strategy.yaml runs.
+        freesynergy.net:summary: Decides whether the strategy needs a report; if so report-to-strategy.yaml runs. A report only on red, at a gate or when a result is finished.

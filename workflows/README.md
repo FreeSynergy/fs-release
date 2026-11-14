@@ -59,5 +59,50 @@ is no copy in the repo. The `[EFFIZIENZ]` rules (one run = one gate cycle, gates
 mechanics as a script, abort protection) are step rules in `agent-run` and `review`. Before any decision `scripts/adr-search`
 looks up the existing ADRs (`entscheidung`, `user-decision`).
 
+## Events / Ereignisse
+
+**DE.** Workflows und CI-Läufe wecken einander über Ereignisse nach CloudEvents (Pflichtfelder `id`, `source`, `specversion`,
+`type`). Hülle: `type` = `net.freesynergy.<gegenstand>.<ereignis>`; `source` = Repo-URL des Senders; `subject` = Tag oder Name;
+`time` RFC 3339; `data` klein (Namen, Zahlen, Tags), nie Geheimnisse, nie Befehle. Ereignisse sind Weckrufe, die Entscheidung steht
+im Repo-Zustand, nicht im Ereignis. **Grundregel: keine Freigabe-Umgehung. Automatisch laufen nur Folgen bereits freigegebener
+Schritte** (Gate `none` oder schon erfüllt); kein Ereignis löst Tag, Push, Veröffentlichung, ADR-Push oder Löschen aus. Der
+Zeitplan von `bump.yml` (alle 15 Minuten) bleibt als Sicherheitsnetz; es gibt keinen Token zwischen Repos (Pull, Q2b in DESIGN.md).
+
+**EN.** Workflows and CI runs wake each other by events in the CloudEvents form (required `id`, `source`, `specversion`, `type`).
+Envelope: `type` = `net.freesynergy.<subject>.<event>`; `source` = repo URL of the sender; `subject` = tag or name; `time`
+RFC 3339; `data` small (names, numbers, tags), never secrets, never commands. Events are wake-up calls; the decision is in the
+repo state, not in the event. **Basic rule: no bypass of an approval. Only follow-ups of steps that are already approved run
+automatically** (gate `none` or already met); no event triggers a tag, push, publication, ADR push or deletion. The 15-minute
+schedule of `bump.yml` stays as the safety net; there is no token between repos (pull, Q2b in DESIGN.md).
+
+| type | sender | receiver | data | approval rule |
+|---|---|---|---|---|
+| `net.freesynergy.release.published` | last job of `release.yml` in the program repo, after `publish` was green (a draft sends nothing); `release-flow` step `announce` | `catalog-bump` (`schedule.on`), `release-flow` step `release` (`listen`) | `repo`, `tag`, `prerelease` (yes/no) | automatic: follow-up of the approved push (the opus-ja and picture OK lay before the tag) |
+| `net.freesynergy.catalog.signed` | `sign.yml` of fs-catalog after the push | `release-flow` step `sign` (`listen`) | `commit` | automatic |
+| `net.freesynergy.catalog.tested` | check like a user (a task in fs-catalog: in the same `sign.yml` run, because a push with the run token starts no other workflow) | `release-flow` step `sign` | `ok` | automatic; `ok` false is red |
+| `net.freesynergy.catalog.changed` | candidate: `sign.yml` after a green check | candidate: rebuild of fs-packages (pull by schedule, later) | `commit` | automatic only if nothing new becomes public; the first publication of a package repo is a gate |
+| `net.freesynergy.text.published` | candidate: text/docs repo on a push to main | candidate: docs build | `repo`, `commit` | build into the preview automatic; going public only with an approved source |
+| `net.freesynergy.run.failed` | any workflow when red (`_notify-red.yml`, issue `rot: <workflow> <repo>`, label `rot`; closes at the next green) | the coordinator, by one query: `gh search issues --owner FreeSynergy --label rot --state open` | `workflow`, `repo`, `run_url`, `step` | always allowed (a notice only); there is no status board |
+| `net.freesynergy.approval` | the Opus approval file | `release-flow` step `review` (`listen`) | head | stays a gate |
+| `net.freesynergy.ci.green` | CI of the pushed branch | `release-flow` step `ci` (`listen`) | head | not a gate, only the wait |
+
+**Mapping to Serverless Workflow 1.0 / what is proven.** Send = `emit.event.with` (`source`, `type`, `subject`, `data`; `id` is made by the
+runtime) - in the spec (dsl-reference, `emit`), also in v1.0.0. Start by event = top-level `schedule.on` (`one`/`any` with `with.type`) -
+in the spec. Wait in the flow = `listen.to` (`one`/`any`/`all`) - in the spec. NOT proven: `schedule.read` in 1.0.x (not set, the default
+`data` is used), and whether `every` and `on` may stand together (so the 15-minute net is written in the comment of `catalog-bump.yaml`,
+not as a second trigger). The spec defines no transport: how an event really arrives is the implementation. Today: `release.published`
+reaches fs-catalog as the schedule of `bump.yml` (pull), `run.failed` as an issue; `listen` steps only describe the wait (the flow stops,
+the continuation is a new run). The check (`scripts/check_workflows.py`) requires that every type is `net.freesynergy.*` and is in
+this table, and that `coordination-round` starts with `rot-pruefen`.
+
+**Rule: the coordinator acts only on red or at approval gates.** Silence on green. Follow-ups after an approval (bump, sign, catalog
+check, package repos, docs build) are never started by hand; they run by event/CI. Red = `bugfix` or `agent-run` for exactly that run.
+
+**Gates that never run automatically / Gates, die nie automatisch laufen:** publication (tag, Pre-release, release), the tag push
+itself, the Opus approval (`opus-ja`) for exactly one head, fast-forward of main (`human`), ADR push, deleting (repos, tags, releases,
+files in foreign repos), the Immutable-Releases switch, making a new package repo public for the first time, creating or rotating
+secrets and tokens, any deviation from the rules. DE: Veröffentlichung, Tag-Push, Opus-JA für genau einen Kopf, ff main, ADR-Push,
+Löschen, Immutable-Schalter, erstes Veröffentlichen eines Paketrepos, Geheimnisse anlegen/drehen, jede Regelabweichung.
+
 The `@fs` catalog (`call: <command>:<version>@fs`) is the fixed list of commands of the draft; it is not defined as a
 `use.catalogs` entry yet, so these files are valid YAML in the profile's shape but not runnable by a stock SW runtime.

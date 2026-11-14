@@ -84,6 +84,7 @@ draft -> Pre-release, only when SHA256SUMS.txt, every file and every `.asc` are 
 `packages.toml` and starts `sign`. **No secret and nothing cross-repo:** direction is pull (fs-catalog reads public releases), so no
 token for fs-catalog is passed to the program repos. Delay between publish and catalog: up to 15 minutes (plus the sign run).
 Drafts and releases with missing files are skipped with a warning, never a red run.
+As an event (`net.freesynergy.release.published`, catalog in `workflows/README.md`) this is the follow-up of an already approved push (no gate is skipped); the 15-minute schedule stays unchanged as the safety net, no token is added. Red runs are reported per repo by `_notify-red.yml` (docs/notify-red.md).
 
 Recommendation: switch on "Immutable releases" (repo Settings, General) in every program repo, so a published release and its
 assets can never be changed or replaced, not even by an owner. Not switched on by this workflow; the repo owner does it.

@@ -98,6 +98,23 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release).
+  - announce:
+      emit:
+        event:
+          with:
+            source: https://github.com/${ .input.repo }
+            type: net.freesynergy.release.published
+            subject: ${ .input.tag }
+            data:
+              repo: ${ .input.repo }
+              tag: ${ .input.tag }
+              prerelease: ${ .input.prerelease }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The sender side of the event the step release waits for - the last job of release.yml sends it, only after publish was green and the Pre-release is really published (a draft sends nothing). It follows the approved push; no gate is skipped. No secret, no command in data.
   - bump:
       call: bump:0.0.6@fs
       with:
@@ -106,9 +123,9 @@ do:
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
-        freesynergy.net:gate: opus-ja
+        freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: After the Pre-release is published - gh workflow run bump.yml -R FreeSynergy/fs-catalog, behind the approval, public reach only.
+        freesynergy.net:summary: Runs by itself as the follow-up of the published release (event net.freesynergy.release.published, see catalog-bump.yaml); the approval (opus-ja, picture OK) lay before, at the tag and push. Pull without token - fs-catalog reads the public releases on its 15-minute schedule; nobody starts it by hand.
   - sign:
       listen:
         to:
