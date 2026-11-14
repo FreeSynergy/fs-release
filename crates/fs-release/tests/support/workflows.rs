@@ -5,9 +5,10 @@ use std::path::{Path, PathBuf};
 
 use super::{have_yaml, python};
 
-pub const FILES: [&str; 28] = [
+pub const FILES: [&str; 29] = [
     "adr-write",
     "agent-run",
+    "anbieter-neuinstallation",
     "bugfix",
     "catalog-bump",
     "cleanup-targets",

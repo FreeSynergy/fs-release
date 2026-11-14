@@ -1,0 +1,361 @@
+#!/usr/bin/env -S python3 -I
+"""installimage-config - deterministic generator and checker for a Hetzner installimage config (way C).
+
+DE: Erzeugt aus einer Variablen-Datei (KEY=VALUE) und optional einer bestand-JSON die installimage-Konfig.
+    Ohne KI, ohne Netz, ohne Zeitstempel: gleiche Eingabe = gleiche Ausgabe. Loescht nichts, schreibt nur die
+    Ausgabedatei. Das Loeschen macht allein installimage, vom Menschen im Rescue-System gestartet.
+EN: Builds the installimage config from a variable file and an optional bestand JSON. No AI, no network, no
+    timestamps. Deletes nothing; only installimage (started by the person in the rescue system) deletes.
+
+Usage:
+  installimage-config --vars VARS [--bestand BESTAND.json] [--out CONFIG]   generate (stdout without --out)
+  installimage-config --vars VARS [--bestand B.json] --plan                 readable plan, warning "all data is lost"
+  installimage-config --check CONFIG [--vars VARS] [--bestand B.json]       check a config, errors on stderr
+  installimage-config --vars VARS --confirm-hostname TEXT                   gate: TEXT must equal HOSTNAME
+Exit: 0 ok, 1 check failed, 2 bad input or usage, 3 confirmation does not match.
+
+Evidence (see docs/anbieter-neuinstallation.md): keywords DRIVEn, SWRAID, SWRAIDLEVEL, HOSTNAME, size `all` and
+M/G/T are on docs.hetzner.com; PART/esp/BOOTLOADER/IMAGE/SUBVOL rules are read from the installimage scripts
+(github.com/hetzneronline/installimage, functions.sh), not from the docs page. Everything else is marked [nicht belegt].
+"""
+import argparse
+import json
+import re
+import sys
+
+KEYS = {"HOSTNAME", "IMAGE", "DRIVE1", "DRIVE2", "BOOT_MODE", "DISK_SIZE_GIB", "BOOT_SIZE_MIB", "ESP_SIZE_MIB",
+        "SWAP_GIB", "ROOT_GIB", "FS_DATA"}
+DEFAULTS = {"BOOT_SIZE_MIB": "1024", "ESP_SIZE_MIB": "256", "SWAP_GIB": "8", "ROOT_GIB": "64", "FS_DATA": "btrfs"}
+FS_OK = {"ext2", "ext3", "ext4", "xfs", "btrfs", "swap", "esp"}  # [nicht belegt]: complete list not read
+UNIT = {"M": 1, "G": 1024, "T": 1024 * 1024}
+HOST_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
+DRIVE_RE = re.compile(r"^/dev/(sd[a-z]+|vd[a-z]+|nvme[0-9]+n[0-9]+)$")
+
+
+class Bad(Exception):
+    pass
+
+
+def read_vars(path):
+    out = {}
+    with open(path, encoding="utf-8") as fh:
+        for n, raw in enumerate(fh, 1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                raise Bad(f"{path}:{n}: expected KEY=VALUE")
+            k, v = line.split("=", 1)
+            k, v = k.strip(), v.strip().strip('"').strip("'")
+            if k not in KEYS:
+                raise Bad(f"{path}:{n}: unknown key {k} (allowed: {', '.join(sorted(KEYS))})")
+            out[k] = v
+    return out
+
+
+def read_bestand(path):
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    if not isinstance(data, dict):
+        raise Bad(f"{path}: JSON object expected")
+    return data
+
+
+def num(text, what):
+    try:
+        val = float(text)
+    except ValueError:
+        raise Bad(f"{what}: not a number: {text!r}") from None
+    if val <= 0:
+        raise Bad(f"{what}: must be > 0")
+    return val
+
+
+def merge(vars_, best):
+    """Resolve variables against the bestand; returns a dict of resolved values."""
+    v = dict(DEFAULTS)
+    v.update(vars_)
+    disks = [d for d in best.get("disks", []) if isinstance(d, dict)] if best else []
+    errs = []
+    mode = v.get("BOOT_MODE", "").lower()
+    bmode = str(best.get("boot_mode", "")).lower() if best else ""
+    if mode and bmode and mode != bmode:
+        errs.append(f"BOOT_MODE {mode} contradicts bestand boot_mode {bmode}")
+    mode = mode or bmode
+    if mode not in ("uefi", "bios"):
+        errs.append("BOOT_MODE missing or not uefi|bios (set it or give the bestand JSON)")
+    drives = [v[k] for k in ("DRIVE1", "DRIVE2") if k in v]
+    if not drives:
+        drives = ["/dev/" + d["name"] for d in disks[:2] if "name" in d]
+    sizes = [num(d["size_gib"], "bestand size_gib") for d in disks if "size_gib" in d]
+    if "DISK_SIZE_GIB" in v:
+        small = num(v["DISK_SIZE_GIB"], "DISK_SIZE_GIB")
+    elif sizes:
+        small = min(sizes[: max(len(drives), 1)])
+    else:
+        small = None
+    if errs:
+        raise Bad("; ".join(errs))
+    v.update(mode=mode, drives=drives, small_gib=small)
+    return v
+
+
+def build(v):
+    """Return (config_lines, post_lines) for resolved variables v; raises Bad on bad input."""
+    errs = []
+    n = len(v["drives"])
+    if n not in (1, 2):
+        errs.append(f"{n} drives: the generator handles 1 or 2 (more is a question for the strategy, not guessed)")
+    if not v.get("HOSTNAME"):
+        errs.append("HOSTNAME missing")
+    if not v.get("IMAGE"):
+        errs.append("IMAGE missing (take the exact file name from the images directory in the rescue system)")
+    if v["FS_DATA"] not in ("btrfs", "zfs", "none"):
+        errs.append("FS_DATA must be btrfs|zfs|none")
+    if errs:
+        raise Bad("; ".join(errs))
+    raid = n == 2
+    uefi = v["mode"] == "uefi"
+    L = []
+    for i, d in enumerate(v["drives"], 1):
+        L.append(f"DRIVE{i} {d}")
+    if raid:
+        L += ["SWRAID 1", "SWRAIDLEVEL 1"]
+    else:
+        L.append("SWRAID 0")
+    L += ["BOOTLOADER grub", f"HOSTNAME {v['HOSTNAME']}", f"IMAGE {v['IMAGE']}"]
+    if uefi:
+        L.append(f"PART /boot/efi esp {int(num(v['ESP_SIZE_MIB'], 'ESP_SIZE_MIB'))}M")
+    L.append(f"PART /boot ext3 {int(num(v['BOOT_SIZE_MIB'], 'BOOT_SIZE_MIB'))}M")
+    L.append(f"PART swap swap {int(num(v['SWAP_GIB'], 'SWAP_GIB'))}G")
+    if v["ROOT_GIB"] == "all" or v["FS_DATA"] == "none":
+        L.append("PART / ext4 all")
+    else:
+        L.append(f"PART / ext4 {int(num(v['ROOT_GIB'], 'ROOT_GIB'))}G")
+    post = []
+    if v["ROOT_GIB"] != "all" and v["FS_DATA"] != "none":
+        post = post_steps(v, raid)
+    return L, post
+
+
+def post_steps(v, raid):
+    """Data part AFTER installimage: lines for the plan only, run by the person later [nicht belegt]."""
+    dev = [d + ("p" if d[-1].isdigit() else "") + "{N}" for d in v["drives"]]
+    out = ["# AFTER the first boot, not part of installimage (installimage does not build multi-device btrfs):"]
+    cmds = [f"sgdisk -n {{N}}:0:0 -t {{N}}:8300 {d}" for d in v["drives"]]
+    out += [c + "   # {N} = next free partition number, read it with lsblk" for c in cmds]
+    if v["FS_DATA"] == "btrfs":
+        mk = "mkfs.btrfs -L data -d raid1 -m raid1 " if raid else "mkfs.btrfs -L data "
+        out.append(mk + " ".join(x for x in dev) + "   # btrfs RAID1 for two disks, single for one disk")
+    else:
+        out.append("zpool create -o ashift=12 data " + ("mirror " if raid else "") + " ".join(dev)
+                   + "   # FS_DATA=zfs [nicht belegt] (zfs-dkms is in contrib)")
+    out.append("mount to /srv/freesynergy; note UUID in /etc/fstab  # next: workflow server-einrichtung")
+    return out
+
+
+def parse_config(path):
+    c = {"drives": {}, "parts": [], "subvol": 0, "raw": {}, "errors": []}
+    with open(path, encoding="utf-8") as fh:
+        for n, raw in enumerate(fh, 1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            f = line.split()
+            k = f[0]
+            if re.fullmatch(r"DRIVE[0-9]+", k):
+                c["drives"][k] = f[1] if len(f) > 1 else ""
+            elif k == "PART":
+                if len(f) != 4:
+                    c["errors"].append(f"{path}:{n}: PART needs mountpoint, filesystem, size")
+                else:
+                    c["parts"].append((n, f[1], f[2], f[3]))
+            elif k == "SUBVOL":
+                c["subvol"] += 1
+            elif k in ("SWRAID", "SWRAIDLEVEL", "BOOTLOADER", "HOSTNAME", "IMAGE", "FORMATDRIVE2"):
+                c["raw"][k] = f[1] if len(f) > 1 else ""
+            else:
+                c["errors"].append(f"{path}:{n}: unknown keyword {k}")
+    return c
+
+
+def to_mib(size):
+    m = re.fullmatch(r"([0-9]+)([MGT])", size)
+    return int(m.group(1)) * UNIT[m.group(2)] if m else None
+
+
+def check(c, mode=None, small_gib=None):
+    e = list(c["errors"])
+    d = c["drives"]
+    names = [d[k] for k in sorted(d, key=lambda s: int(s[5:]))]
+    if "DRIVE1" not in d:
+        e.append("DRIVE1 missing")
+    for x in names:
+        if not DRIVE_RE.match(x):
+            e.append(f"drive {x!r}: not a device path like /dev/sda or /dev/nvme0n1")
+    if len(set(names)) != len(names):
+        e.append("a drive appears twice: " + ", ".join(sorted({x for x in names if names.count(x) > 1})))
+    r = c["raw"]
+    raid = r.get("SWRAID", "0")
+    if raid not in ("0", "1"):
+        e.append("SWRAID must be 0 or 1")
+    level = r.get("SWRAIDLEVEL")
+    need = {"0": 2, "1": 2, "5": 3, "6": 4, "10": 4}  # 5/6/10 minimums: [nicht belegt] (script reads, number not seen)
+    if raid == "1":
+        if level not in need:
+            e.append("SWRAIDLEVEL must be 0, 1, 5, 6 or 10 when SWRAID is 1")
+        elif len(names) < need[level]:
+            e.append(f"RAID{level} needs at least {need[level]} drives, config has {len(names)}")
+        if level in ("0", "5", "6", "10") and not any(p[1] == "/boot" for p in c["parts"]):
+            e.append(f"RAID{level} needs a separate /boot partition")
+    elif len(names) > 1 and "FORMATDRIVE2" not in r:
+        e.append("more than one drive but SWRAID 0: the second drive would stay unused (set SWRAID 1 or FORMATDRIVE2)")
+    if r.get("BOOTLOADER", "").lower() != "grub":
+        e.append("BOOTLOADER must be grub")
+    if not HOST_RE.match(r.get("HOSTNAME", "")):
+        e.append("HOSTNAME missing or not a valid host name")
+    if not r.get("IMAGE"):
+        e.append("IMAGE missing")
+    parts = c["parts"]
+    mounts = [p[1] for p in parts]
+    dup = sorted({m for m in mounts if mounts.count(m) > 1})
+    if dup:
+        e.append("identical mountpoints: " + ", ".join(dup))
+    if "/" not in mounts:
+        e.append("no partition for /")
+    esp = [p for p in parts if p[2] == "esp"]
+    if len(esp) > 1:
+        e.append("more than one esp partition")
+    for p in esp:
+        if p[1] != "/boot/efi":
+            e.append(f"line {p[0]}: esp must be mounted at /boot/efi")
+        if p[3] == "all" or (to_mib(p[3]) or 0) < 256:
+            e.append(f"line {p[0]}: esp needs a fixed size of at least 256M")
+    if mode == "uefi" and not esp:
+        e.append("boot mode uefi but no esp partition (PART /boot/efi esp 256M)")
+    if mode == "bios" and esp:
+        e.append("boot mode bios but an esp partition is configured")
+    alls = [p for p in parts if p[3] == "all"]
+    if alls and parts[-1] is not alls[0]:
+        e.append("size all must be the last PART line")
+    if len(alls) > 1:
+        e.append("size all used more than once")
+    total = 0
+    for p in parts:
+        base = p[2].split(".")[0]
+        if base not in FS_OK:
+            e.append(f"line {p[0]}: filesystem {p[2]!r} not in the known list {sorted(FS_OK)} [nicht belegt: full list]")
+        if p[1] == "swap" and p[2] != "swap" or p[2] == "swap" and p[1] != "swap":
+            e.append(f"line {p[0]}: swap needs mountpoint swap and filesystem swap")
+        if p[1] != "swap" and not p[1].startswith("/") and p[2] != "btrfs":
+            e.append(f"line {p[0]}: mountpoint {p[1]!r} must start with /")
+        if p[1] == "/boot" and p[2] not in ("ext2", "ext3", "ext4"):
+            e.append(f"line {p[0]}: /boot should be ext2/3/4")
+        if p[3] != "all":
+            mib = to_mib(p[3])
+            if mib is None or mib <= 0:
+                e.append(f"line {p[0]}: size {p[3]!r} is not a number with M, G or T")
+            else:
+                total += mib
+    bt = [p for p in parts if p[2].startswith("btrfs")]
+    if bt and not c["subvol"]:
+        e.append("btrfs partition without SUBVOL line")
+    if bt and raid == "1":
+        e.append("btrfs inside installimage with SWRAID 1 is [nicht belegt]; installimage has no multi-device btrfs")
+    if small_gib is not None and not e:
+        room = int(small_gib * 1024) - 2  # 1 MiB at the end, 1 MiB bios_grub (BIOS)
+        if total > room:
+            e.append(f"partitions need {total} MiB, smallest disk has {room} MiB usable")
+        elif alls and room - total < 1024:
+            e.append("less than 1 GiB left for the size-all partition")
+    return e, total
+
+
+def plan_text(v, cfg, post):
+    raid = len(v["drives"]) == 2
+    lines = ["*** ALLE DATEN GEHEN VERLOREN / ALL DATA ON THESE DISKS IS LOST ***",
+             "Disks: " + ", ".join(v["drives"]) + f"   Host: {v['HOSTNAME']}   Boot: {v['mode'].upper()}",
+             f"Image: {v['IMAGE']}   Data: {v['FS_DATA']}   RAID: {'md RAID1 (/boot/efi metadata 1.0, belegt in scripts)' if raid else 'none (1 disk)'}",
+             "", "Per disk, in order (installimage adds a 1 MiB bios_grub partition on BIOS):"]
+    for ln in cfg:
+        if ln.startswith("PART"):
+            f = ln.split()
+            lines.append(f"  {f[1]:<10} {f[2]:<6} {f[3]:>6}" + ("   -> md device, mirrored" if raid else ""))
+    if v["small_gib"] is not None:
+        lines.append(f"Smallest disk: {v['small_gib']} GiB")
+    if post:
+        lines += ["", "Rest of each disk stays free for the data part (done AFTER first boot):"] + ["  " + p for p in post]
+    lines += ["", "Nothing is deleted by this script. Deletion happens only when the person runs installimage in rescue."]
+    return "\n".join(lines) + "\n"
+
+
+def main(argv):
+    ap = argparse.ArgumentParser(add_help=True, description="installimage config generator (way C), no AI, no network")
+    ap.add_argument("--vars")
+    ap.add_argument("--bestand")
+    ap.add_argument("--out")
+    ap.add_argument("--plan", action="store_true")
+    ap.add_argument("--check", metavar="CONFIG")
+    ap.add_argument("--confirm-hostname", dest="confirm")
+    a = ap.parse_args(argv)
+    try:
+        vars_ = read_vars(a.vars) if a.vars else {}
+        best = read_bestand(a.bestand) if a.bestand else None
+        if a.check:
+            mode = None
+            small = None
+            if a.vars or best:
+                r = merge(vars_, best or {})
+                mode, small = r["mode"], r["small_gib"]
+            errs, _ = check(parse_config(a.check), mode, small)
+            for m in errs:
+                print("ERROR: " + m, file=sys.stderr)
+            print("CHECK " + ("FAILED" if errs else "OK"))
+            return 1 if errs else 0
+        if not a.vars:
+            ap.error("--vars or --check required")
+        if a.confirm is not None:
+            if a.confirm != vars_.get("HOSTNAME"):
+                print("GATE REFUSED: repeated host name does not match HOSTNAME", file=sys.stderr)
+                return 3
+            print("GATE OK: host name repeated")
+            return 0
+        v = merge(vars_, best or {})
+        cfg, post = build(v)
+        tmp = "\n".join(cfg) + "\n"
+        errs, _ = check(parse_config_text(tmp), v["mode"], v["small_gib"])
+        if errs:
+            for m in errs:
+                print("ERROR: " + m, file=sys.stderr)
+            return 1
+        if a.plan:
+            sys.stdout.write(plan_text(v, cfg, post))
+            return 0
+        text = "# generated by scripts/installimage-config; run by the person in the Hetzner rescue system\n" + tmp
+        if post:
+            text += "\n".join("# " + p.lstrip("# ") for p in post) + "\n"
+        if a.out:
+            with open(a.out, "w", encoding="utf-8") as fh:
+                fh.write(text)
+        else:
+            sys.stdout.write(text)
+        return 0
+    except (Bad, OSError, json.JSONDecodeError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+
+def parse_config_text(text):
+    import os
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".cfg", delete=False, encoding="utf-8") as fh:
+        fh.write(text)
+        name = fh.name
+    try:
+        return parse_config(name)
+    finally:
+        os.unlink(name)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

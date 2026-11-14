@@ -1,0 +1,234 @@
+# Reinstall a server from the provider rescue system, way C (Hetzner installimage) - config from variables, check, data-loss gate, rescue, install, reboot, check, hand-over.
+# Not here (own workflows): A server-einrichtung (our layer, the hand-over target), B kexec, D disk rebuild. Provider adapter, optional (ADR 0079, addenda).
+# Every step runs WITHOUT an AI: deterministic scripts, plan, log. No agent gets SSH or root on a real server; the PERSON runs rescue and
+# installimage (Monday, own decision 2026-11-14). The generator scripts/installimage-config and its self test scripts/test_installimage_config.sh run locally.
+# Order: `Workflow anbieter-neuinstallation, step <id>, parameters hostname, image, boot_mode, drives, root_gib, fs_data`. FS profile: see README.md.
+# Evidence: only DRIVEn, SWRAID, SWRAIDLEVEL, HOSTNAME and the unit/all sizes are on the docs.hetzner.com page; PART/esp/BOOTLOADER/IMAGE rules come from the
+# installimage scripts (GitHub). [nicht belegt]: the installimage call line, image file names, btrfs data inside installimage, see docs/anbieter-neuinstallation.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: anbieter-neuinstallation
+  version: 0.0.6
+  title: Reinstall a server from the provider rescue system (way C, Hetzner installimage) - config, check, data-loss gate, rescue, install, reboot, check, hand-over
+do:
+  - variables:
+      set:
+        server: ${ .input }
+      export:
+        as: '${ $context + { server: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: 'The person writes the variable set (plain text, no secrets): HOSTNAME, IMAGE (exact file name from the images directory of the rescue system: Debian 13 or 12, Ubuntu), BOOT_MODE (uefi or bios, or taken from the inventory), DRIVE1 and DRIVE2 (or from the inventory), BOOT_SIZE_MIB, ESP_SIZE_MIB, SWAP_GIB, ROOT_GIB, FS_DATA (btrfs default, zfs optional, none). Way C only; the setup of our layer is the separate flow server-einrichtung (way A).'
+  - inventory:
+      call: fs-server-bestand:0.0.6@fs
+      with:
+        mode: read-only
+        output: bestand-vorher.json
+      export:
+        as: '${ $context + { inventory: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'Before anything is deleted: the person starts fs-server-run on the CURRENT system and the script fs-server-bestand only reads - boot mode UEFI or BIOS, disks with names and sizes, RAID, file system. Expected - bestand-vorher.json, exit code 0, nothing changed. The file goes to the generator as --bestand. If the current system is not reachable, the person writes BOOT_MODE and the disk names by hand from the Robot data.'
+  - config-generate:
+      run:
+        shell:
+          command: "scripts/installimage-config --vars server.vars --bestand bestand-vorher.json --out installimage.conf && scripts/installimage-config --vars server.vars --bestand bestand-vorher.json --plan > plan.txt"
+      export:
+        as: '${ $context + { generate: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'The local deterministic generator (no AI, no network) writes installimage.conf (DRIVEn, SWRAID 1 and SWRAIDLEVEL 1 for two disks, BOOTLOADER grub, HOSTNAME, IMAGE, PART /boot/efi esp on UEFI, PART /boot ext3, PART swap, PART / ext4) and plan.txt (disk layout, the data step after first boot, the warning ALL DATA IS LOST). Nothing is deleted. Expected - both files, exit code 0; a red run lists every error.'
+  - back-to-variables:
+      switch:
+        - red:
+            when: '${ $context.generate.exit != 0 }'
+            then: variables
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'Control flow - a red generator run (bad or missing variable, BOOT_MODE against inventory) goes back to variables; green goes on to config-check.'
+  - config-check:
+      run:
+        shell:
+          command: "scripts/installimage-config --check installimage.conf --vars server.vars --bestand bestand-vorher.json"
+      export:
+        as: '${ $context + { check: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'A second, independent pass over the finished file text - drives unique, RAID level fits the number of disks, UEFI or BIOS fits the esp partition, mount points unique and / present, esp 256M or more, size all only last, sizes fit the smallest disk, btrfs rules. Expected - CHECK OK and exit code 0; each error is one line on stderr.'
+  - back-to-generate:
+      switch:
+        - red:
+            when: '${ $context.check.exit != 0 }'
+            then: variables
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'Control flow - a red check goes back to variables; the config is never edited by hand to make it pass. Green goes on to the data-loss gate.'
+  - data-loss-gate:
+      call: confirm-plan:0.0.6@fs
+      with:
+        file: plan.txt
+        repeat: hostname
+      export:
+        as: '${ $context + { approval: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: 'GATE - DATA WILL BE DELETED. The person reads plan.txt (disks, layout, the warning ALL DATA IS LOST), checks that a backup exists or that the data may go, and repeats the host name; scripts/installimage-config --vars server.vars --confirm-hostname <text> must answer GATE OK (exit 0, else 3). Nothing below runs without this; an agent never gives it (ADR 0056, 0079).'
+  - back-to-plan:
+      switch:
+        - rejected:
+            when: '${ $context.approval.no or $context.approval.exit == 3 }'
+            then: exit
+        - approved:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'Control flow - a NO or a wrong host name ends the flow here, nothing has been changed; a YES goes on to rescue.'
+  - rescue:
+      call: provider-rescue:0.0.6@fs
+      with:
+        provider: hetzner
+        config: installimage.conf
+      export:
+        as: '${ $context + { rescue: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: 'The person does it, no agent has access - in the Hetzner Robot activates the Rescue System (Linux 64 bit, own public key), triggers a hardware reset or reboot, waits, logs in by SSH to the rescue system (host key shown and compared first) and copies installimage.conf there. Expected - a root shell in the rescue system and the file present. Emergency hint - if the machine does not come up, Robot offers reset and the vKVM option; they help the person and are never a precondition of this flow.'
+  - install:
+      call: fs-server-run:0.0.6@fs
+      with:
+        action: installimage
+        config: installimage.conf
+        log: protocol.log
+      export:
+        as: '${ $context + { install: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: 'THIS STEP DELETES THE DISKS. The person starts installimage with the config in the rescue system under fs-server-run, which logs command, output, exit code and duration (secrets redacted). The exact call line (autosetup file or option -c) is [nicht belegt] - the person checks installimage help in the rescue system. Expected - installimage ends with its success message, exit code 0, log written. After an error the disks may be half written - never boot into it.'
+  - back-to-install:
+      switch:
+        - config-cause:
+            when: '${ $context.install.red and $context.install.cause == "config" }'
+            then: variables
+        - broken:
+            when: '${ $context.install.red and $context.install.tries >= 3 }'
+            then: exit
+        - retry:
+            when: '${ $context.install.red }'
+            then: install
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'Control flow - a failed installimage goes back to variables when the config was the cause, repeats up to three times otherwise, then ends the flow; the person reads the log (hardware or Robot support). Green goes on to the reboot.'
+  - reboot:
+      call: reboot:0.0.6@fs
+      with:
+        command: reboot
+        from: rescue
+      export:
+        as: '${ $context + { reboot: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: 'GATE - the person types reboot in the rescue system (rescue is a one-time mode, the next start comes from the disk). Never automatic. Expected - the machine goes down and comes up with the new system. Emergency hint - if it does not return, Robot reset, then vKVM or the rescue again as a help; the flow then goes back to rescue.'
+  - first-boot-check:
+      call: fs-server-bestand:0.0.6@fs
+      with:
+        mode: read-only
+        output: bestand-nachher.json
+        compare: installimage.conf
+      export:
+        as: '${ $context + { after: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'Only reads. The person logs in by SSH (new host key, compared and remembered) and starts fs-server-run - SSH reachable, boot mode as planned, mdadm --detail and /proc/mdstat show RAID1 for /boot/efi, /boot, swap and /, file systems as in the plan, the free rest of both disks for the data part. Expected - bestand-nachher.json, exit code 0, nothing changed.'
+  - back-to-rescue:
+      switch:
+        - differs:
+            when: '${ $context.after.red or $context.after.unreachable }'
+            then: rescue
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: 'Control flow - not reachable, or boot mode or RAID differs from the plan, goes back to rescue (the person decides about a new installimage run); green goes on.'
+  - data-part:
+      call: fs-server-run:0.0.6@fs
+      with:
+        action: data-filesystem
+        from: plan.txt
+        fs: ${ .input.FS_DATA }
+      export:
+        as: '${ $context + { data: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: 'The person runs the data lines of plan.txt on the new system - sgdisk for the rest of each disk, mkfs.btrfs with -d raid1 -m raid1 (two disks) or single (one disk), or the ZFS pool only when FS_DATA=zfs, then the mount at /srv/freesynergy and the fstab entry by UUID. installimage builds no multi-device btrfs, so this part is separate and under a human gate. With FS_DATA=none the step is skipped. Expected - the lines in the log, exit code 0.'
+  - hand-over:
+      call: server-einrichtung:0.0.6@fs
+      with:
+        input: ${ $context.server }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: 'Continue with the flow server-einrichtung (way A) on the new system - inventory, dry run, approval, layer, hardening, services. Way C ends here; it sets up no service and no package source.'
+  - hand-back:
+      call: return-log:0.0.6@fs
+      with:
+        files: [bestand-vorher.json, installimage.conf, plan.txt, bestand-nachher.json, protocol.log]
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: 'The person hands back the one log file with these files (the full log, appended only, secrets redacted). Agents read it, they never log in.'

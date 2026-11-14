@@ -32,7 +32,8 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
 - Fremdes: `upstream-anfrage` (ein git-bug-Issue an einen Upstream), `wrapper-einbindung` (fremde Crate per Git-Pin
   unverändert, eigene Wrapper-Crate, Lizenz-Gate in der CI).
 - Server: `server-einrichtung` (Weg A: unsere Schicht auf ein vorhandenes System mit SSH; Bestand, Trockenlauf, Gate, Schicht,
-  Absicherung, Dienste, Prüfung; der Mensch führt `fs-server-run` lokal aus, ohne KI; B kexec, C Anbieter-Rescue, D Plattenumbau sind eigene Workflows).
+  Absicherung, Dienste, Prüfung; der Mensch führt `fs-server-run` lokal aus, ohne KI; B kexec, D Plattenumbau sind eigene Workflows),
+  `anbieter-neuinstallation` (Weg C: Hetzner-Rescue und `installimage` mit Konfig aus Variablen durch `scripts/installimage-config`; Gate "Daten werden gelöscht" mit Hostname-Wiederholung; der Mensch führt Rescue und Install aus; danach Übergabe an `server-einrichtung`; Montagsablauf in `docs/anbieter-neuinstallation.md`).
 - Koordinator: `coordination-round`, `cost-reconcile`, `report-to-strategy`, `slot-check`, `wip-continue`, `download-readonly`,
   `publish-doc`, `workflow-pflege`.
 - Strategie: `entscheidung` (erst ADR-Suche, dann Auswertung, Nutzerfrage nur bei Abweichung oder Lücke), `adr-write`,
