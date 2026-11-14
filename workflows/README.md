@@ -29,6 +29,7 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
   `cleanup-targets`, `agent-run`, `bugfix`, `review`.
 - Frontend und Bilder: `frontend-round` (mit dem objektiven Schritt `menue-vergleich`, s. u.), `frontend-umbau` (Bestand auf die Schichten nach ADR 0074), `dossier`, `icon-round`,
   `picture-acceptance`.
+- Neues Programm: `programm-neu` (17 Schritte in P0 bis P6, s. u.).
 - Fremdes: `upstream-anfrage` (ein git-bug-Issue an einen Upstream), `wrapper-einbindung` (fremde Crate per Git-Pin
   unverändert, eigene Wrapper-Crate, Lizenz-Gate in der CI).
 - Koordinator: `coordination-round`, `cost-reconcile`, `report-to-strategy`, `slot-check`, `wip-continue`, `download-readonly`,
@@ -52,6 +53,20 @@ in fs-files ist dieselbe Tabelle wie später in fs-data, nur mit ausgeblendeten 
 von ADR 0084). Der objektive Prüfschritt `baustein-zuordnung` (in `dossier`, vor dem Veröffentlichen; rot springt zu `research`) lässt
 `scripts/baustein-zuordnung` die Tabelle `## Baustein-Zuordnung` in `bausteine.md` prüfen und meldet den Anteil neu gebauter
 Bausteine. Format: `docs/baustein-zuordnung.md`, Selbsttest `scripts/test_baustein_zuordnung.sh`.
+
+**Neues Programm (`programm-neu`, Nutzerwunsch 14.11.).** Ein Ablauf von der Prüffrage bis zur Abnahme, 17 Schritte in sieben Phasen:
+P0 (1 „wessen Daten?“, ADR 0076, Ausgang Programm / Facette / Modul / Suite; 2 Hub und Katalog, ADR 0068), P1 (3 Standards und ihre
+Testsammlungen, ADR 0014; 4 Kern-Crate, Wrapper statt Fork; 5 Import/Export der verbreiteten Formate, Umzugsweg), P2 (6 Datenmodell
+auf Standards, Speichern ist nicht Exportieren, ADR 0046; 7 Themen-Schnittstelle, ADR 0045/0066; 8 Manifest, ADR 0068), P3 (9 Engine
+mit Vertragstests; 10 Admin-Frontend aus der Typbeschreibung), P4 (11 Vorbild-Dossier; 12 `frontend-round` mit Baustein-Zuordnung,
+Stil, Zusammensetzen, `menue-vergleich`; 13 Sprache MF2 de+en und Barrierefreiheit), P5 (14 Hub-Anmeldung und `fs-server`-Adapter
+nach ADR 0082; 15 Sicherheit, ADR 0054/0056/0067; 16 Pakete, Katalog ADR 0077, Doku, `release-flow`), P6 (17 Abnahme durch den
+Nutzer, Befunde laufen durch `bugfix`). Jeder Agentenschritt (`objective`) hat danach einen objektiven Skript-Prüfschritt; rot
+springt per `switch`/`then` zurück. Jeder Schritt nennt seine ADRs in `freesynergy.net:adr` und seine Phase in
+`freesynergy.net:phase`. Ausgang Facette, Modul oder Suite verlässt den Ablauf an einem Stub (`facette-abzweig`, `modul-abzweig`,
+`suite-abzweig`); **`facette-anlegen` und ein Modul-Ablauf gibt es noch nicht** und sind als TODO geführt, nicht erfunden. Auf echten
+Servern arbeitet kein Agent: Schritt 14 läuft nur lokal gegen Testinstanzen, den echten Lauf macht der Mensch (`server-lauf`). Selbsttest:
+`crates/fs-release/tests/workflows_programm_neu.rs` (Gegenproben: Schritt ohne `kind`, ohne ADR-Verweis, ohne Prüfschritt, Sprung ins Leere).
 
 **EN.** Our processes as visible workflows: Serverless Workflow 1.0 YAML (`dsl: 1.0.x`) in the FS profile (draft
 `ENTWURF-workflow-standard.md`, version 3). Every step carries `freesynergy.net:actor` (`human` = Person, `ai` =
@@ -95,3 +110,17 @@ hidden headers and no calculation module (formulas = a module, ADR 0084 pattern)
 `dossier`, before publish; red jumps to `research`) lets `scripts/baustein-zuordnung` check the `## Baustein-Zuordnung` table of
 `bausteine.md` and reports the share of newly built blocks. Format: `docs/baustein-zuordnung.md`, self test
 `scripts/test_baustein_zuordnung.sh`.
+
+**New program (`programm-neu`, user request 14 Nov).** One flow from the test question to acceptance, 17 steps in seven phases:
+P0 (1 "whose data?", ADR 0076, outcome Programm / Facette / Modul / Suite; 2 hub and catalog, ADR 0068), P1 (3 standards and their test
+collections, ADR 0014; 4 core crate, wrapper not fork; 5 import/export of the widespread formats, the way of moving house), P2 (6 data
+model on the standards, saving is not exporting, ADR 0046; 7 topic interface, ADR 0045/0066; 8 manifest, ADR 0068), P3 (9 engine with
+contract tests; 10 admin Frontend from the type description), P4 (11 model dossier; 12 `frontend-round` with block assignment, look,
+composition, `menue-vergleich`; 13 language MF2 de+en and accessibility), P5 (14 hub registration and the `fs-server` adapter per ADR
+0082; 15 security, ADR 0054/0056/0067; 16 packages, catalog ADR 0077, docs, `release-flow`), P6 (17 acceptance by the user, findings run
+through `bugfix`). Every agent step (`objective`) is followed by an objective script check; red jumps back by `switch`/`then`. Every step names its
+ADRs in `freesynergy.net:adr` and its phase in `freesynergy.net:phase`. The outcomes Facette, Modul and Suite leave the flow at a stub
+(`facette-abzweig`, `modul-abzweig`, `suite-abzweig`); **`facette-anlegen` and a module flow do not exist yet** and are kept as a TODO,
+not invented. No agent works on a real server: step 14 runs only locally against test instances, the real run is the person's
+(`server-lauf`). Self test: `crates/fs-release/tests/workflows_programm_neu.rs` (counter-tests: a step without `kind`, without an ADR
+reference, without a check step, a jump to nothing).
