@@ -58,3 +58,11 @@ dpkg-sig --verify tool_1.0.0-1_amd64.deb      # needs dpkg-sig
 rpm --import FreeSynergy-release-public.asc && rpm -K tool-1.0.0-1.x86_64.rpm
 gh attestation verify tool-1.0.0-linux-x86_64.tar.gz --repo FreeSynergy/<repo>
 ```
+
+## APT repositories (`actions/sign-apt`)
+
+`.deb` files carry no signature that `apt` checks; trust comes from the repository metadata. The action `FreeSynergy/fs-release/actions/sign-apt`
+signs `dists/<suite>/Release` of every suite below `directory` as `InRelease` (clear-signed) and `Release.gpg` (detached, armoured) with the same
+secrets (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`; the signing subkey alone is enough). Unlike `sign-files` it fails without a key. The tree itself is built
+in the `fs-packages` repository (`scripts/build-apt.sh`, `apt-ftparchive`); users check it with `scripts/verify-apt.sh` or simply with `apt update`.
+Use it only in the signing job, pinned by commit SHA.

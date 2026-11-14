@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.7 (in preparation)
+
+- New action `actions/sign-apt` (`sign.sh`): OpenPGP signing of APT metadata, `dists/<suite>/InRelease` (clear-signed) and `Release.gpg` (detached) for every suite below the repository directory. Own action instead of a new `sign-files` mode, because it must FAIL without a key (a repository is never published unsigned; `sign-files` only warns) and needs gpg only. Same hygiene as `sign-files`: temporary GNUPGHOME and passphrase file, EXIT trap, nothing printed. Test `tests/packaging/sign-apt.sh` with a throwaway key (both suites verify with gpgv, manipulated Release fails, nothing left behind, missing/broken key and missing Release fail). Used by the `publish` workflow of `fs-packages` (build of the tree: `apt-ftparchive`, there).
+
 ## 0.0.6
 
 - All crates, all flows, `chains/release.chain.yaml` and all `@fs` calls at 0.0.6 (crate version = tag).
