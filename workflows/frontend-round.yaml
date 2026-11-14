@@ -80,6 +80,57 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a block id without rules goes back to stil-analyse (from the third red round to the person), green goes on to the images.
+  - stil-sichern:
+      call: style-save-ai:0.0.6@fs
+      with:
+        frontend: ${ .input.frontend }
+        dossier: ${ .input.dossier }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Every model that is rebuilt yields a style, saved as a style file (DTCG tokens plus the rule entries of the theme contract) when it does not exist yet, English name (Calm, Office, Craft ...), fair reference to the model named in the description (what it is based on), source and licence of the reference named, nothing copied (ADR 0013, ADR 0074 section 3). Own worktree, local commits, no push, no tag. Whenever a style exists or is added it styles EVERY block of the theme contract with all parts and states (an explicit entry each, no silent gaps).
+  - stil-sichern-check:
+      call: style-save-check:0.0.6@fs
+      with:
+        frontend: ${ .input.frontend }
+      export:
+        as: '${ $context + { gesichert: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script (no network, no AI) - the style file of the model exists (or the style already existed), the name is English, source and licence of the reference are named; result `red` and `runde`.
+  - stil-vollstaendigkeit:
+      call: stil-vollstaendigkeit:0.0.6@fs
+      with:
+        contract: contract
+      export:
+        as: '${ $context + { vollstaendig: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/stil-vollstaendigkeit (no network, no AI; self test with counter-checks like baustein-zuordnung) - theme contract times ALL styles - every style has an explicit entry for every block, part and state of the contract; a missing entry is `red`, no release (mandatory rule, ADR 0074). Result `red` and `runde`. Order - contract, completeness, then zwei-stile.
+  - stil-sichern-again:
+      switch:
+        - runden:
+            when: '${ ($context.gesichert.red or $context.vollstaendig.red) and (($context.vollstaendig.runde // 0) >= 3 or ($context.gesichert.runde // 0) >= 3) }'
+            then: stil-eskalation
+        - red:
+            when: '${ $context.gesichert.red or $context.vollstaendig.red }'
+            then: stil-sichern
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a missing style file, an unnamed reference or a missing contract entry goes back to stil-sichern (from the third red round to the person), green goes on to the images.
   - images:
       call: render-images:0.0.6@fs
       with:

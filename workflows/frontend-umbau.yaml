@@ -1,5 +1,6 @@
 # Convert existing building blocks and Frontends to the layers of ADR 0074: theme contract with fixed block names, DTCG tokens, no fixed colors or spacings in blocks or Frontends, arrangement separate. Goal: new Frontends are built quickly from blocks.
 # The ADR is conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md in fs-documentation.
+# Gate before replacing painted copies by Blinc blocks: bruecke, alle-stile-erweitern, stil-vollstaendigkeit, zwei-stile (plan-theme-bruecke.md).
 # One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters repo,
 # branch, head, delta, group` (docs/prompt-template.md). FS profile: see README.md.
 document:
@@ -73,6 +74,85 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent maps every counted value to a DTCG token and every block to its fixed contract name (WAI-ARIA, Open UI); a value without a fitting token is listed, not invented.
+  - bruecke:
+      call: theme-bridge-ai:0.0.6@fs
+      with:
+        group: ${ .input.group }
+        mapping: ${ $context.assign }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Before a painted copy is replaced by a real Blinc block - the agent gives every Blinc block of the group its fixed contract name with parts and states (WAI-ARIA, Open UI) and the `blinc` entry (class and state selectors) and maps the DTCG tokens to the Blinc theme slots, the generated style sheet and the wrapper; nothing may stay in the Blinc default look (ADR 0074, one style for everything). Plan /srv/FreeSynergy/.scratch/plan-theme-bruecke.md. Own worktree, local commits, no push, no tag.
+  - alle-stile-erweitern:
+      call: styles-extend-ai:0.0.6@fs
+      with:
+        group: ${ .input.group }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Fixed step of the flow that introduces a block, part or state - a new version of the theme contract, and EVERY existing style gets an explicit entry for it (mostly only assigning tokens; no silent gaps). Own worktree, local commits, no push, no tag.
+  - stil-vollstaendigkeit:
+      call: stil-vollstaendigkeit:0.0.6@fs
+      with:
+        contract: contract
+      export:
+        as: '${ $context + { vollstaendig: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/stil-vollstaendigkeit - theme contract times all styles, every block with all parts and states has an explicit entry in every style; a missing one is `red`, no release.
+  - vollstaendig-again:
+      switch:
+        - red:
+            when: '${ $context.vollstaendig.red }'
+            then: alle-stile-erweitern
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a missing entry goes back to alle-stile-erweitern, otherwise on to zwei-stile.
+  - zwei-stile:
+      call: zwei-stile:0.0.6@fs
+      with:
+        group: ${ .input.group }
+      export:
+        as: '${ $context + { stile2: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script scripts/zwei-stile (no network, no AI) - the gate BEFORE the painted copies are replaced (convert) - every block of the group (own and Blinc through the adapter) is drawn once in two styles (Craft and a second one, light and dark); a block whose picture does not change is RED (it does not hang on the style); the exception list only holds reasons of content (e.g. icons). Order - contract, stil-vollstaendigkeit, zwei-stile. Self test with counter-checks. Plan /srv/FreeSynergy/.scratch/plan-theme-bruecke.md section 4.
+  - zwei-stile-again:
+      switch:
+        - red:
+            when: '${ $context.stile2.red }'
+            then: bruecke
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a block that does not follow the style goes back to bruecke, otherwise on to the images before the change and to convert.
   - before:
       call: render-images:0.0.6@fs
       with:

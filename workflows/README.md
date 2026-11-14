@@ -45,6 +45,8 @@ Abweichungen (`fehlt`, `zusaetzlich`, `anders-benannt`, `kuerzel`) sind nur mit 
 erlaubt; ohne Begründung ist das Ergebnis rot. Gilt für alle Frontends der Welle 1. Format: `docs/menue-vergleich.md`,
 Selbsttest `scripts/test_menue_vergleich.sh`.
 
+**Stil-Tor der Theme-Brücke (Nutzerregeln zu ADR 0074, Plan `/srv/FreeSynergy/.scratch/plan-theme-bruecke.md`).** In `frontend-umbau` laufen vor `convert` (dem Ersetzen gemalter Nachbildungen durch Blinc-Bausteine) `bruecke`, `alle-stile-erweitern`, `stil-vollstaendigkeit` (Skript: Theme-Vertrag x alle Stile, fehlender Eintrag = rot, kein Release) und `zwei-stile` (Skript: jeder Baustein in zwei Stilen gezeichnet, unverändertes Bild = rot, Ausnahmen nur für Inhalt). Reihenfolge: Vertrag, Vollständigkeit, zwei-stile. Jeder Stil gestaltet jeden Baustein mit allen Teilen und Zuständen; ein neuer Baustein, Teil oder Zustand = neue Vertragsversion und der feste Schritt `alle-stile-erweitern`. In `frontend-round` sichert `stil-sichern` den Stil des nachgebauten Vorbilds (englischer Name, Anlehnung und Lizenz benannt, nichts kopiert), danach `stil-vollstaendigkeit`. Die Skripte sind noch nicht gebaut.
+
 **Baustein-Zuordnung (Nutzerentscheidung 14.11., für alle Frontends).** Verbindliche Reihenfolge: (1) Baustein-Analyse - jeder
 Bereich des Vorbilds wird einer Baustein-Familie und einer Baustein-Id zugeordnet („was ist das?“: Tabelle, Baum, Liste, Karte,
 Leiste, Dialog …), vorhandene Bausteine zuerst, ein neuer nur mit Begründung, warum kein vorhandener (mit Modul) passt; (2) Aussehen -
