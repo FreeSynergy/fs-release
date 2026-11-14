@@ -110,6 +110,33 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - red gates go back to build, green ones go on to the acceptance.
+  - menue-vergleich:
+      call: menue-vergleich:0.0.6@fs
+      with:
+        dossier: ${ .input.dossier }
+        dump: ${ .input.dump }
+        exceptions: ${ .input.exceptions }
+      export:
+        as: '${ $context + { menus: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/menue-vergleich (no network, no AI) compares the menu tree and the dialog list of the Frontend (dump of the program, schema fs-menu-dump/1) with the lists in the dossier (menus.md, dialogs.md; R2 - menus, dialogs and flows equal or similar to the model, extensions later). Deviations are listed as fehlt, zusaetzlich, anders-benannt, kuerzel; each is allowed only with a reason in the exception list of the Frontend, without it the result is `red` (rc 1; rc 2 = bad input). Applies to every Frontend of wave 1 (store, tasks, wiki, files, people, calendar, maps, groups). Format and dump - docs/menue-vergleich.md.
+  - menue-vergleich-again:
+      switch:
+        - red:
+            when: '${ $context.menus.red }'
+            then: build
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a deviation without a reason goes back to build (the step that builds the Frontend; the agent either builds the missing entry or writes the reason into the exception list), otherwise on to the acceptance.
   - acceptance:
       call: click-through:0.0.6@fs
       with:

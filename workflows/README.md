@@ -27,7 +27,7 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
 **Die Flows.**
 - Release und Bau: `release-flow` (lift, gates, Review, Tag, Push, CI, ff main, Release, bump, sign), `lift`, `catalog-bump`,
   `cleanup-targets`, `agent-run`, `bugfix`, `review`.
-- Frontend und Bilder: `frontend-round`, `frontend-umbau` (Bestand auf die Schichten nach ADR 0074), `dossier`, `icon-round`,
+- Frontend und Bilder: `frontend-round` (mit dem objektiven Schritt `menue-vergleich`, s. u.), `frontend-umbau` (Bestand auf die Schichten nach ADR 0074), `dossier`, `icon-round`,
   `picture-acceptance`.
 - Fremdes: `upstream-anfrage` (ein git-bug-Issue an einen Upstream), `wrapper-einbindung` (fremde Crate per Git-Pin
   unverändert, eigene Wrapper-Crate, Lizenz-Gate in der CI).
@@ -35,6 +35,14 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
   `publish-doc`, `workflow-pflege`.
 - Strategie: `entscheidung` (erst ADR-Suche, dann Auswertung, Nutzerfrage nur bei Abweichung oder Lücke), `adr-write`,
   `user-decision`, `handoff-update`, `restart-handoff`.
+
+**Menü-Vergleich (R2, Nutzerentscheidung 14.11.).** Menüs, Dialoge und Abläufe eines Frontends müssen denen des Vorbilds
+gleich oder ähnlich sein (Erweiterungen später), nicht nur die Bilder. Der Schritt `menue-vergleich` in `frontend-round` (nach
+`gates`, vor `acceptance`; rot springt zu `build`) lässt `scripts/menue-vergleich` (Python, ohne Netz, ohne KI) den Menübaum
+und die Dialogliste des Programms (Dump `fs-menu-dump/1`) mit `## Menü-Inventar` / Dialogtabelle des Dossiers vergleichen.
+Abweichungen (`fehlt`, `zusaetzlich`, `anders-benannt`, `kuerzel`) sind nur mit Begründung in der Ausnahmeliste des Frontends
+erlaubt; ohne Begründung ist das Ergebnis rot. Gilt für alle Frontends der Welle 1. Format: `docs/menue-vergleich.md`,
+Selbsttest `scripts/test_menue_vergleich.sh`.
 
 **EN.** Our processes as visible workflows: Serverless Workflow 1.0 YAML (`dsl: 1.0.x`) in the FS profile (draft
 `ENTWURF-workflow-standard.md`, version 3). Every step carries `freesynergy.net:actor` (`human` = Person, `ai` =
@@ -61,3 +69,11 @@ looks up the existing ADRs (`entscheidung`, `user-decision`).
 
 The `@fs` catalog (`call: <command>:<version>@fs`) is the fixed list of commands of the draft; it is not defined as a
 `use.catalogs` entry yet, so these files are valid YAML in the profile's shape but not runnable by a stock SW runtime.
+
+**Menu comparison (R2, user decision 14 Nov).** Menus, dialogs and flows of a Frontend must be equal or similar to the model's
+(extensions later), not only the pictures. The step `menue-vergleich` in `frontend-round` (after `gates`, before `acceptance`;
+red jumps to `build`) lets `scripts/menue-vergleich` (Python, no network, no AI) compare the program's menu tree and dialog
+list (dump `fs-menu-dump/1`) with the `## Menü-Inventar` list / dialogs table of the dossier. Deviations (`fehlt`,
+`zusaetzlich`, `anders-benannt`, `kuerzel`) are allowed only with a reason in the Frontend's exception list; without one the
+result is red. Applies to every Frontend of wave 1. Format: `docs/menue-vergleich.md`, self test
+`scripts/test_menue_vergleich.sh`.

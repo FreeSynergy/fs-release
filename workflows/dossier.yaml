@@ -20,7 +20,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Writes one research file each for states, dialogs, menus and context menus, shortcuts, workflows, acceptance.md and gaps into R2; every fact has a source, what is not proven is marked [nicht belegt]; ADR 0013 - nothing is copied. Read-only on the Frontend, no network beyond the sources named in the order, commits per [COMMIT], report per [BERICHT].
+        freesynergy.net:summary: Writes one research file each for states, dialogs, menus and context menus, shortcuts, workflows, acceptance.md and gaps into R2; every fact has a source, what is not proven is marked [nicht belegt]; the menus file carries a `## Menü-Inventar` list (nested bullets with optional shortcut and names, format in docs/menue-vergleich.md) and the dialogs file a table or `## Dialog-Inventar` list, because scripts/menue-vergleich reads them (docs/menue-vergleich.md); ADR 0013 - nothing is copied. Read-only on the Frontend, no network beyond the sources named in the order, commits per [COMMIT], report per [BERICHT].
   - check-docs:
       call: check-docs:0.0.6@fs
       metadata:

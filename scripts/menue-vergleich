@@ -1,0 +1,316 @@
+#!/usr/bin/env python3
+"""menue-vergleich: compares the menu tree and the dialog list of a Frontend with its research dossier.
+
+usage: python3 -I menue-vergleich --dossier FILE [FILE ...] --dump DUMP.json [--ausnahmen FILE.toml|.json] [--json OUT.json]
+exit 0  every deviation has a reason in the exception list (or there is none)
+     1  at least one deviation without a reason (red)
+     2  input error (missing or unreadable file, no inventory in the dossier, bad dump, bad exception list)
+Deterministic, no network, no AI. Formats: docs/menue-vergleich.md.
+
+Deviation kinds: fehlt (in the dossier, not in the program), zusaetzlich (in the program, not in the dossier: an extension),
+anders-benannt (same id, other label), kuerzel (shortcut differs or is missing). Paths are `Menu > Sub > Entry`,
+`Dialog > Name`; an exception on a path covers everything below it.
+"""
+import argparse
+import json
+import re
+import sys
+import unicodedata
+
+try:
+    import tomllib
+except ImportError:  # pragma: no cover
+    tomllib = None
+
+SCHEMA = "fs-menu-dump/1"
+KINDS = ("fehlt", "zusaetzlich", "anders-benannt", "kuerzel")
+MENU_HEAD = re.compile(r"^#{1,6}\s*(men(?:ü|ue|u)[- ]inventar|menu inventory)\s*$", re.I)
+DIALOG_HEAD = re.compile(r"^#{1,6}\s*(dialog[- ]inventar|dialog inventory)\s*$", re.I)
+ANY_HEAD = re.compile(r"^#{1,6}\s")
+ITEM = re.compile(r"^(\s*)[-*+]\s+(.*\S)\s*$")
+MODS = {"ctrl": "ctrl", "control": "ctrl", "strg": "ctrl", "alt": "alt", "shift": "shift", "umschalt": "shift",
+        "meta": "meta", "super": "meta", "cmd": "meta", "win": "meta"}
+KEYS = {"del": "delete", "entf": "delete", "esc": "escape", "return": "enter", "ins": "insert", "einfg": "insert",
+        "pgup": "pageup", "bildauf": "pageup", "pgdn": "pagedown", "bildab": "pagedown"}
+
+
+class InputError(Exception):
+    pass
+
+
+def norm_label(text):
+    text = unicodedata.normalize("NFKC", text).replace("&", "")
+    text = re.sub(r"(…|\.\.\.)\s*$", "", text.strip())
+    return re.sub(r"\s+", " ", text).casefold()
+
+
+def norm_shortcut(text):
+    """`Ctrl+S, Strg+Shift+S` -> frozenset of canonical strings."""
+    out = set()
+    for one in re.split(r"[,;]", text):
+        one = one.replace("`", "").strip()
+        if not one:
+            continue
+        parts = [p.strip().casefold() for p in one.split("+") if p.strip()]
+        mods = sorted({MODS[p] for p in parts[:-1] if p in MODS}, key=["ctrl", "alt", "shift", "meta"].index)
+        key = parts[-1] if parts else ""
+        if key in MODS and not mods:
+            mods, key = [MODS[key]], ""
+        out.add("+".join(mods + [KEYS.get(key, key)] if key else mods))
+    return frozenset(out)
+
+
+def parse_entry(text):
+    """`Save as… [Ctrl+Shift+S] {de: Speichern unter, id: file.saveas}` -> entry dict."""
+    names, ident, shortcut = [], None, None
+    m = re.search(r"\{([^{}]*)\}\s*$", text)
+    if m:
+        text = text[: m.start()].rstrip()
+        for part in m.group(1).split(","):
+            key, _, val = part.partition(":")
+            key, val = key.strip().casefold(), val.strip()
+            if key == "id" and val:
+                ident = val
+            elif key and val:
+                names.append(val)
+    m = re.search(r"\[([^\[\]]*)\]\s*$", text)
+    if m:
+        shortcut = norm_shortcut(m.group(1))
+        text = text[: m.start()].rstrip()
+    label = text.strip()
+    return {"label": label, "names": {norm_label(n) for n in [label] + names}, "id": ident,
+            "shortcut": shortcut or None, "children": []}
+
+
+def parse_inventory(lines, start):
+    """Nested bullet list below a heading (until the next heading) -> list of entry trees."""
+    roots, stack = [], []
+    for line in lines[start:]:
+        if ANY_HEAD.match(line):
+            break
+        m = ITEM.match(line)
+        if not m:
+            continue
+        indent = len(m.group(1).replace("\t", "    "))
+        entry = parse_entry(m.group(2))
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        (stack[-1][1]["children"] if stack else roots).append(entry)
+        stack.append((indent, entry))
+    return roots
+
+
+def parse_dialog_table(lines):
+    """The dialogs table of dialogs.md: first column is the name, a trailing `(...)` is dropped."""
+    out, seen_sep = [], False
+    for line in lines:
+        if not line.strip().startswith("|"):
+            if seen_sep and out:
+                break
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if all(re.fullmatch(r":?-{3,}:?", c) for c in cells if c):
+            seen_sep = True
+            continue
+        if seen_sep and cells and cells[0]:
+            out.append(parse_entry(re.sub(r"\s*\([^()]*\)\s*$", "", cells[0].replace("`", ""))))
+    return out
+
+
+def read_dossier(paths):
+    menus, dialogs, found = [], [], False
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+        except OSError as err:
+            raise InputError(f"dossier {path}: {err.strerror}") from err
+        for i, line in enumerate(lines):
+            if MENU_HEAD.match(line.strip()):
+                menus += parse_inventory(lines, i + 1)
+                found = True
+            elif DIALOG_HEAD.match(line.strip()):
+                dialogs += parse_inventory(lines, i + 1)
+                found = True
+        if path.rstrip("/").rsplit("/", 1)[-1].casefold() == "dialogs.md":
+            table = parse_dialog_table(lines)
+            dialogs += table
+            found = found or bool(table)
+    if not found or not (menus or dialogs):
+        raise InputError("dossier: no `Menü-Inventar` / `Dialog-Inventar` list (or dialogs table) found, nothing to compare")
+    return menus, dialogs
+
+
+def prepare_dump_entry(raw, where):
+    if not isinstance(raw, dict) or not isinstance(raw.get("label"), str):
+        raise InputError(f"dump: {where} needs a string `label`")
+    kids = raw.get("children", [])
+    if not isinstance(kids, list):
+        raise InputError(f"dump: {where} `children` is not a list")
+    sc = raw.get("shortcut")
+    if sc is not None and not isinstance(sc, str):
+        raise InputError(f"dump: {where} `shortcut` is not a string")
+    return {"label": raw["label"], "id": raw.get("id"), "shortcut": norm_shortcut(sc) if sc else None,
+            "children": [prepare_dump_entry(k, f"{where} > {raw['label']}") for k in kids
+                         if not (isinstance(k, dict) and k.get("separator"))]}
+
+
+def read_dump(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except OSError as err:
+        raise InputError(f"dump {path}: {err.strerror}") from err
+    except ValueError as err:
+        raise InputError(f"dump {path}: not JSON ({err})") from err
+    if not isinstance(raw, dict) or raw.get("schema") != SCHEMA:
+        raise InputError(f"dump {path}: `schema` must be {SCHEMA!r}")
+    for key in ("menus", "dialogs"):
+        if not isinstance(raw.get(key), list):
+            raise InputError(f"dump {path}: `{key}` must be a list")
+    return ([prepare_dump_entry(m, "menus") for m in raw["menus"]],
+            [prepare_dump_entry(d, "dialogs") for d in raw["dialogs"]])
+
+
+def read_exceptions(path):
+    if path is None:
+        return []
+    try:
+        if path.endswith(".json"):
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        else:
+            if tomllib is None:
+                raise InputError("exceptions: TOML needs Python 3.11+, use a .json file")
+            with open(path, "rb") as fh:
+                data = tomllib.load(fh)
+    except OSError as err:
+        raise InputError(f"exceptions {path}: {err.strerror}") from err
+    except ValueError as err:  # JSONDecodeError and TOMLDecodeError are ValueErrors
+        raise InputError(f"exceptions {path}: not readable ({err})") from err
+    items = data.get("ausnahme") if isinstance(data, dict) else None
+    if items is None:
+        return []
+    if not isinstance(items, list):
+        raise InputError("exceptions: `ausnahme` must be a list")
+    out = []
+    for it in items:
+        if not isinstance(it, dict) or not isinstance(it.get("pfad"), str) or not it["pfad"].strip():
+            raise InputError("exceptions: every entry needs a `pfad`")
+        art = it.get("art")
+        if art is not None and art not in KINDS:
+            raise InputError(f"exceptions: `art` {art!r} not one of {', '.join(KINDS)}")
+        out.append({"pfad": " > ".join(norm_label(p) for p in it["pfad"].split(">")), "art": art,
+                    "grund": str(it.get("grund", "")).strip(), "used": False, "raw": it["pfad"].strip()})
+    return out
+
+
+def find(entry, level, taken):
+    for i, cand in enumerate(level):
+        if i not in taken and entry["id"] and cand["id"] == entry["id"]:
+            return i
+    for i, cand in enumerate(level):
+        if i not in taken and norm_label(cand["label"]) in entry["names"]:
+            return i
+    return None
+
+
+def compare(want, have, path, out):
+    taken = set()
+    for entry in want:
+        here = path + [entry["label"]]
+        i = find(entry, have, taken)
+        if i is None:
+            out.append({"art": "fehlt", "pfad": " > ".join(here), "detail": "in the dossier, not in the program"})
+            continue
+        taken.add(i)
+        got = have[i]
+        if norm_label(got["label"]) not in entry["names"]:
+            out.append({"art": "anders-benannt", "pfad": " > ".join(here),
+                        "detail": f"program says {got['label']!r}"})
+        if entry["shortcut"] and entry["shortcut"] != got["shortcut"]:
+            seen = ", ".join(sorted(got["shortcut"])) if got["shortcut"] else "none"
+            out.append({"art": "kuerzel", "pfad": " > ".join(here),
+                        "detail": f"dossier {', '.join(sorted(entry['shortcut']))}, program {seen}"})
+        compare(entry["children"], got["children"], here, out)
+    for i, cand in enumerate(have):
+        if i not in taken:
+            out.append({"art": "zusaetzlich", "pfad": " > ".join(path + [cand["label"]]),
+                        "detail": "in the program, not in the dossier (extension)"})
+
+
+def apply_exceptions(diffs, exceptions):
+    for d in diffs:
+        key = " > ".join(norm_label(p) for p in d["pfad"].split(" > "))
+        d["grund"] = ""
+        for ex in exceptions:
+            covers = key == ex["pfad"] or key.startswith(ex["pfad"] + " > ")
+            if covers and ex["art"] in (None, d["art"]):
+                ex["used"] = True
+                if ex["grund"]:
+                    d["grund"] = ex["grund"]
+                    break
+    return [d for d in diffs if not d["grund"]]
+
+
+def run(args):
+    menus_w, dialogs_w = read_dossier(args.dossier)
+    menus_h, dialogs_h = read_dump(args.dump)
+    exceptions = read_exceptions(args.ausnahmen)
+    diffs = []
+    compare(menus_w, menus_h, [], diffs)
+    compare(dialogs_w, dialogs_h, ["Dialog"], diffs)
+    open_ = apply_exceptions(diffs, exceptions)
+    unused = [e["raw"] for e in exceptions if not e["used"]]
+    unreasoned = [e["raw"] for e in exceptions if not e["grund"]]
+    count = sum(1 for _ in iter_all(menus_w)) + sum(1 for _ in iter_all(dialogs_w))
+    return {"result": "red" if open_ else "green", "compared": count, "deviations": diffs, "unexplained": len(open_), "unused_exceptions": unused,
+            "exceptions_without_reason": unreasoned}
+
+
+def iter_all(entries):
+    for e in entries:
+        yield e
+        yield from iter_all(e["children"])
+
+
+def text_report(rep):
+    lines = [f"menue-vergleich: {rep['result']} ({rep['compared']} entries in the dossier, "
+             f"{len(rep['deviations'])} deviations, {rep['unexplained']} without a reason)"]
+    for kind in KINDS:
+        for d in rep["deviations"]:
+            if d["art"] == kind:
+                tail = f"  [Grund: {d['grund']}]" if d["grund"] else "  [OHNE GRUND]"
+                lines.append(f"  {kind:15} {d['pfad']} - {d['detail']}{tail}")
+    for p in rep["unused_exceptions"]:
+        lines.append(f"  warning: exception matches nothing: {p}")
+    for p in rep["exceptions_without_reason"]:
+        lines.append(f"  warning: exception without a reason does not count: {p}")
+    return "\n".join(lines)
+
+
+def main(argv):
+    ap = argparse.ArgumentParser(prog="menue-vergleich", description=__doc__.splitlines()[0])
+    ap.add_argument("--dossier", nargs="+", required=True)
+    ap.add_argument("--dump", required=True)
+    ap.add_argument("--ausnahmen")
+    ap.add_argument("--json", dest="json_out")
+    try:
+        args = ap.parse_args(argv)
+    except SystemExit as err:
+        return 2 if err.code else 0
+    try:
+        rep = run(args)
+        if args.json_out:
+            with open(args.json_out, "w", encoding="utf-8") as fh:
+                json.dump(rep, fh, ensure_ascii=False, indent=2, sort_keys=True)
+                fh.write("\n")
+    except (InputError, OSError) as err:
+        print(f"menue-vergleich: input error: {err}", file=sys.stderr)
+        return 2
+    print(text_report(rep))
+    return 0 if rep["result"] == "green" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

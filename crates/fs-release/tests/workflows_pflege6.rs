@@ -149,6 +149,7 @@ fn the_jumps_back_that_were_only_in_the_summary_are_switch_with_then() {
     for (f, step, target) in [
         ("frontend-round", "picture-again", "then: gap-list"),
         ("frontend-round", "gates-again", "then: build"),
+        ("frontend-round", "menue-vergleich-again", "then: build"),
         ("frontend-round", "acceptance-again", "then: build"),
         ("bugfix", "red-back", "then: fix"),
         ("frontend-umbau", "texts-again", "then: texte"),
