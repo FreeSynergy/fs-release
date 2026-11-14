@@ -2,6 +2,8 @@
 # Fixed order for every Frontend (wave 1 included): (1) BLOCK ANALYSIS - every area of the model is assigned to a block family and id, existing blocks first
 # (dossier, bausteine.md, check baustein-zuordnung); (2) LOOK - style analysis, tokens and style rules per block (ADR 0074; step stil-analyse);
 # (3) COMPOSITION - the arrangement in the Frontend (step build). Agents never push, tag or merge. FS profile: see README.md.
+# Input: frontend (the model program the dossier is about), bestand, dossier (folder of the dossier), model (pictures of the model), dump, exceptions,
+# repo, branch, head, delta, release (true or missing = the flow ends with release-flow; `false` = no release here, the caller releases later, e.g. programm-neu).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -18,6 +20,9 @@ do:
         input:
           frontend: ${ .input.frontend }
           bestand: ${ .input.bestand }
+          dossier: ${ .input.dossier }
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -46,6 +51,34 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Step 2 of the fixed order (after the block analysis of the dossier, before the composition) - the style analysis of the model gives tokens and style rules per block id of bausteine.md (ADR 0074, DTCG tokens, rules per named part and state); no fixed colours or spaces in the block or the Frontend; repeat until every block id of the table has its rules.
+  - stil-check:
+      call: style-check:0.0.6@fs
+      with:
+        dossier: ${ .input.dossier }
+      export:
+        as: '${ $context + { stil: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script (no network, no AI) - every block id of the `## Baustein-Zuordnung` table of bausteine.md has style rules and tokens (a rule per named part and state, DTCG tokens, ADR 0074) in the style files; no fixed colour or space in a rule. The result carries `red` (true = back) and `runde`; the red rounds are counted by the script, from the third one the flow ends in `stil-eskalation`.
+  - stil-again:
+      switch:
+        - runden:
+            when: '${ $context.stil.red and ($context.stil.runde // 0) >= 3 }'
+            then: stil-eskalation
+        - red:
+            when: '${ $context.stil.red }'
+            then: stil-analyse
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a block id without rules goes back to stil-analyse (from the third red round to the person), green goes on to the images.
   - images:
       call: render-images:0.0.6@fs
       with:
@@ -186,6 +219,8 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a failed flow goes back to build with the order of acceptance-red, otherwise on to the release.
   - release:
+      if: ${ .input.release != false }
+      then: end
       run:
         workflow:
           namespace: freesynergy.net
@@ -196,4 +231,14 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge.
+        freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge. Skipped when the input `release` is false (the caller releases after its later steps).
+  - stil-eskalation:
+      set:
+        todo: stil-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The style analysis was red three times (`runde` >= 3); the person decides what is wrong, the table or the rules. This flow ends.

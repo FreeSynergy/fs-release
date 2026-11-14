@@ -1,4 +1,5 @@
 # The research dossier of a Frontend: files in R2 with sourced facts, check-docs, then the docs main branch.
+# Input: frontend, repo, branch, bestand (block inventory of fs-components), dossier (folder of the dossier files, bausteine.md lies in it).
 # Order: `Workflow dossier, step research, parameters frontend, repo, branch` (docs/prompt-template.md); the file list,
 # the source rule and the report form are in this file and rules.md [BERICHT], not in the order. FS profile: see README.md.
 document:
@@ -32,7 +33,7 @@ do:
   - baustein-zuordnung:
       call: baustein-zuordnung:0.0.6@fs
       with:
-        dossier: bausteine.md
+        dossier: ${ .input.dossier }/bausteine.md
         bestand: ${ .input.bestand }
       export:
         as: '${ $context + { bausteine: . } }'
@@ -41,9 +42,15 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: scripts/baustein-zuordnung (no network, no AI) reads `## Baustein-Zuordnung` of bausteine.md and the block inventory of fs-components; red (rc 1) when an area has no block id, an id marked existing is not in the inventory, a new block exists already or has no reason; rc 2 = bad input. It reports the share of newly built blocks. ADR 0074 (blocks with fixed names), 0084 (one block with modules, e.g. formulas as a module).
+        freesynergy.net:summary: scripts/baustein-zuordnung (no network, no AI) reads `## Baustein-Zuordnung` of bausteine.md and the block inventory of fs-components; red (rc 1) when an area has no block id, an id marked existing is not in the inventory, a new block exists already or has no reason; rc 2 = bad input (modelled explicitly, the function maps rc 0 to green, rc 1 to `red` true, rc 2 to `fehler` true with `red` false - it is not proven how a real `@fs` run maps rc, so the flow does not rely on rc alone). It reports the share of newly built blocks. ADR 0074 (blocks with fixed names), 0084 (one block with modules, e.g. formulas as a module).
   - baustein-zuordnung-again:
       switch:
+        - fehler:
+            when: '${ $context.bausteine.fehler }'
+            then: eingabe-fehler
+        - runden:
+            when: '${ $context.bausteine.red and ($context.bausteine.runde // 0) >= 3 }'
+            then: eingabe-fehler
         - red:
             when: '${ $context.bausteine.red }'
             then: research
@@ -54,9 +61,10 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - a red assignment goes back to research (the agent fixes bausteine.md), green goes on to publish.
+        freesynergy.net:summary: Control flow - bad input (`fehler`, rc 2) and a third red round (`runde` >= 3, counted by the script) go to the person (`eingabe-fehler`), they never jump back; a red assignment goes back to research (the agent fixes bausteine.md), green goes on to publish.
   - publish:
       call: docs-main:0.0.6@fs
+      then: end
       with:
         frontend: ${ .input.frontend }
       metadata:
@@ -65,3 +73,13 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: The human or the coordinator brings the green dossier into the docs main branch; the agent never does.
+  - eingabe-fehler:
+      set:
+        todo: eingabe-fehler
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The block check got bad input (the table or the inventory is missing or unreadable, rc 2) or was red three times; sending the agent back to research cannot fix that, so the person looks at it. This flow ends.

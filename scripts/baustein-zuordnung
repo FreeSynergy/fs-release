@@ -7,7 +7,8 @@ Dossier: heading `## Baustein-Zuordnung` (or `## Block assignment`), below it a 
   | Bereich | Was ist das? | Baustein-Id | Module | Neu | Begründung |
 `Neu` = `nein` (existing block) or `ja` (new block, then Begründung says why no existing block with a module fits).
 Bestand: one block id per line (`#` = comment), or a JSON list of ids. Format and rules: docs/baustein-zuordnung.md.
-rc 0 = every area assigned and every new block reasoned, rc 1 = deviation, rc 2 = bad input (never green).
+rc 0 = every area assigned and every new block reasoned, rc 1 = deviation, rc 2 = bad input (unreadable or non-UTF-8 file, wrong table header,
+empty or malformed inventory; never green). The block inventory path and the dossier path are given by the caller; the flow passes `<dossier folder>/bausteine.md`.
 """
 import argparse, json, re, sys
 
@@ -45,13 +46,22 @@ def col(row, *names):
     return ""
 
 
+class InputError(Exception):
+    pass
+
+
 def read_bestand(path):
     text = open(path, encoding="utf-8").read()
-    try:
-        data = json.loads(text)
-        return {str(x) for x in data}
-    except ValueError:
-        return {l.split("#")[0].strip() for l in text.splitlines() if l.split("#")[0].strip()}
+    if text.lstrip().startswith(("[", "{")):
+        # a JSON list of ids; anything else that looks like JSON (object, nested list, number) is bad input
+        try:
+            data = json.loads(text)
+        except ValueError as e:
+            raise InputError(f"the inventory looks like JSON but does not parse: {e}")
+        if not isinstance(data, list) or not all(isinstance(x, str) and x.strip() for x in data):
+            raise InputError("a JSON inventory must be a list of non-empty id strings")
+        return {x.strip() for x in data}
+    return {l.split("#")[0].strip() for l in text.splitlines() if l.split("#")[0].strip()}
 
 
 def main():
@@ -63,8 +73,13 @@ def main():
     try:
         header, rows = read_table(a.dossier)
         bestand = read_bestand(a.bestand)
-    except OSError as e:
+    except (OSError, UnicodeError, InputError) as e:
         print(f"input error: {e}")
+        return 2
+    need = [("bereich", "area"), ("baustein-id", "block id"), ("neu", "new"), ("begründung", "begruendung", "reason")]
+    missing = [n[0] for n in need if not any(h in (header or []) for h in n)]
+    if rows and missing:
+        print(f"input error: the table header lacks the column(s) {', '.join(missing)}")
         return 2
     if not rows:
         print("input error: no table below '## Baustein-Zuordnung' in the dossier")

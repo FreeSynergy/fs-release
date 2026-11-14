@@ -29,4 +29,18 @@ out="$("${tool[@]}" --dossier "$tmp/d.md" --bestand "$tmp/bestand.txt" 2>&1)"; r
 if [ "$rc" -eq 2 ]; then echo "ok   no table = rc 2"; else echo "FAIL no table: rc=$rc"; fails=$((fails+1)); fi
 "${tool[@]}" --dossier "$tmp/none.md" --bestand "$tmp/bestand.txt" >/dev/null 2>&1; rc=$?
 if [ "$rc" -eq 2 ]; then echo "ok   missing file = rc 2"; else echo "FAIL missing file: rc=$rc"; fails=$((fails+1)); fi
+rc2() { # rc2 <name> <dossier> <bestand>
+  "${tool[@]}" --dossier "$2" --bestand "$3" >/dev/null 2>&1; rc=$?
+  if [ "$rc" -eq 2 ]; then echo "ok   $1 = rc 2"; else echo "FAIL $1: rc=$rc (want 2)"; fails=$((fails+1)); fi
+}
+printf "$head| Folders | tree | tree | - | nein | |\n" >"$tmp/ok.md"
+printf '\377\376 not utf-8\n' >"$tmp/bad-utf8.md"
+rc2 "dossier not UTF-8" "$tmp/bad-utf8.md" "$tmp/bestand.txt"
+printf '\377\376' >"$tmp/bad-utf8.txt"
+rc2 "inventory not UTF-8" "$tmp/ok.md" "$tmp/bad-utf8.txt"
+printf '## Baustein-Zuordnung\n\n| Foo | Bar |\n|---|---|\n| a | b |\n' >"$tmp/header.md"
+rc2 "wrong table header" "$tmp/header.md" "$tmp/bestand.txt"
+printf '{"a": 1}' >"$tmp/obj.json"; rc2 "inventory JSON object" "$tmp/ok.md" "$tmp/obj.json"
+printf '[1, 2]' >"$tmp/nums.json"; rc2 "inventory JSON numbers" "$tmp/ok.md" "$tmp/nums.json"
+printf '[]' >"$tmp/empty.json"; rc2 "inventory empty list" "$tmp/ok.md" "$tmp/empty.json"
 [ "$fails" -eq 0 ] && echo "all green" || { echo "$fails failed"; exit 1; }

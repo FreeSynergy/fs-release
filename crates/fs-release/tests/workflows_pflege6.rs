@@ -174,11 +174,18 @@ fn counter_a_jump_to_a_missing_step_is_red() {
     });
 }
 
+/// The fixed order of a Frontend round as a rule: block analysis (dossier), look (stil-analyse and its check), composition (build).
+fn block_look_composition(text: &str) -> bool {
+    position(text, "dossier") < position(text, "stil-analyse")
+        && position(text, "stil-analyse") < position(text, "stil-check")
+        && position(text, "stil-check") < position(text, "stil-again")
+        && position(text, "stil-again") < position(text, "build")
+}
+
 #[test]
 fn block_analysis_comes_before_the_look_before_the_composition() {
     let text = read("frontend-round");
-    assert!(position(&text, "dossier") < position(&text, "stil-analyse"));
-    assert!(position(&text, "stil-analyse") < position(&text, "build"));
+    assert!(block_look_composition(&text));
     let dossier = read("dossier");
     assert!(position(&dossier, "research") < position(&dossier, "baustein-zuordnung"));
     assert!(position(&dossier, "baustein-zuordnung-again") < position(&dossier, "publish"));
@@ -187,7 +194,51 @@ fn block_analysis_comes_before_the_look_before_the_composition() {
 
 #[test]
 fn counter_composition_before_the_look_is_caught() {
-    let text = swapped(&read("frontend-round"), "stil-analyse", "build");
-    assert!(position(&text, "build") < position(&text, "stil-analyse"));
-    assert!(position(&text, "dossier") < position(&text, "build"));
+    let text = read("frontend-round");
+    // a rule recognises the swap (not only: the swap happened)
+    assert!(!block_look_composition(&swapped(
+        &text,
+        "stil-analyse",
+        "build"
+    )));
+    assert!(!block_look_composition(&swapped(
+        &text,
+        "dossier",
+        "stil-analyse"
+    )));
+    assert!(!block_look_composition(&swapped(
+        &text,
+        "stil-check",
+        "stil-again"
+    )));
+}
+
+#[test]
+fn the_style_analysis_has_a_script_check_that_jumps_back() {
+    let text = read("frontend-round");
+    let check = step_body(&text, "stil-check");
+    assert!(check.contains("actor: machine") && check.contains("kind: objective"));
+    let again = step_body(&text, "stil-again");
+    assert!(
+        again.contains("switch:")
+            && again.contains("then: stil-analyse")
+            && again.contains("then: stil-eskalation")
+    );
+    // counter-test: a jump to a missing step is red
+    assert_red("frontend-round", "no step of this flow", |t| {
+        t.replacen("then: stil-analyse", "then: stil-analyze", 1)
+    });
+}
+
+#[test]
+fn bad_input_of_the_block_check_goes_to_the_person_not_back_to_research() {
+    let text = read("dossier");
+    let again = step_body(&text, "baustein-zuordnung-again");
+    let first: Vec<&str> = again.lines().filter(|l| l.contains("then:")).collect();
+    assert_eq!(first[0].trim(), "then: eingabe-fehler");
+    assert!(again.contains("$context.bausteine.fehler") && again.contains("then: research"));
+    let stop = step_body(&text, "eingabe-fehler");
+    assert!(stop.contains("actor: human") && stop.contains("then: end"));
+    assert!(step_body(&text, "publish").contains("then: end"));
+    assert!(step_body(&text, "baustein-zuordnung").contains("${ .input.dossier }/bausteine.md"));
 }
