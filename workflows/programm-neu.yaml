@@ -1,10 +1,12 @@
-# Input: programm, vorbild (the model program, name), bestand, dossier (folder of the model dossier), model (pictures of the model), dump, exceptions (menu dump and exception list), repo, branch, head, delta.
-# Loops: a red check jumps back at most 3 times, the third red round goes to `eskalation` (the person), the script carries `runde`.
+# Input: programm, vorbild (the model program, name), bestand (block inventory of the fs-components family), blinc (inventory of the Blinc widgets), dossier (folder of the model dossier), model (pictures of the model), dump, exceptions (menu dump and exception list), repo, branch, head, delta.
+# Loops: a red check jumps back at most twice (red rounds 1 and 2); the third red round goes to `eskalation` (the person). The script carries `runde`
+# (red rounds of that check so far). `runde` is NOT reset by a green result inside one loop (a loop of several checks counts its rounds together);
+# it is reset only when the flow leaves the phase.
 # New program: from the test question 'whose data?' to acceptance by the user, 17 steps (plus 9a) in the phases P0 to P6.
 # Every agent step (objective) is followed by an objective script check; red goes back (switch with then); every step names its ADRs
 # (freesynergy.net:adr). Outcomes Facette, Modul and Suite leave the flow at a stub (facette-abzweig, modul-abzweig, suite-abzweig, at the
 # end of the file); `facette-anlegen` does not exist yet (TODO, not invented). Agents never push, tag or merge, never touch a real server,
-# never handle secrets. Order: `Workflow programm-neu, step <id>, parameters repo, branch, head, delta, programm, vorbild, bestand, dossier, model, dump, exceptions`
+# never handle secrets. Order: `Workflow programm-neu, step <id>, parameters repo, branch, head, delta, programm, vorbild, bestand, blinc, dossier, model, dump, exceptions`
 # (docs/prompt-template.md). FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -330,7 +332,7 @@ do:
             when: '${ ($context.schnittstelle.red and ($context.schnittstelle.runde // 0) >= 3) }'
             then: eskalation
         - modell:
-            when: '${ $context.schnittstelle.modell }'
+            when: '${ $context.schnittstelle.red and $context.schnittstelle.modell }'
             then: datenmodell
         - red:
             when: '${ $context.schnittstelle.red }'
@@ -429,7 +431,7 @@ do:
             when: '${ ($context.engine.red and ($context.engine.runde // 0) >= 3) }'
             then: eskalation
         - vertrag:
-            when: '${ $context.engine.schnittstelle }'
+            when: '${ $context.engine.red and $context.engine.schnittstelle }'
             then: schnittstelle
         - red:
             when: '${ $context.engine.red }'
@@ -480,7 +482,7 @@ do:
             when: '${ ($context.grenz.red and ($context.grenz.runde // 0) >= 3) }'
             then: eskalation
         - modell:
-            when: '${ $context.grenz.modell }'
+            when: '${ $context.grenz.red and $context.grenz.modell }'
             then: datenmodell
         - red:
             when: '${ $context.grenz.red }'
@@ -531,7 +533,7 @@ do:
             when: '${ ($context.admin.red and ($context.admin.runde // 0) >= 3) }'
             then: eskalation
         - typ:
-            when: '${ $context.admin.schnittstelle }'
+            when: '${ $context.admin.red and $context.admin.schnittstelle }'
             then: schnittstelle
         - red:
             when: '${ $context.admin.red }'
@@ -553,8 +555,9 @@ do:
           name: dossier
           version: 0.0.6
         input:
-          frontend: ${ .input.vorbild }
+          vorbild: ${ .input.vorbild }
           bestand: ${ .input.bestand }
+          blinc: ${ .input.blinc }
           dossier: ${ .input.dossier }
           repo: ${ .input.repo }
           branch: ${ .input.branch }
@@ -565,7 +568,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:phase: P4
         freesynergy.net:adr: '0074, 0084'
-        freesynergy.net:summary: "Step 11 - the model dossier with the menu inventory (`## Menü-Inventar`, dialogs, workflows) for the model program of this topic: sub-workflow dossier.yaml, repeat until check-docs is green; it ends with the human publish, so the step carries that gate. The next step (frontend-round) starts with the same sub-workflow with the same input (`frontend` = the model program `vorbild`, same `dossier`, `bestand`, `repo`, `branch`) and finds it green at once; the dossier is about the model, not about our program."
+        freesynergy.net:summary: "Step 11 - the model dossier with the menu inventory (`## Menü-Inventar`, dialogs, workflows) for the model program of this topic: sub-workflow dossier.yaml, repeat until check-docs is green; it ends with the human publish, so the step carries that gate. The next step (frontend-round) starts with the same sub-workflow with the same input (`vorbild` = the model program, same `dossier`, `bestand`, `blinc`, `repo`, `branch`; `frontend` of step 12 is our program `programm`, the dossier is about the model) and finds it green at once; the dossier is about the model, not about our program."
   - frontend:
       run:
         workflow:
@@ -573,8 +576,10 @@ do:
           name: frontend-round
           version: 0.0.6
         input:
-          frontend: ${ .input.vorbild }
+          vorbild: ${ .input.vorbild }
+          frontend: ${ .input.programm }
           bestand: ${ .input.bestand }
+          blinc: ${ .input.blinc }
           dossier: ${ .input.dossier }
           model: ${ .input.model }
           dump: ${ .input.dump }
@@ -951,4 +956,4 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:phase: P0
         freesynergy.net:adr: '0076 (no ADR of its own for the escalation rule: [kein ADR])'
-        freesynergy.net:summary: "A check step was red three times in a row (`runde` >= 3): the loop stops and the person decides (what the step asks for may be wrong or not reachable). The report names the step and the last red result. This flow ends."
+        freesynergy.net:summary: "A check step was red for the third time (`runde` >= 3; a green result inside the loop does not reset the counter): the loop stops and the person decides (what the step asks for may be wrong or not reachable). The report names the step and the last red result. This flow ends."

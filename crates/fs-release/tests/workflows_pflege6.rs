@@ -242,3 +242,48 @@ fn bad_input_of_the_block_check_goes_to_the_person_not_back_to_research() {
     assert!(step_body(&text, "publish").contains("then: end"));
     assert!(step_body(&text, "baustein-zuordnung").contains("${ .input.dossier }/bausteine.md"));
 }
+
+/// The release of `frontend-round` is skipped by a `switch` step in front of it (case `release == false` goes to `end`), not by an `if` on the
+/// release step: a skipped step falls into the next step (`stil-eskalation`) in Serverless Workflow 1.0.
+fn release_is_skipped_by_a_switch(text: &str) -> bool {
+    let r = position(text, "release");
+    let weiche = step_body(text, "release-weiche");
+    position(text, "release-weiche") + 1 == r
+        && weiche.contains("      switch:\n")
+        && weiche.contains("when: '${ .input.release == false }'\n            then: end")
+        && weiche.contains("then: continue")
+        && !step_body(text, "release").contains("      if:")
+        && step_body(text, "release").contains("      then: end\n")
+}
+
+#[test]
+fn the_release_of_frontend_round_is_skipped_by_a_switch_and_not_by_an_if() {
+    let text = read("frontend-round");
+    assert!(release_is_skipped_by_a_switch(&text));
+    // counter-tests (mutations): the switch case removed, the `if` back on the release step, the condition changed, the switch moved away
+    let weiche = step_body(&text, "release-weiche");
+    let no_case = text.replacen(&weiche, &weiche.replace("then: end", "then: continue"), 1);
+    assert_ne!(no_case, text);
+    assert!(!release_is_skipped_by_a_switch(&no_case));
+    assert!(!release_is_skipped_by_a_switch(&text.replacen(
+        "  - release:\n      then: end\n",
+        "  - release:\n      if: ${ .input.release != false }\n      then: end\n",
+        1
+    )));
+    assert!(!release_is_skipped_by_a_switch(&text.replacen(
+        ".input.release == false",
+        ".input.release == true",
+        1
+    )));
+    assert!(!release_is_skipped_by_a_switch(&swapped(
+        &text,
+        "release-weiche",
+        "release"
+    )));
+    // the whole step removed: the check is red (no such step), and the file check is red as well (`release` must be reached some way)
+    let gone = text.replacen(&format!("  - release-weiche:\n{weiche}\n"), "", 1);
+    assert_ne!(gone, text);
+    assert!(
+        std::panic::catch_unwind(|| release_is_skipped_by_a_switch(&gone)).map_or(true, |ok| !ok)
+    );
+}

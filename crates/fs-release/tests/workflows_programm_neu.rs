@@ -197,11 +197,25 @@ fn red_checks_jump_back_by_switch_and_the_person_runs_real_servers() {
 fn facette_and_modul_leave_at_a_todo_stub_and_facette_anlegen_is_not_invented() {
     let text = read(FLOW);
     for stub in ["facette-abzweig", "modul-abzweig", "suite-abzweig"] {
-        let b = step_body(&text, stub);
-        assert!(
-            b.contains("then: end") && b.contains("actor: human"),
-            "{stub}"
+        assert!(ends_the_flow(&text, stub), "{stub}");
+        assert!(step_body(&text, stub).contains("actor: human"), "{stub}");
+    }
+    // every dead end of the flow really ends (a `then: continue` would run on into the next stub)
+    for end in ["eskalation", "vorhanden-bericht", "katalog-fehler"] {
+        assert!(ends_the_flow(&text, end), "{end}");
+    }
+    // counter-tests: a stub with `then: continue`, a stub without any `then`
+    for stub in ["facette-abzweig", "modul-abzweig", "suite-abzweig"] {
+        let body = step_body(&text, stub);
+        let cont = text.replacen(
+            &body,
+            &body.replace("      then: end", "      then: continue"),
+            1,
         );
+        assert_ne!(cont, text);
+        assert!(!ends_the_flow(&cont, stub), "{stub}");
+        let none = text.replacen(&body, &body.replace("      then: end\n", ""), 1);
+        assert!(!ends_the_flow(&none, stub), "{stub}");
     }
     assert!(step_body(&text, "facette-abzweig").contains("does NOT exist yet"));
     assert!(!text.contains("name: facette-anlegen"));
@@ -285,19 +299,63 @@ fn back_jumps_land_on_workers(text: &str) -> bool {
     })
 }
 
-/// Every red loop of the flow stops after three red rounds: the first case of its switch tests `runde` and goes to `eskalation`.
-fn red_loops_escalate(text: &str) -> bool {
+/// Every red loop of the flow stops in the third red round: its switch has a case whose `when` tests `runde` against exactly `>= 3`,
+/// that case goes to `escalate` (a human step), and it stands before the first case that jumps back. `skip` = loops without a counter by design.
+fn red_loops_escalate(text: &str, escalate: &str, skip: &[&str]) -> bool {
     let names = step_names(text);
     (0..names.len()).all(|i| {
         let back = successors(text, i).into_iter().any(|j| j <= i);
         let b = step_body(text, &names[i]);
-        !(back && b.contains("      switch:\n") && names[i] != "befunde") || {
-            let first = b.split("      switch:\n").nth(1).unwrap_or("");
-            let first: Vec<&str> = first.lines().take(3).collect();
-            first.iter().any(|l| l.contains("runde"))
-                && first.iter().any(|l| l.contains("then: eskalation"))
+        if !back || !b.contains("      switch:\n") || skip.contains(&names[i].as_str()) {
+            return true;
         }
+        let lines: Vec<&str> = b
+            .split("      switch:\n")
+            .nth(1)
+            .unwrap_or("")
+            .lines()
+            .collect();
+        // the case that counts: `when` with `runde` and `>= 3`, directly followed by `then: <escalate>`
+        let Some(k) = lines
+            .iter()
+            .position(|l| l.contains("runde") && threshold_is_3(l))
+        else {
+            return false;
+        };
+        let goes_to_escalate = lines
+            .get(k + 1)
+            .is_some_and(|l| l.trim() == format!("then: {escalate}"));
+        let first_back = lines.iter().position(|l| {
+            l.trim()
+                .strip_prefix("then: ")
+                .and_then(|t| names.iter().position(|n| n == t))
+                .is_some_and(|j| j <= i)
+        });
+        goes_to_escalate && first_back.map_or(true, |f| k < f) && human_step(text, escalate)
     })
+}
+
+/// The `when` line compares against exactly `>= 3` (not 30, not 99).
+fn threshold_is_3(line: &str) -> bool {
+    line.split(">= ").nth(1).is_some_and(|rest| {
+        let mut c = rest.chars();
+        c.next() == Some('3') && !c.next().is_some_and(|d| d.is_ascii_digit())
+    })
+}
+
+fn human_step(text: &str, step: &str) -> bool {
+    let b = step_body(text, step);
+    b.contains("actor: human") && b.contains("gate: human")
+}
+
+/// The step has the flow directive `then: end` at task level (6 spaces), so it ends the flow and does not fall into the next step.
+fn ends_the_flow(text: &str, step: &str) -> bool {
+    let thens: Vec<String> = step_body(text, step)
+        .lines()
+        .filter(|l| l.len() - l.trim_start().len() == 6)
+        .filter_map(|l| l.trim().strip_prefix("then: ").map(str::to_string))
+        .collect();
+    thens == ["end"]
 }
 
 fn at(text: &str, s: &str) -> usize {
@@ -318,7 +376,9 @@ fn release_comes_last(text: &str) -> bool {
 fn formats_before_commands(text: &str) -> bool {
     let u = step_body(text, "umzug-check");
     let g = step_body(text, "grenz-check");
-    !u.contains("round trip over the fixtures keeps")
+    u.contains("call: format-check:")
+        && g.contains("call: boundary-check:")
+        && !u.contains("round trip over the fixtures keeps")
         && u.contains("NO import or export command")
         && g.contains("round trip")
 }
@@ -341,10 +401,13 @@ fn p0_exits_are_reported(text: &str) -> bool {
 
 /// Every `.input.X` that the called flow reads is passed by the calling step.
 fn run_inputs_are_given(caller: &str) -> Vec<String> {
-    let text = read(caller);
+    run_inputs_missing(caller, &read(caller))
+}
+
+fn run_inputs_missing(caller: &str, text: &str) -> Vec<String> {
     let mut missing = vec![];
-    for s in step_names(&text) {
-        let b = step_body(&text, &s);
+    for s in step_names(text) {
+        let b = step_body(text, &s);
         let Some(callee) = b
             .lines()
             .skip_while(|l| !l.contains("workflow:"))
@@ -423,13 +486,92 @@ fn the_graph_has_no_dead_step_and_the_back_jumps_land_on_workers() {
 }
 
 #[test]
-fn every_red_loop_stops_after_three_rounds() {
+fn every_red_loop_of_programm_neu_stops_in_the_third_red_round() {
     let text = read(FLOW);
-    assert!(red_loops_escalate(&text));
+    assert!(red_loops_escalate(&text, "eskalation", &["befunde"]));
     let one = "        - runden:\n            when: '${ ($context.standards.red and ($context.standards.runde // 0) >= 3) }'\n            then: eskalation\n";
     assert!(text.contains(one));
-    assert!(!red_loops_escalate(&text.replacen(one, "", 1)));
+    // counter-tests: the case removed, the threshold 99 or 30, the case after the jump back, the target not a human step
+    assert!(!red_loops_escalate(
+        &text.replacen(one, "", 1),
+        "eskalation",
+        &["befunde"]
+    ));
+    assert!(!red_loops_escalate(
+        &text.replacen(
+            ">= 3) }'\n            then: eskalation",
+            ">= 99) }'\n            then: eskalation",
+            1
+        ),
+        "eskalation",
+        &["befunde"]
+    ));
+    assert!(!red_loops_escalate(
+        &text.replacen(
+            ">= 3) }'\n            then: eskalation",
+            ">= 30) }'\n            then: eskalation",
+            1
+        ),
+        "eskalation",
+        &["befunde"]
+    ));
+    assert!(!red_loops_escalate(
+        &text.replacen(
+            one,
+            &format!("{}", one.replace("then: eskalation", "then: standards")),
+            1
+        ),
+        "eskalation",
+        &["befunde"]
+    ));
+    assert!(!red_loops_escalate(
+        &text.replacen("then: eskalation", "then: katalog-fehler", 1),
+        "eskalation",
+        &["befunde"]
+    ));
     assert!(step_body(&text, "eskalation").contains("actor: human"));
+}
+
+#[test]
+fn the_red_loops_of_dossier_and_frontend_round_stop_where_they_have_a_counter() {
+    // dossier: the block assignment (rc 3 of the script); frontend-round: only the style analysis has a counter, the loops
+    // `gates`, `menue-vergleich` and `acceptance` have none yet (open point, see CHANGELOG), so they are named as skipped
+    let dossier = read("dossier");
+    assert!(red_loops_escalate(&dossier, "eingabe-fehler", &[]));
+    let case = "        - runden:\n            when: '${ $context.bausteine.red and ($context.bausteine.runde // 0) >= 3 }'\n            then: eingabe-fehler\n";
+    assert!(dossier.contains(case));
+    assert!(!red_loops_escalate(
+        &dossier.replacen(case, "", 1),
+        "eingabe-fehler",
+        &[]
+    ));
+    assert!(!red_loops_escalate(
+        &dossier.replacen(">= 3 }'", ">= 99 }'", 1),
+        "eingabe-fehler",
+        &[]
+    ));
+    let round = read("frontend-round");
+    let open = [
+        "picture-again",
+        "gates-again",
+        "menue-vergleich-again",
+        "acceptance-again",
+    ];
+    assert!(red_loops_escalate(&round, "stil-eskalation", &open));
+    let case = "        - runden:\n            when: '${ $context.stil.red and ($context.stil.runde // 0) >= 3 }'\n            then: stil-eskalation\n";
+    assert!(round.contains(case));
+    assert!(!red_loops_escalate(
+        &round.replacen(case, "", 1),
+        "stil-eskalation",
+        &open
+    ));
+    assert!(!red_loops_escalate(
+        &round.replacen(">= 3 }'", ">= 99 }'", 1),
+        "stil-eskalation",
+        &open
+    ));
+    // the open loops are exactly those without a counter: with no skip list the check is red
+    assert!(!red_loops_escalate(&round, "stil-eskalation", &[]));
 }
 
 #[test]
@@ -465,6 +607,17 @@ fn step_5_checks_formats_only_and_the_round_trip_is_checked_in_9a() {
     );
     assert_ne!(old, text);
     assert!(!formats_before_commands(&old));
+    // counter-tests: step 5 calls the boundary check of step 9a (or the old name), step 9a calls the format check
+    assert!(!formats_before_commands(&text.replacen(
+        "call: format-check:",
+        "call: roundtrip-check:",
+        1
+    )));
+    assert!(!formats_before_commands(&text.replacen(
+        "call: boundary-check:",
+        "call: format-check:",
+        1
+    )));
 }
 
 #[test]
@@ -489,15 +642,50 @@ fn sub_workflows_get_every_input_they_read_and_the_dossier_is_the_models() {
     }
     let text = read(FLOW);
     assert!(inputs_are_declared(&text));
-    // step 11 and step 12 ask for the same dossier (the model program), so step 12 finds it green
-    let frontend = |s: &str| {
+    // step 11 and step 12 ask for the same dossier of the MODEL program (`vorbild`), so step 12 finds it green; the `frontend`
+    // of step 12 is our own program (`programm`), never the model
+    let line = |s: &str, key: &str| {
         step_body(&text, s)
             .lines()
-            .find(|l| l.trim().starts_with("frontend: "))
+            .find(|l| l.trim().starts_with(key))
             .map(str::to_string)
     };
-    assert_eq!(frontend("vorbild-dossier"), frontend("frontend"));
-    assert!(frontend("frontend").unwrap().contains("input.vorbild"));
+    assert!(line("vorbild-dossier", "vorbild: ").is_some());
+    assert_eq!(
+        line("vorbild-dossier", "vorbild: "),
+        line("frontend", "vorbild: ")
+    );
+    assert!(line("vorbild-dossier", "frontend: ").is_none());
+    assert!(line("frontend", "frontend: ")
+        .unwrap()
+        .contains("input.programm"));
+    // counter-tests: an input the callee reads dropped (every sub-workflow call), a name changed
+    for key in ["vorbild: ", "blinc: ", "bestand: "] {
+        let body = step_body(&text, "vorbild-dossier");
+        let line = body.lines().find(|l| l.trim().starts_with(key)).unwrap();
+        let dropped = text.replacen(&body, &body.replace(&format!("{line}\n"), ""), 1);
+        assert_ne!(dropped, text, "{key}");
+        assert!(!run_inputs_missing(FLOW, &dropped).is_empty(), "{key}");
+    }
+    let body = step_body(&text, "frontend");
+    for key in ["frontend: ", "vorbild: ", "blinc: "] {
+        let line = body.lines().find(|l| l.trim().starts_with(key)).unwrap();
+        let dropped = text.replacen(&body, &body.replace(&format!("{line}\n"), ""), 1);
+        assert!(
+            !run_inputs_missing(FLOW, &dropped).is_empty(),
+            "frontend {key}"
+        );
+    }
+    let round = read("frontend-round");
+    for key in ["vorbild: ", "blinc: "] {
+        let body = step_body(&round, "dossier");
+        let line = body.lines().find(|l| l.trim().starts_with(key)).unwrap();
+        let dropped = round.replacen(&body, &body.replace(&format!("{line}\n"), ""), 1);
+        assert!(
+            !run_inputs_missing("frontend-round", &dropped).is_empty(),
+            "{key}"
+        );
+    }
     // counter-tests: an input dropped, a name changed
     let dropped = text.replacen("          release: false\n", "", 1);
     assert!(!release_comes_last(&dropped));

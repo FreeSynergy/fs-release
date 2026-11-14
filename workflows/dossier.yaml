@@ -1,6 +1,6 @@
 # The research dossier of a Frontend: files in R2 with sourced facts, check-docs, then the docs main branch.
-# Input: frontend, repo, branch, bestand (block inventory of fs-components), dossier (folder of the dossier files, bausteine.md lies in it).
-# Order: `Workflow dossier, step research, parameters frontend, repo, branch` (docs/prompt-template.md); the file list,
+# Input: vorbild (the model program the dossier is about), repo, branch, bestand (block inventory of the fs-components family), blinc (inventory of the Blinc widgets), dossier (folder of the dossier files, bausteine.md lies in it).
+# Order: `Workflow dossier, step research, parameters vorbild, repo, branch` (docs/prompt-template.md); the file list,
 # the source rule and the report form are in this file and rules.md [BERICHT], not in the order. FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -12,7 +12,7 @@ do:
   - research:
       call: research-ai:0.0.6@fs
       with:
-        frontend: ${ .input.frontend }
+        vorbild: ${ .input.vorbild }
         repo: ${ .input.repo }
         branch: ${ .input.branch }
         files: [states, dialogs, menus, context-menus, shortcuts, workflows, bausteine, acceptance, gaps]
@@ -21,7 +21,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Writes one research file each for states, dialogs, menus and context menus, shortcuts, workflows, acceptance.md and gaps into R2; every fact has a source, what is not proven is marked [nicht belegt]; the menus file carries a `## Menü-Inventar` list (nested bullets with optional shortcut and names, format in docs/menue-vergleich.md) and the dialogs file a table or `## Dialog-Inventar` list, because scripts/menue-vergleich reads them (docs/menue-vergleich.md); bausteine.md carries the `## Baustein-Zuordnung` table (every area of the model -> 'what is this?' -> block id, existing blocks first; Neu=ja only with the reason why no existing block with a module fits; format in docs/baustein-zuordnung.md; the order of a Frontend is block analysis, then look, then composition); ADR 0013 - nothing is copied. Read-only on the Frontend, no network beyond the sources named in the order, commits per [COMMIT], report per [BERICHT].
+        freesynergy.net:summary: Writes one research file each for states, dialogs, menus and context menus, shortcuts, workflows, acceptance.md and gaps into R2; every fact has a source, what is not proven is marked [nicht belegt]; the menus file carries a `## Menü-Inventar` list (nested bullets with optional shortcut and names, format in docs/menue-vergleich.md) and the dialogs file a table or `## Dialog-Inventar` list, because scripts/menue-vergleich reads them (docs/menue-vergleich.md); bausteine.md carries the `## Baustein-Zuordnung` table (every area of the model -> 'what is this?' -> block id, with the column `Quelle` in the order family block (familie), Blinc widget through an adapter (blinc), new block (neu, only with the reason why neither a family block nor a Blinc widget fits); format in docs/baustein-zuordnung.md; the order of a Frontend is block analysis, then look, then composition); ADR 0013 - nothing is copied. Read-only on the Frontend, no network beyond the sources named in the order, commits per [COMMIT], report per [BERICHT].
   - check-docs:
       call: check-docs:0.0.6@fs
       metadata:
@@ -35,6 +35,7 @@ do:
       with:
         dossier: ${ .input.dossier }/bausteine.md
         bestand: ${ .input.bestand }
+        blinc: ${ .input.blinc }
       export:
         as: '${ $context + { bausteine: . } }'
       metadata:
@@ -42,7 +43,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: scripts/baustein-zuordnung (no network, no AI) reads `## Baustein-Zuordnung` of bausteine.md and the block inventory of fs-components; red (rc 1) when an area has no block id, an id marked existing is not in the inventory, a new block exists already or has no reason; rc 2 = bad input (modelled explicitly, the function maps rc 0 to green, rc 1 to `red` true, rc 2 to `fehler` true with `red` false - it is not proven how a real `@fs` run maps rc, so the flow does not rely on rc alone). It reports the share of newly built blocks. ADR 0074 (blocks with fixed names), 0084 (one block with modules, e.g. formulas as a module).
+        freesynergy.net:summary: scripts/baustein-zuordnung (no network, no AI) reads `## Baustein-Zuordnung` of bausteine.md and the block inventory of fs-components; red (rc 1) when an area has no block id, an id is not in the inventory of its `Quelle`, a Blinc widget is used although the family has the block, a new block exists already or has no reason naming both family and Blinc; rc 2 = bad input (modelled explicitly, the function maps rc 0 to green, rc 1 and rc 3 to `red` true, rc 2 to `fehler` true with `red` false - it is not proven how a real `@fs` run maps rc, so the flow does not rely on rc alone). The script counts the red rounds itself in the state file `.baustein-zuordnung-runde` in the dossier folder (+1 on red, reset on green) and prints `runde=N` (also `runde` in the `--json` report; rc 3 from N >= 3); the function puts N into the result as `runde`. It reports the share per source (familie, blinc, neu). ADR 0074 (blocks with fixed names), 0084 (one block with modules, e.g. formulas as a module).
   - baustein-zuordnung-again:
       switch:
         - fehler:
@@ -61,12 +62,12 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - bad input (`fehler`, rc 2) and a third red round (`runde` >= 3, counted by the script) go to the person (`eingabe-fehler`), they never jump back; a red assignment goes back to research (the agent fixes bausteine.md), green goes on to publish.
+        freesynergy.net:summary: Control flow - bad input (`fehler`, rc 2) and a third red round (`runde` >= 3, counted by `scripts/baustein-zuordnung` in its state file, rc 3) go to the person (`eingabe-fehler`), they never jump back; a red assignment goes back to research (the agent fixes bausteine.md), green goes on to publish.
   - publish:
       call: docs-main:0.0.6@fs
       then: end
       with:
-        frontend: ${ .input.frontend }
+        vorbild: ${ .input.vorbild }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

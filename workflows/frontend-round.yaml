@@ -1,8 +1,8 @@
 # One round on a Frontend: dossier, gap list, images, the user's verdict, build, acceptance by clicking through the working flows, release.
 # Fixed order for every Frontend (wave 1 included): (1) BLOCK ANALYSIS - every area of the model is assigned to a block family and id, existing blocks first
-# (dossier, bausteine.md, check baustein-zuordnung); (2) LOOK - style analysis, tokens and style rules per block (ADR 0074; step stil-analyse);
+# (dossier, bausteine.md, check baustein-zuordnung; source order family block, Blinc widget through an adapter, new block with reason); (2) LOOK - style analysis, tokens and style rules per block (ADR 0074; step stil-analyse);
 # (3) COMPOSITION - the arrangement in the Frontend (step build). Agents never push, tag or merge. FS profile: see README.md.
-# Input: frontend (the model program the dossier is about), bestand, dossier (folder of the dossier), model (pictures of the model), dump, exceptions,
+# Input: vorbild (the model program the dossier is about), frontend (OUR program that is built; gap list, style analysis, images and build are about it), bestand (family inventory), blinc (Blinc widget inventory), dossier (folder of the dossier), model (pictures of the model), dump, exceptions,
 # repo, branch, head, delta, release (true or missing = the flow ends with release-flow; `false` = no release here, the caller releases later, e.g. programm-neu).
 document:
   dsl: 1.0.3
@@ -18,8 +18,9 @@ do:
           name: dossier
           version: 0.0.6
         input:
-          frontend: ${ .input.frontend }
+          vorbild: ${ .input.vorbild }
           bestand: ${ .input.bestand }
+          blinc: ${ .input.blinc }
           dossier: ${ .input.dossier }
           repo: ${ .input.repo }
           branch: ${ .input.branch }
@@ -218,8 +219,20 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a failed flow goes back to build with the order of acceptance-red, otherwise on to the release.
+  - release-weiche:
+      switch:
+        - kein-release:
+            when: '${ .input.release == false }'
+            then: end
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - with the input `release` false this flow ends here (the caller releases after its later steps), otherwise it goes on to the release. A `switch` and not an `if` on the release step, because a skipped step would fall through to the next step (`stil-eskalation`) in Serverless Workflow 1.0.
   - release:
-      if: ${ .input.release != false }
       then: end
       run:
         workflow:
@@ -231,7 +244,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge. Skipped when the input `release` is false (the caller releases after its later steps).
+        freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge. Not reached when the input `release` is false (see `release-weiche`).
   - stil-eskalation:
       set:
         todo: stil-eskalation

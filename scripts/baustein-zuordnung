@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""Step baustein-zuordnung: every area of the model is assigned to a block id (existing first); the share of new blocks is reported.
+"""Step baustein-zuordnung: every area of the model is assigned to a block id; source order family, then Blinc widget, then new; shares are reported.
 
-  python3 -I scripts/baustein-zuordnung --dossier bausteine.md --bestand bestand.txt [--json report.json]
+  python3 -I scripts/baustein-zuordnung --dossier bausteine.md --bestand bestand.txt --blinc blinc.txt [--json report.json]
 
 Dossier: heading `## Baustein-Zuordnung` (or `## Block assignment`), below it a table
-  | Bereich | Was ist das? | Baustein-Id | Module | Neu | Begründung |
-`Neu` = `nein` (existing block) or `ja` (new block, then Begründung says why no existing block with a module fits).
-Bestand: one block id per line (`#` = comment), or a JSON list of ids. Format and rules: docs/baustein-zuordnung.md.
-rc 0 = every area assigned and every new block reasoned, rc 1 = deviation, rc 2 = bad input (unreadable or non-UTF-8 file, wrong table header,
-empty or malformed inventory; never green). The block inventory path and the dossier path are given by the caller; the flow passes `<dossier folder>/bausteine.md`.
+  | Bereich | Was ist das? | Baustein-Id | Module | Quelle | Begründung |
+`Quelle` = `familie` (block of the fs-components family, id in --bestand), `blinc` (Blinc widget through an adapter, id in --blinc) or
+`neu` (new block; Begründung says why neither a family block nor a Blinc widget fits, it must name both).
+Inventories: one block id per line (`#` = comment), or a JSON list of ids. Format and rules: docs/baustein-zuordnung.md.
+Round counter: the state file `.baustein-zuordnung-runde` in the folder of the dossier counts red rounds (+1 on red, reset to 0 on green);
+the output has the line `runde=N`; from N >= 3 the result is rc 3 (escalate to the person).
+rc 0 = every area assigned, every source rule met; rc 1 = deviation (round 1 or 2); rc 2 = bad input (unreadable or non-UTF-8 file, wrong
+table header, empty or malformed inventory; never green, the counter is not touched); rc 3 = deviation and
+the third red round or later. The paths are given by the caller; the flow passes `<dossier folder>/bausteine.md`.
 """
-import argparse, json, re, sys
+import argparse, json, os, re, sys
+
+STATE = ".baustein-zuordnung-runde"
 
 HEADS = ("## baustein-zuordnung", "## block assignment")
 
@@ -64,19 +70,36 @@ def read_bestand(path):
     return {l.split("#")[0].strip() for l in text.splitlines() if l.split("#")[0].strip()}
 
 
+def count_round(dossier, red):
+    """Red rounds so far, kept in a state file next to the dossier: +1 on red, back to 0 on green."""
+    path = os.path.join(os.path.dirname(os.path.abspath(dossier)), STATE)
+    try:
+        before = int(open(path, encoding="utf-8").read().strip() or 0)
+    except (OSError, ValueError):
+        before = 0
+    now = before + 1 if red else 0
+    try:
+        open(path, "w", encoding="utf-8").write(f"{now}\n")
+    except OSError as e:
+        raise InputError(f"cannot write the round counter {path}: {e}")
+    return now
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dossier", required=True)
     ap.add_argument("--bestand", required=True)
+    ap.add_argument("--blinc", required=True)
     ap.add_argument("--json")
     a = ap.parse_args()
     try:
         header, rows = read_table(a.dossier)
         bestand = read_bestand(a.bestand)
+        blinc = read_bestand(a.blinc)
     except (OSError, UnicodeError, InputError) as e:
         print(f"input error: {e}")
         return 2
-    need = [("bereich", "area"), ("baustein-id", "block id"), ("neu", "new"), ("begründung", "begruendung", "reason")]
+    need = [("bereich", "area"), ("baustein-id", "block id"), ("quelle", "source"), ("begründung", "begruendung", "reason")]
     missing = [n[0] for n in need if not any(h in (header or []) for h in n)]
     if rows and missing:
         print(f"input error: the table header lacks the column(s) {', '.join(missing)}")
@@ -84,37 +107,58 @@ def main():
     if not rows:
         print("input error: no table below '## Baustein-Zuordnung' in the dossier")
         return 2
-    if not bestand:
-        print("input error: the block inventory is empty")
+    if not bestand or not blinc:
+        print("input error: the family inventory or the Blinc inventory is empty")
         return 2
-    dev, new = [], 0
+    dev, count = [], {"familie": 0, "blinc": 0, "neu": 0}
     for r in rows:
         area = col(r, "bereich", "area")
         bid = col(r, "baustein-id", "block id")
-        neu = col(r, "neu", "new").lower()
+        src = col(r, "quelle", "source").lower()
         why = col(r, "begründung", "begruendung", "reason")
         if not area or not bid or bid in ("-", "?"):
             dev.append(("ohne-baustein", area or "?", "no block id"))
-        elif neu not in ("ja", "nein", "yes", "no"):
-            dev.append(("neu-unklar", area, "column Neu must be ja or nein"))
-        elif neu in ("nein", "no") and bid not in bestand:
-            dev.append(("unbekannt", area, f"{bid} is not in the inventory; mark it Neu=ja with a reason"))
-        elif neu in ("ja", "yes"):
-            new += 1
+        elif src not in count:
+            dev.append(("quelle-unklar", area, "column Quelle must be familie, blinc or neu"))
+        elif src == "familie":
+            count[src] += 1
+            if bid not in bestand:
+                dev.append(("unbekannt", area, f"{bid} is not in the family inventory; take a Blinc widget (Quelle=blinc) or a new block with a reason"))
+        elif src == "blinc":
+            count[src] += 1
             if bid in bestand:
-                dev.append(("schon-da", area, f"{bid} exists already, use it (Neu=nein) and add a module if needed"))
+                dev.append(("familie-zuerst", area, f"{bid} is in the family inventory, use it (Quelle=familie)"))
+            elif bid not in blinc:
+                dev.append(("unbekannt", area, f"{bid} is not in the Blinc inventory; new block with a reason"))
+        else:
+            count[src] += 1
+            if bid in bestand or bid in blinc:
+                dev.append(("schon-da", area, f"{bid} exists already (family or Blinc), use it and add a module if needed"))
             elif len(why) < 10:
-                dev.append(("ohne-begruendung", area, f"new block {bid} needs the reason why no existing block with a module fits"))
-    share = new / len(rows)
+                dev.append(("ohne-begruendung", area, f"new block {bid} needs the reason why neither a family block nor a Blinc widget fits"))
+            elif not (re.search(r"famil", why, re.I) and re.search(r"blinc", why, re.I)):
+                dev.append(("begruendung-unvollstaendig", area, f"the reason of {bid} must say why the family AND why Blinc do not fit (name both)"))
+    total = len(rows)
     result = "red" if dev else "green"
+    try:
+        runde = count_round(a.dossier, bool(dev))
+    except InputError as e:
+        print(f"input error: {e}")
+        return 2
     for art, area, detail in dev:
         print(f"{art}: {area}: {detail}")
-    print(f"areas {len(rows)}, new blocks {new} ({share:.0%}), result {result}")
+    shares = ", ".join(f"{k} {v} ({v / total:.0%})" for k, v in count.items())
+    print(f"areas {total}, sources {shares}, new blocks {count['neu']} ({count['neu'] / total:.0%}), result {result}")
+    print(f"runde={runde}")
+    new = count["neu"]
+    share = new / total
     if a.json:
-        json.dump({"result": result, "areas": len(rows), "new": new, "share_new": round(share, 3),
+        json.dump({"result": result, "areas": len(rows), "new": new, "share_new": round(share, 3), "sources": count, "runde": runde,
                    "deviations": [{"art": x, "bereich": y, "detail": z} for x, y, z in dev]},
                   open(a.json, "w"), indent=1)
-    return 1 if dev else 0
+    if not dev:
+        return 0
+    return 3 if runde >= 3 else 1
 
 
 if __name__ == "__main__":

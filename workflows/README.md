@@ -51,8 +51,8 @@ Leiste, Dialog …), vorhandene Bausteine zuerst, ein neuer nur mit Begründung,
 Stil-Analyse, Tokens und Stilregeln je Baustein (ADR 0074); (3) Zusammensetzen - die Anordnung im Frontend. Beispiel: die Datei-Tabelle
 in fs-files ist dieselbe Tabelle wie später in fs-data, nur mit ausgeblendeten Köpfen und ohne Rechen-Modul (Formeln = Modul, Muster
 von ADR 0084). Der objektive Prüfschritt `baustein-zuordnung` (in `dossier`, vor dem Veröffentlichen; rot springt zu `research`) lässt
-`scripts/baustein-zuordnung` die Tabelle `## Baustein-Zuordnung` in `bausteine.md` prüfen und meldet den Anteil neu gebauter
-Bausteine. Format: `docs/baustein-zuordnung.md`, Selbsttest `scripts/test_baustein_zuordnung.sh`.
+`scripts/baustein-zuordnung` die Tabelle `## Baustein-Zuordnung` in `bausteine.md` prüfen und zählt die roten Runden selbst (Zustandsdatei im Dossier-Ordner, rc 3 ab der dritten) und meldet den Anteil je Quelle
+(Familie, Blinc-Widget, neu; Reihenfolge Familie, Blinc, neu mit Begründung). Format: `docs/baustein-zuordnung.md`, Selbsttest `scripts/test_baustein_zuordnung.sh`.
 
 **Neues Programm (`programm-neu`, Nutzerwunsch 14.11.).** Ein Ablauf von der Prüffrage bis zur Abnahme, 17 Schritte in sieben Phasen:
 P0 (1 „wessen Daten?“, ADR 0076, Ausgang Programm / Facette / Modul / Suite; 2 Hub und Katalog, ADR 0068), P1 (3 Standards und ihre
@@ -62,7 +62,7 @@ mit Vertragstests; 9a Importer/Exporter als Grenz-Adapter nach ADR 0085 (Entwurf
 Stil, Zusammensetzen, `menue-vergleich`; 13 Sprache MF2 de+en und Barrierefreiheit), P5 (14 Hub-Anmeldung und `fs-server`-Adapter
 nach ADR 0082; 15 Sicherheit, ADR 0054/0056/0067; 16 Pakete, Katalog ADR 0077, Doku; danach `release-flow`, danach der Serverlauf), P6 (17 Abnahme durch den
 Nutzer, Befunde laufen durch `bugfix`). Jeder Agentenschritt (`objective`) hat danach einen objektiven Skript-Prüfschritt; rot
-springt per `switch`/`then` zurück, höchstens dreimal: die dritte rote Runde (`runde` im Ergebnis des Prüfskripts) endet in `eskalation` beim Menschen. `frontend-round` läuft hier mit `release: false` (ein einziges Release, erst nach Sprache, Sicherheit und Paketen). Jeder Schritt nennt seine ADRs in `freesynergy.net:adr` und seine Phase in
+springt per `switch`/`then` zurück, höchstens zweimal: die dritte rote Runde (`runde` im Ergebnis des Prüfskripts, bei Grün innerhalb eines Kreises nicht zurückgesetzt) endet in `eskalation` beim Menschen. `frontend-round` läuft hier mit `release: false` (ein einziges Release, erst nach Sprache, Sicherheit und Paketen). Jeder Schritt nennt seine ADRs in `freesynergy.net:adr` und seine Phase in
 `freesynergy.net:phase`. Ausgang Facette, Modul oder Suite verlässt den Ablauf an einem Stub (`facette-abzweig`, `modul-abzweig`,
 `suite-abzweig`); **`facette-anlegen` und ein Modul-Ablauf gibt es noch nicht** und sind als TODO geführt, nicht erfunden. Auf echten
 Servern arbeitet kein Agent: Schritt 14 läuft nur lokal gegen Testinstanzen, den echten Lauf macht der Mensch (`server-lauf`). Selbsttest:
@@ -118,7 +118,7 @@ model on the standards, saving is not exporting, ADR 0046; 7 topic interface, AD
 contract tests; 9a importers/exporters as border adapters per ADR 0085 (draft); 10 admin Frontend from the type description), P4 (11 model dossier; 12 `frontend-round` with block assignment, look,
 composition, `menue-vergleich`; 13 language MF2 de+en and accessibility), P5 (14 hub registration and the `fs-server` adapter per ADR
 0082; 15 security, ADR 0054/0056/0067; 16 packages, catalog ADR 0077, docs; then `release-flow`, then the server run), P6 (17 acceptance by the user, findings run
-through `bugfix`). Every agent step (`objective`) is followed by an objective script check; red jumps back by `switch`/`then`, at most three times: the third red round (`runde` in the result of the check script) ends in `eskalation` with the person. `frontend-round` runs here with `release: false` (one single release, only after language, security and packages). Every step names its
+through `bugfix`). Every agent step (`objective`) is followed by an objective script check; red jumps back by `switch`/`then`, at most twice: the third red round (`runde` in the result of the check script, not reset by green inside a loop) ends in `eskalation` with the person. `frontend-round` runs here with `release: false` (one single release, only after language, security and packages). Every step names its
 ADRs in `freesynergy.net:adr` and its phase in `freesynergy.net:phase`. The outcomes Facette, Modul and Suite leave the flow at a stub
 (`facette-abzweig`, `modul-abzweig`, `suite-abzweig`); **`facette-anlegen` and a module flow do not exist yet** and are kept as a TODO,
 not invented. No agent works on a real server: step 14 runs only locally against test instances, the real run is the person's
