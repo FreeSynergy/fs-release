@@ -44,6 +44,15 @@ Abweichungen (`fehlt`, `zusaetzlich`, `anders-benannt`, `kuerzel`) sind nur mit 
 erlaubt; ohne Begründung ist das Ergebnis rot. Gilt für alle Frontends der Welle 1. Format: `docs/menue-vergleich.md`,
 Selbsttest `scripts/test_menue_vergleich.sh`.
 
+**Baustein-Zuordnung (Nutzerentscheidung 14.11., für alle Frontends).** Verbindliche Reihenfolge: (1) Baustein-Analyse - jeder
+Bereich des Vorbilds wird einer Baustein-Familie und einer Baustein-Id zugeordnet („was ist das?“: Tabelle, Baum, Liste, Karte,
+Leiste, Dialog …), vorhandene Bausteine zuerst, ein neuer nur mit Begründung, warum kein vorhandener (mit Modul) passt; (2) Aussehen -
+Stil-Analyse, Tokens und Stilregeln je Baustein (ADR 0074); (3) Zusammensetzen - die Anordnung im Frontend. Beispiel: die Datei-Tabelle
+in fs-files ist dieselbe Tabelle wie später in fs-data, nur mit ausgeblendeten Köpfen und ohne Rechen-Modul (Formeln = Modul, Muster
+von ADR 0084). Der objektive Prüfschritt `baustein-zuordnung` (in `dossier`, vor dem Veröffentlichen; rot springt zu `research`) lässt
+`scripts/baustein-zuordnung` die Tabelle `## Baustein-Zuordnung` in `bausteine.md` prüfen und meldet den Anteil neu gebauter
+Bausteine. Format: `docs/baustein-zuordnung.md`, Selbsttest `scripts/test_baustein_zuordnung.sh`.
+
 **EN.** Our processes as visible workflows: Serverless Workflow 1.0 YAML (`dsl: 1.0.x`) in the FS profile (draft
 `ENTWURF-workflow-standard.md`, version 3). Every step carries `freesynergy.net:actor` (`human` = Person, `ai` =
 Application, `machine` = Service; plus `freesynergy.net:actor-type`) and `freesynergy.net:gate` (approval stop, e.g.
@@ -77,3 +86,12 @@ list (dump `fs-menu-dump/1`) with the `## Menü-Inventar` list / dialogs table o
 `zusaetzlich`, `anders-benannt`, `kuerzel`) are allowed only with a reason in the Frontend's exception list; without one the
 result is red. Applies to every Frontend of wave 1. Format: `docs/menue-vergleich.md`, self test
 `scripts/test_menue_vergleich.sh`.
+
+**Block assignment (user decision 14 Nov, all Frontends).** Fixed order: (1) block analysis - every area of the model is assigned to a
+block family and block id ("what is this?": table, tree, list, card, bar, dialog ...), existing blocks first, a new one only with the
+reason why no existing block (with a module) fits; (2) look - style analysis, tokens and style rules per block (ADR 0074); (3)
+composition - the arrangement in the Frontend. Example: the file table of fs-files is the same table as later in fs-data, only with
+hidden headers and no calculation module (formulas = a module, ADR 0084 pattern). The objective check `baustein-zuordnung` (in
+`dossier`, before publish; red jumps to `research`) lets `scripts/baustein-zuordnung` check the `## Baustein-Zuordnung` table of
+`bausteine.md` and reports the share of newly built blocks. Format: `docs/baustein-zuordnung.md`, self test
+`scripts/test_baustein_zuordnung.sh`.

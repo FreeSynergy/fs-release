@@ -1,5 +1,7 @@
 # One round on a Frontend: dossier, gap list, images, the user's verdict, build, acceptance by clicking through the working flows, release.
-# Agents never push, tag or merge. FS profile: see README.md.
+# Fixed order for every Frontend (wave 1 included): (1) BLOCK ANALYSIS - every area of the model is assigned to a block family and id, existing blocks first
+# (dossier, bausteine.md, check baustein-zuordnung); (2) LOOK - style analysis, tokens and style rules per block (ADR 0074; step stil-analyse);
+# (3) COMPOSITION - the arrangement in the Frontend (step build). Agents never push, tag or merge. FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -15,12 +17,13 @@ do:
           version: 0.0.6
         input:
           frontend: ${ .input.frontend }
+          bestand: ${ .input.bestand }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The research dossier of the Frontend exists and passes check-docs (sub-workflow dossier.yaml, research by the agent, check-docs by the machine); repeat until it does. The sub-workflow ends with the human publish into the docs main branch, so the step carries that gate.
+        freesynergy.net:summary: The research dossier of the Frontend exists and passes check-docs (sub-workflow dossier.yaml, research by the agent, check-docs by the machine); repeat until it does. The sub-workflow holds block analysis (bausteine.md, objective check baustein-zuordnung with the share of new blocks, red goes back to research). It ends with the human publish into the docs main branch, so the step carries that gate.
   - gap-list:
       call: gap-list:0.0.6@fs
       with:
@@ -32,6 +35,17 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Compares dossier (states, dialogs, menus, shortcuts, workflows, gaps) with our Frontend and writes the list of what is missing.
+  - stil-analyse:
+      call: stil-analyse:0.0.6@fs
+      with:
+        frontend: ${ .input.frontend }
+        dossier: ${ .input.dossier }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Step 2 of the fixed order (after the block analysis of the dossier, before the composition) - the style analysis of the model gives tokens and style rules per block id of bausteine.md (ADR 0074, DTCG tokens, rules per named part and state); no fixed colours or spaces in the block or the Frontend; repeat until every block id of the table has its rules.
   - images:
       call: render-images:0.0.6@fs
       with:
@@ -86,7 +100,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent builds the gaps in its own worktree and commits locally ([COMMIT]); repeat until the gates are green ([GATES], commands one at a time per [BASH]), no push, no tag; report per [BERICHT]. Order - `Workflow frontend-round, step build, parameters repo, branch, head, delta, frontend` (docs/prompt-template.md).
+        freesynergy.net:summary: Step 3 of the fixed order (composition) - the agent builds the gaps in its own worktree, composing only from the block ids of bausteine.md (a new block first, in the crate of its family, with the reason of the table; one block with modules instead of a second copy, ADR 0084 pattern) and the rules of stil-analyse; and commits locally ([COMMIT]); repeat until the gates are green ([GATES], commands one at a time per [BASH]), no push, no tag; report per [BERICHT]. Order - `Workflow frontend-round, step build, parameters repo, branch, head, delta, frontend` (docs/prompt-template.md).
   - gates:
       call: gates:0.0.6@fs
       export:

@@ -14,13 +14,13 @@ do:
         frontend: ${ .input.frontend }
         repo: ${ .input.repo }
         branch: ${ .input.branch }
-        files: [states, dialogs, menus, context-menus, shortcuts, workflows, acceptance, gaps]
+        files: [states, dialogs, menus, context-menus, shortcuts, workflows, bausteine, acceptance, gaps]
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Writes one research file each for states, dialogs, menus and context menus, shortcuts, workflows, acceptance.md and gaps into R2; every fact has a source, what is not proven is marked [nicht belegt]; the menus file carries a `## Menü-Inventar` list (nested bullets with optional shortcut and names, format in docs/menue-vergleich.md) and the dialogs file a table or `## Dialog-Inventar` list, because scripts/menue-vergleich reads them (docs/menue-vergleich.md); ADR 0013 - nothing is copied. Read-only on the Frontend, no network beyond the sources named in the order, commits per [COMMIT], report per [BERICHT].
+        freesynergy.net:summary: Writes one research file each for states, dialogs, menus and context menus, shortcuts, workflows, acceptance.md and gaps into R2; every fact has a source, what is not proven is marked [nicht belegt]; the menus file carries a `## Menü-Inventar` list (nested bullets with optional shortcut and names, format in docs/menue-vergleich.md) and the dialogs file a table or `## Dialog-Inventar` list, because scripts/menue-vergleich reads them (docs/menue-vergleich.md); bausteine.md carries the `## Baustein-Zuordnung` table (every area of the model -> 'what is this?' -> block id, existing blocks first; Neu=ja only with the reason why no existing block with a module fits; format in docs/baustein-zuordnung.md; the order of a Frontend is block analysis, then look, then composition); ADR 0013 - nothing is copied. Read-only on the Frontend, no network beyond the sources named in the order, commits per [COMMIT], report per [BERICHT].
   - check-docs:
       call: check-docs:0.0.6@fs
       metadata:
@@ -29,6 +29,32 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: check-docs on the dossier; red goes back to research until it is green.
+  - baustein-zuordnung:
+      call: baustein-zuordnung:0.0.6@fs
+      with:
+        dossier: bausteine.md
+        bestand: ${ .input.bestand }
+      export:
+        as: '${ $context + { bausteine: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/baustein-zuordnung (no network, no AI) reads `## Baustein-Zuordnung` of bausteine.md and the block inventory of fs-components; red (rc 1) when an area has no block id, an id marked existing is not in the inventory, a new block exists already or has no reason; rc 2 = bad input. It reports the share of newly built blocks. ADR 0074 (blocks with fixed names), 0084 (one block with modules, e.g. formulas as a module).
+  - baustein-zuordnung-again:
+      switch:
+        - red:
+            when: '${ $context.bausteine.red }'
+            then: research
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a red assignment goes back to research (the agent fixes bausteine.md), green goes on to publish.
   - publish:
       call: docs-main:0.0.6@fs
       with:

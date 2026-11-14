@@ -150,6 +150,7 @@ fn the_jumps_back_that_were_only_in_the_summary_are_switch_with_then() {
         ("frontend-round", "picture-again", "then: gap-list"),
         ("frontend-round", "gates-again", "then: build"),
         ("frontend-round", "menue-vergleich-again", "then: build"),
+        ("dossier", "baustein-zuordnung-again", "then: research"),
         ("frontend-round", "acceptance-again", "then: build"),
         ("bugfix", "red-back", "then: fix"),
         ("frontend-umbau", "texts-again", "then: texte"),
@@ -171,4 +172,22 @@ fn counter_a_jump_to_a_missing_step_is_red() {
     assert_red("frontend-round", "no step of this flow", |t| {
         t.replacen("then: gap-list", "then: gap-lst", 1)
     });
+}
+
+#[test]
+fn block_analysis_comes_before_the_look_before_the_composition() {
+    let text = read("frontend-round");
+    assert!(position(&text, "dossier") < position(&text, "stil-analyse"));
+    assert!(position(&text, "stil-analyse") < position(&text, "build"));
+    let dossier = read("dossier");
+    assert!(position(&dossier, "research") < position(&dossier, "baustein-zuordnung"));
+    assert!(position(&dossier, "baustein-zuordnung-again") < position(&dossier, "publish"));
+    assert!(step_body(&dossier, "baustein-zuordnung").contains("kind: objective"));
+}
+
+#[test]
+fn counter_composition_before_the_look_is_caught() {
+    let text = swapped(&read("frontend-round"), "stil-analyse", "build");
+    assert!(position(&text, "build") < position(&text, "stil-analyse"));
+    assert!(position(&text, "dossier") < position(&text, "build"));
 }

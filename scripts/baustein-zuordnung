@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Step baustein-zuordnung: every area of the model is assigned to a block id (existing first); the share of new blocks is reported.
+
+  python3 -I scripts/baustein-zuordnung --dossier bausteine.md --bestand bestand.txt [--json report.json]
+
+Dossier: heading `## Baustein-Zuordnung` (or `## Block assignment`), below it a table
+  | Bereich | Was ist das? | Baustein-Id | Module | Neu | Begründung |
+`Neu` = `nein` (existing block) or `ja` (new block, then Begründung says why no existing block with a module fits).
+Bestand: one block id per line (`#` = comment), or a JSON list of ids. Format and rules: docs/baustein-zuordnung.md.
+rc 0 = every area assigned and every new block reasoned, rc 1 = deviation, rc 2 = bad input (never green).
+"""
+import argparse, json, re, sys
+
+HEADS = ("## baustein-zuordnung", "## block assignment")
+
+
+def cells(line):
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def read_table(path):
+    rows, inside, header = [], False, None
+    for line in open(path, encoding="utf-8"):
+        low = line.strip().lower()
+        if low.startswith("## "):
+            inside = low in HEADS
+            header = None
+            continue
+        if not inside or not low.startswith("|"):
+            continue
+        c = cells(line)
+        if all(re.fullmatch(r":?-{2,}:?", x) for x in c if x):
+            continue
+        if header is None:
+            header = [x.lower() for x in c]
+            continue
+        rows.append(dict(zip(header, c)))
+    return header, rows
+
+
+def col(row, *names):
+    for n in names:
+        if n in row:
+            return row[n].strip("` ")
+    return ""
+
+
+def read_bestand(path):
+    text = open(path, encoding="utf-8").read()
+    try:
+        data = json.loads(text)
+        return {str(x) for x in data}
+    except ValueError:
+        return {l.split("#")[0].strip() for l in text.splitlines() if l.split("#")[0].strip()}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dossier", required=True)
+    ap.add_argument("--bestand", required=True)
+    ap.add_argument("--json")
+    a = ap.parse_args()
+    try:
+        header, rows = read_table(a.dossier)
+        bestand = read_bestand(a.bestand)
+    except OSError as e:
+        print(f"input error: {e}")
+        return 2
+    if not rows:
+        print("input error: no table below '## Baustein-Zuordnung' in the dossier")
+        return 2
+    if not bestand:
+        print("input error: the block inventory is empty")
+        return 2
+    dev, new = [], 0
+    for r in rows:
+        area = col(r, "bereich", "area")
+        bid = col(r, "baustein-id", "block id")
+        neu = col(r, "neu", "new").lower()
+        why = col(r, "begründung", "begruendung", "reason")
+        if not area or not bid or bid in ("-", "?"):
+            dev.append(("ohne-baustein", area or "?", "no block id"))
+        elif neu not in ("ja", "nein", "yes", "no"):
+            dev.append(("neu-unklar", area, "column Neu must be ja or nein"))
+        elif neu in ("nein", "no") and bid not in bestand:
+            dev.append(("unbekannt", area, f"{bid} is not in the inventory; mark it Neu=ja with a reason"))
+        elif neu in ("ja", "yes"):
+            new += 1
+            if bid in bestand:
+                dev.append(("schon-da", area, f"{bid} exists already, use it (Neu=nein) and add a module if needed"))
+            elif len(why) < 10:
+                dev.append(("ohne-begruendung", area, f"new block {bid} needs the reason why no existing block with a module fits"))
+    share = new / len(rows)
+    result = "red" if dev else "green"
+    for art, area, detail in dev:
+        print(f"{art}: {area}: {detail}")
+    print(f"areas {len(rows)}, new blocks {new} ({share:.0%}), result {result}")
+    if a.json:
+        json.dump({"result": result, "areas": len(rows), "new": new, "share_new": round(share, 3),
+                   "deviations": [{"art": x, "bereich": y, "detail": z} for x, y, z in dev]},
+                  open(a.json, "w"), indent=1)
+    return 1 if dev else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
